@@ -1,0 +1,17 @@
+*.pyc
+*.mat
+*.fif
+*.wav
+*.profile
+
+*.egg-info
+.cache
+*__pycache__
+
+.ipynb_checkpoints
+
+tags
+.tags
+.tags1
+
+.nfs*
