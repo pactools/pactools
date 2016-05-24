@@ -117,7 +117,7 @@ class ProgressBar():
             self.closed = True
 
 
-if __name__ == "__main__":
+def test1():
     n = 50
     app = ProgressBar(title='Testing progressBar', max_value=n - 1)
     for k in range(n):

@@ -11,8 +11,8 @@ def example_comodulogram():
     frequencies. The plot is automatically saved (cf. save_name), and the
     MI array is saved in csv.
     """
-    path = '/data/tdupre/rat_data/LTM1_L3-L4/'
-    filename = 'c0_e1_[0.0-30.0]-epo.fif'
+    path = '/data/tdupre/rat_data/LTM1_L1-L2/'
+    filename = 'c2_e1_[0.0-30.0]-epo.fif'
     loaded_epochs = mne.read_epochs(path + filename)
 
     fs = loaded_epochs.info['sfreq']
@@ -22,7 +22,7 @@ def example_comodulogram():
     t_evok = 1.0
     sig = sig[:, :, int(t_evok * fs):]
 
-    # Parameters for the PAC analysis
+    # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
     high_fq_width = 10.0  # Hz
     low_fq_range = np.arange(0.2, 5.2, 0.2)  # Hz
@@ -50,8 +50,8 @@ def example_phase_plot():
     This example also show a plot of the mean amplitude of the fast oscillation
     for each phase of the slow oscillation.
     """
-    path = '/data/tdupre/rat_data/LTM1_L3-L4/'
-    filename = 'c0_e1_[0.0-30.0]-epo.fif'
+    path = '/data/tdupre/rat_data/LTM1_L1-L2/'
+    filename = 'c2_e1_[0.0-30.0]-epo.fif'
     loaded_epochs = mne.read_epochs(path + filename)
 
     fs = loaded_epochs.info['sfreq']
@@ -61,7 +61,7 @@ def example_phase_plot():
     t_evok = 1.0
     sig = sig[:, :, int(t_evok * fs):]
 
-    # Parameters for the PAC analysis
+    # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
     high_fq_width = 10.0  # Hz
     low_fq_range = [3.0]  # Hz

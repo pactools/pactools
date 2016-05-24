@@ -135,7 +135,10 @@ class Spectrum(object):
         replicate: number of replication of the spectrum across frequencies
         """
         if labels is None:
+            plot_legend = False
             labels = [''] * len(self.psd)
+        else:
+            plot_legend = True
         if isinstance(labels, str):
             labels = [labels]
 
@@ -175,7 +178,8 @@ class Spectrum(object):
         fig.set_title(title)
         fig.set_xlabel('Frequency (Hz)')
         fig.set_ylabel('Amplitude (dB)')
-        fig.legend(loc=0)
+        if plot_legend:
+            fig.legend(loc=0)
         return fig
 
     def main_frequency(self):

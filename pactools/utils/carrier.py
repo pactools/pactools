@@ -132,6 +132,3 @@ def test1():
         fig = carrier.plot(fig=fig, fscale='lin', print_width=True)
 
     plt.show()
-
-if __name__ == '__main__':
-    test1()

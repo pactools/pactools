@@ -1,4 +1,3 @@
-
 # pactools
 
 
@@ -6,8 +5,12 @@
 
     git clone https://github.com/TomDLT/pactools.git
     cd pactools
-    python setup.py install
+    pip install -e .
 
+## Update
+
+    git pull origin master
+    python setup.py build_ext --inplace
 
 ## Dependencies
 
@@ -17,8 +20,8 @@ The code is actually NOT tested. It is supposed to be working with:
     NumPy >= 1.10
     SciPy >= 0.17
     Matplotlib >= 1.5
-    MNE-Python >= 0.11
-    NEO >= 0.3
+    MNE-Python >= 0.11 (optional)
+    NEO >= 0.3 (optional)
 
 It might work with previous versions also, yet nothing is guaranteed.
 
@@ -27,10 +30,7 @@ It might work with previous versions also, yet nothing is guaranteed.
 
 Pactools is **BSD-licenced** (3 clause):
 
-    This software is OSI Certified Open Source Software.
-    OSI Certified is a certification mark of the Open Source Initiative.
-
-    Copyright (c) 2011, authors of Pactools
+    Copyright (c) 2016, authors of Pactools
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without

@@ -6,14 +6,14 @@ from scipy.signal import hilbert
 from scipy import linalg
 from mne.filter import band_pass_filter
 
-from .progress_bar import ProgressBar
-from .spectrum import crop_for_fast_hilbert
-from .carrier import Carrier
+from .utils.progress_bar import ProgressBar
+from .utils.spectrum import crop_for_fast_hilbert
+from .utils.carrier import Carrier
 
 
-def my_cwt(sig, fs, f_range, f_width, n_cycles=None, method=1):
+def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
     """
-    Compute time freq decomposition.
+    Band-pass filter the signal at multiple frequencies
     """
     fixed_n_cycles = n_cycles
     sig = crop_for_fast_hilbert(sig)
@@ -37,7 +37,7 @@ def my_cwt(sig, fs, f_range, f_width, n_cycles=None, method=1):
                 h_trans_bandwidth=f_width / 4.0,
                 n_jobs=1, method='iir')
 
-        # 2--------- with pactools.Carrier
+        # 1--------- with pactools.Carrier
         if method == 1:
             fir.design(fs, f, n_cycles, None, zero_mean=True)
             low_sig = fir.direct(sig)
@@ -121,9 +121,6 @@ def _modulation_index(filtered_low, filtered_high, method, fs, n_surrogates,
 
 def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
                           tmax, fs, n_surrogates, random_state, draw_phase):
-    """
-    For parallel jobs.
-    """
     if method == 'ozkurt':
         # Modulation index as in Ozkurt 2011
         MI = np.abs(np.mean(amplitude * exp_phase))
@@ -151,18 +148,27 @@ def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
         # Modulation index as in Tort 2010
 
         # mean amplitude distribution along phase bins
-        n_bins = 18
-        phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
-        bin_indices = np.digitize(phase, phase_bins) - 1
-        amplitude_dist = np.zeros(n_bins)
-        for b in range(n_bins):
-            amplitude_dist[b] = np.mean(amplitude[bin_indices == b])
+        n_bins = 18 + 2
+        while n_bins > 0:
+            n_bins -= 2
+            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+            bin_indices = np.digitize(phase, phase_bins) - 1
+            amplitude_dist = np.zeros(n_bins)
+            for b in range(n_bins):
+                selection = amplitude[bin_indices == b]
+                if selection.size == 0:  # no sample in that bin
+                    continue
+                amplitude_dist[b] = np.mean(selection)
+            if np.any(amplitude_dist == 0):
+                continue
 
-        # Kullback-Leibler divergence of the distribution vs uniform
-        amplitude_dist /= np.sum(amplitude_dist)
-        divergence_kl = np.sum(amplitude_dist *
-                               np.log(amplitude_dist * n_bins))
-        MI = divergence_kl / np.log(n_bins)
+            # Kullback-Leibler divergence of the distribution vs uniform
+            amplitude_dist /= np.sum(amplitude_dist)
+            divergence_kl = np.sum(amplitude_dist *
+                                   np.log(amplitude_dist * n_bins))
+
+            MI = divergence_kl / np.log(n_bins)
+            break
 
         if draw_phase:
             phase_bins = 0.5 * (phase_bins[:-1] + phase_bins[1:]) / np.pi * 180
@@ -226,8 +232,8 @@ def modulation_index(sig, fs,
     high_fq_range = np.asarray(high_fq_range)
 
     # compute a number of band-pass filtered and Hilbert filtered signals
-    filtered_high = my_cwt(sig, fs, high_fq_range, high_fq_width)
-    filtered_low = my_cwt(sig, fs, low_fq_range, low_fq_width)
+    filtered_high = multiple_band_pass(sig, fs, high_fq_range, high_fq_width)
+    filtered_low = multiple_band_pass(sig, fs, low_fq_range, low_fq_width)
 
     MI = _modulation_index(filtered_low, filtered_high, method, fs,
                            n_surrogates, progress_bar, draw_phase)
