@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mne
 
-from pactools.pac import modulation_index
+from pactools.modulation_index import modulation_index
 
 
 def example_comodulogram():
@@ -28,7 +28,7 @@ def example_comodulogram():
     low_fq_range = np.arange(0.2, 5.2, 0.2)  # Hz
     high_fq_range = np.arange(0.2, 150., 5.0)  # Hz
     method = 'tort'  # 'ozkurt', 'tort', 'canolty'
-    save_name = 'example_figure_saved.png'
+    save_name = 'example_figure_saved'
 
     comodulogram = modulation_index(
         sig, fs=fs, draw=True, method=method,
@@ -81,5 +81,5 @@ def example_phase_plot():
 
 if __name__ == '__main__':
 
-    # example_comodulogram()
-    example_phase_plot()
+    example_comodulogram()
+    # example_phase_plot()

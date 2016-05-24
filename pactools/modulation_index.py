@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 from numpy.random import RandomState
 from scipy.signal import hilbert
 from scipy import linalg
@@ -9,6 +8,7 @@ from mne.filter import band_pass_filter
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import crop_for_fast_hilbert
 from .utils.carrier import Carrier
+from .plot_comodulogram import plot_comodulogram_histogram
 
 
 def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
@@ -225,7 +225,6 @@ def modulation_index(sig, fs,
     """
     sig = sig.ravel()
     sig = crop_for_fast_hilbert(sig)
-    tmax = sig.size
 
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
@@ -239,38 +238,9 @@ def modulation_index(sig, fs,
                            n_surrogates, progress_bar, draw_phase)
 
     if draw:
-        vmin = MI.min() if vmin is None else vmin
-        vmax = MI.max() if vmax is None else vmax
-        fig = plt.figure(figsize=(20, 15))
-        gs = gridspec.GridSpec(9, 9)
-        ax_vert = plt.subplot(gs[:-2, :2])
-        ax_hori = plt.subplot(gs[-2:, 2:-1])
-        ax_main = plt.subplot(gs[:-2, 2:-1])
-        ax_cbar = plt.subplot(gs[:-2, -1])
-
-        extent = [low_fq_range[0], low_fq_range[-1],
-                  high_fq_range[0], high_fq_range[-1]]
-        cax = ax_main.imshow(MI.T, cmap=plt.cm.viridis,
-                             aspect='auto', origin='lower', extent=extent,
-                             interpolation='none', vmax=vmax, vmin=vmin)
-
-        fig.colorbar(cax, cax=ax_cbar, ticks=np.linspace(vmin, vmax, 6))
-        ax_hori.set_xlabel('Phase frequency (Hz) (w=%.1f)' % low_fq_width)
-        ax_vert.set_ylabel('Amplitude frequency (Hz) (w=%.2f)' % high_fq_width)
-        plt.suptitle('Phase Amplitude Coupling measured with Modulation Index'
-                     ' (%s)' % method,
-                     fontsize=14)
-
-        ax_vert.plot(np.mean(MI.T, axis=1), high_fq_range)
-        ax_vert.set_ylim(extent[2:])
-        ax_hori.plot(low_fq_range, np.mean(MI.T, axis=0))
-        ax_hori.set_xlim(extent[:2])
-
-        if save_name is None:
-            save_name = '%s_tmax%d_wlo%.2f_whi%.1f' % (method, tmax,
-                                                       low_fq_width,
-                                                       high_fq_width)
-        fig.savefig(save_name + '.png')
+        plot_comodulogram_histogram(MI, low_fq_range, low_fq_width,
+                                    high_fq_range, high_fq_width,
+                                    method, vmin, vmax, save_name)
 
     if return_filtered:
         return MI, filtered_low, filtered_high
