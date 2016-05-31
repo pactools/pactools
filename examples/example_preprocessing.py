@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os
 
+import numpy as np
 from mne import Epochs
 
 from pactools.preprocess import fill_gap, preprocess
@@ -79,7 +80,7 @@ def get_save_directory(raw_file):
     return save_dir
 
 
-def example_preprocessing():
+def example_preprocessing_channel_by_channel():
     """
     Example of preprocessing of a raw file
     """
@@ -128,8 +129,63 @@ def example_preprocessing():
                                 n_channels=4, n_epochs=3, block=True)
 
                     # save the epochs object (bad epochs are not saved)
-                    epochs.save(save_name)
-                    print('Saved: %s' % save_name)
+                    if epochs.events.size > 0:
+                        epochs.save(save_name)
+                        print('Saved: %s' % save_name)
+
+
+def example_preprocessing_all_channels():
+    """
+    Example of preprocessing of a raw file
+    """
+    # load parameters and preprocess the data
+    # (load raw file, decimate, dehumm, fill the 50 Hz gap)
+    preprocess_params, _ = params_rat()
+    raw_file = preprocess_params['raw_file']
+    save_dir = get_save_directory(raw_file)
+    save_name = '%s/dehummed.mat' % save_dir
+
+    # skip preprocessing and load if the file exists
+    if os.path.isfile(save_name):
+        data = mat2sig(save_name)
+        sigs, fs, events = data['sigs'], data['fs'], data['events']
+    else:
+        sigs, fs, events = preprocess(**preprocess_params)
+        sig2mat(save_name, sigs=sigs, fs=fs, events=events)
+
+    # preprocess through MNE to remove bad epochs, select channels, ...
+    mne_raw, mne_events = sig2mne(sigs, fs, events)
+
+    # select CS+ or CS- events
+    for event_id in [-1, +1]:
+        # select time around the events
+        tmin = -30.0
+        tmax = 60.0
+
+        # save name
+        raw_file = preprocess_params['raw_file']
+        save_dir = get_save_directory(raw_file)
+
+        save_name = ('%s/e%d_[%.1f-%.1f]-epo.fif'
+                     % (save_dir, event_id, tmin, tmax))
+
+        # if the file already exists, we skip it
+        if not os.path.isfile(save_name):
+            picks = np.arange(8)   # all channels
+            epochs = Epochs(mne_raw, mne_events,
+                            event_id=event_id,
+                            preload=True, picks=picks,
+                            tmin=tmin, tmax=tmax,
+                            baseline=None)
+
+            # plot and reject bad epochs
+            epochs.plot(picks=picks, scalings={'misc': 1.0},
+                        n_channels=8, n_epochs=3, block=True)
+
+            # save the epochs object (bad epochs are not saved)
+            if epochs.events.size > 0:
+                epochs.save(save_name)
+                print('Saved: %s' % save_name)
 
 if __name__ == '__main__':
-    example_preprocessing()
+    example_preprocessing_all_channels()

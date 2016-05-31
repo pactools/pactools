@@ -37,10 +37,10 @@ def blend_and_ravel(sig, n_blend):
     n_blend = int(n_blend)
     if n_blend > 0:
         triangle = np.linspace(0, 1, n_blend)
-        sig[1:, :, :n_blend] *= triangle
-        sig[:-1, :, -n_blend:] *= triangle[::-1]
-        sig[:-1, :, -n_blend:] += sig[1:, :, :n_blend]
-        sig = sig[:, :, n_blend:]
+        sig[1:, :n_blend] *= triangle
+        sig[:-1, -n_blend:] *= triangle[::-1]
+        sig[:-1, -n_blend:] += sig[1:, :n_blend]
+        sig = sig[:, n_blend:]
 
     sig = sig.ravel()
     return sig
