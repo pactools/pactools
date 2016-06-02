@@ -26,8 +26,8 @@ def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
 
     ticks, tick_labels = compute_ticks(vmin, vmax, unit)
 
-    fig.subplots_adjust(right=0.85)
     if ax is None:
+        fig.subplots_adjust(right=0.85)
         cbar_ax = fig.add_axes([0.90, 0.10, 0.03, 0.8])
     else:
         cbar_ax = None
@@ -76,7 +76,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
 def plot_comodulograms(comodulograms, fs, fc_array,
                        titles, fig, axs,
                        cmap=None, vmin=None, vmax=None, unit=''):
-    axs = axs.ravel()
+    axs = np.array(axs).ravel()
     if isinstance(comodulograms, list):
         comodulograms = np.array(comodulograms)
 
