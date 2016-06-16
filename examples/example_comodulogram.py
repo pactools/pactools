@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import mne
 
 from pactools.modulation_index import modulation_index
+from pactools.utils.spliter import blend_and_ravel
 
 
 def example_comodulogram():
@@ -20,7 +21,8 @@ def example_comodulogram():
 
     #remove the first t_evok seconds with the ERP
     t_evok = 1.0
-    sig = sig[:, :, int(t_evok * fs):]
+    sig = sig[:, 0, int(t_evok * fs):]
+    sig = blend_and_ravel(sig, n_blend=int(0.1 * fs))
 
     # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
@@ -31,7 +33,7 @@ def example_comodulogram():
     save_name = 'example_figure_saved'
 
     comodulogram = modulation_index(
-        sig, fs=fs, draw=True, method=method,
+        low_sig=sig, fs=fs, draw=True, method=method,
         low_fq_range=low_fq_range,
         low_fq_width=low_fq_width,
         high_fq_range=high_fq_range,
@@ -59,7 +61,8 @@ def example_phase_plot():
 
     #remove the first t_evok seconds with the ERP
     t_evok = 1.0
-    sig = sig[:, :, int(t_evok * fs):]
+    sig = sig[:, 0, int(t_evok * fs):]
+    sig = blend_and_ravel(sig, n_blend=int(0.1 * fs))
 
     # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
@@ -69,7 +72,7 @@ def example_phase_plot():
     method = 'tort'  # 'ozkurt', 'tort', 'canolty'
 
     MI = modulation_index(
-        sig, fs=fs, draw=False, method=method,
+        low_sig=sig, fs=fs, draw=False, method=method,
         low_fq_range=low_fq_range,
         low_fq_width=low_fq_width,
         high_fq_range=high_fq_range,

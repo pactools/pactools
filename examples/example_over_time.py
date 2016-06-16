@@ -70,7 +70,7 @@ def example_channel_by_channel():
             data = blend_and_ravel(data[:n_epochs_min, 0], int(t_blend * fs))
 
             comodulogram = modulation_index(
-                data, fs=fs, draw=False, method=method,
+                low_sig=data, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range,
                 low_fq_width=low_fq_width,
                 high_fq_range=high_fq_range,
@@ -147,7 +147,7 @@ def example_all_channels():
                                    int(t_blend * fs))
 
             comodulogram = modulation_index(
-                data, fs=fs, draw=False, method=method,
+                low_sig=data, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range,
                 low_fq_width=low_fq_width,
                 high_fq_range=high_fq_range,

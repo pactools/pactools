@@ -43,7 +43,7 @@ def example_on_each_epoch():
             for method in ['tort', 'ozkurt']:
                 # compute the comodulograms
                 comod = modulation_index(
-                    one_sig, fs=fs, draw=False, method=method,
+                    low_sig=one_sig, fs=fs, draw=False, method=method,
                     low_fq_range=low_fq_range, low_fq_width=low_fq_width,
                     high_fq_range=high_fq_range, high_fq_width=high_fq_width,
                     vmin=None, vmax=None)
@@ -105,7 +105,7 @@ def example_concatenating_epochs():
         for method in ['tort', 'ozkurt']:
             # compute the comodulograms
             comod = modulation_index(
-                one_sig, fs=fs, draw=False, method=method,
+                low_sig=one_sig, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range, low_fq_width=low_fq_width,
                 high_fq_range=high_fq_range, high_fq_width=high_fq_width,
                 vmin=None, vmax=None)

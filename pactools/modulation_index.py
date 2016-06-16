@@ -2,13 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import RandomState
 from scipy.signal import hilbert
-from scipy import linalg
 from mne.filter import band_pass_filter
 
+from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import crop_for_fast_hilbert
 from .utils.carrier import Carrier
+from .utils.maths import norm, argmax_2d
 from .plot_comodulogram import plot_comodulogram_histogram
+from .preprocess import extract
 
 
 def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
@@ -46,31 +48,6 @@ def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
         res[i, :] = hilbert(low_sig)
 
     return res
-
-
-def norm(x):
-    """Compute the Euclidean or Frobenius norm of x.
-
-    Returns the Euclidean norm when x is a vector, the Frobenius norm when x
-    is a matrix (2-d array). More precise than sqrt(squared_norm(x)).
-    """
-    x = np.asarray(x)
-
-    if np.any(np.iscomplex(x)):
-        return np.sqrt(squared_norm(x))
-    else:
-        nrm2, = linalg.get_blas_funcs(['nrm2'], [x])
-        return nrm2(x)
-
-
-def squared_norm(x):
-    """Squared Euclidean or Frobenius norm of x.
-
-    Returns the Euclidean norm when x is a vector, the Frobenius norm when x
-    is a matrix (2-d array). Faster than norm(x) ** 2.
-    """
-    x = x.ravel(order='K')
-    return np.dot(x, np.conj(x))
 
 
 def _modulation_index(filtered_low, filtered_high, method, fs, n_surrogates,
@@ -195,9 +172,8 @@ def modulation_index(fs, low_sig, high_sig=None,
                      high_fq_width=10.0,
                      method='tort',
                      n_surrogates=100,
-                     draw='', save_name=None,
+                     draw=False, save_name=None,
                      vmin=None, vmax=None,
-                     return_filtered=False,
                      progress_bar=True,
                      draw_phase=False):
     """
@@ -217,7 +193,6 @@ def modulation_index(fs, low_sig, high_sig=None,
     n_surrogates  : number of surrogates computed in 'canolty's method
     draw          : if True, draw the comodulogram
     vmin, vmax    : if not None, it define the min/max value of the plot
-    return_filtered: if True, also return the filtered signals
     draw_phase    : if True, plot the phase distribution in 'tort' index
 
     Return
@@ -225,40 +200,99 @@ def modulation_index(fs, low_sig, high_sig=None,
     MI            : Modulation Index,
                     shape (len(low_fq_range), len(high_fq_range))
     """
-    low_sig = low_sig.ravel()
-    low_sig = crop_for_fast_hilbert(low_sig)
-    if high_sig is not None:
-        high_sig = high_sig.ravel()
-        high_sig = crop_for_fast_hilbert(high_sig)
-    else:
-        high_sig = low_sig
-
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
     high_fq_range = np.asarray(high_fq_range)
 
-    # compute a number of band-pass filtered and Hilbert filtered signals
-    filtered_high = multiple_band_pass(high_sig, fs,
-                                       high_fq_range, high_fq_width)
-    filtered_low = multiple_band_pass(low_sig, fs,
-                                      low_fq_range, low_fq_width)
+    if method in ('ozkurt', 'canolty', 'tort'):
+        low_sig = low_sig.ravel()
+        low_sig = crop_for_fast_hilbert(low_sig)
+        if high_sig is not None:
+            high_sig = high_sig.ravel()
+            high_sig = crop_for_fast_hilbert(high_sig)
+        else:
+            high_sig = low_sig
 
-    MI = _modulation_index(filtered_low, filtered_high, method, fs,
-                           n_surrogates, progress_bar, draw_phase)
+        # compute a number of band-pass filtered and Hilbert filtered signals
+        filtered_high = multiple_band_pass(high_sig, fs,
+                                           high_fq_range, high_fq_width)
+        filtered_low = multiple_band_pass(low_sig, fs,
+                                          low_fq_range, low_fq_width)
+
+        MI = _modulation_index(filtered_low, filtered_high, method, fs,
+                               n_surrogates, progress_bar, draw_phase)
+    elif isinstance(method, DAR):
+        MI = driven_comodulogram(fs, low_sig, high_sig, model=method,
+                                 low_fq_range=low_fq_range,
+                                 low_fq_width=low_fq_width,
+                                 high_fq_range=high_fq_range,
+                                 progress_bar=progress_bar)
+    else:
+        raise(ValueError, 'unknown method: %s' % method)
 
     if draw:
         plot_comodulogram_histogram(MI, low_fq_range, low_fq_width,
                                     high_fq_range, high_fq_width,
                                     method, vmin, vmax, save_name)
 
-    if return_filtered:
-        return MI, filtered_low, filtered_high
+    return MI
+
+
+def driven_comodulogram(fs, low_sig, high_sig, model, low_fq_range,
+                        low_fq_width, high_fq_range, method='minmax',
+                        fill=4, ordar=12, enf=50., random_noise=None,
+                        normalize=True, whitening='after',
+                        progress_bar=True):
+    """
+    Compute the driven comodulogram with a DAR model
+
+    sig            : single signal
+    fs             : sampling frequency
+    model          : DAR instance
+    low_fq_range   : range of carrier frequency to scan
+    methods        : 'firstlast' or 'minmax'
+    """
+    if high_sig is None:
+        sigs = [low_sig.ravel()]
     else:
-        return MI
+        sigs = [low_sig.ravel(), high_sig.ravel()]
 
+    comod = None
+    if progress_bar:
+        bar = ProgressBar(max_value=len(low_fq_range) - 1,
+                          title='comod: %s' % model.get_title(name=True))
+    for j, (sigdrivs, sigins) in enumerate(extract(
+            sigs=sigs, fs=fs, low_fq_range=low_fq_range,
+            bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
+            random_noise=random_noise, normalize=normalize,
+            whitening=whitening)):
 
-def argmax_2d(a):
-    return np.unravel_index(np.argmax(a), a.shape)
+        if high_sig is None:
+            sigin = sigins[0]
+            sigdriv = sigdrivs[0]
+        else:
+            sigin = sigins[1]
+            sigdriv = sigdrivs[0]
+
+        sigin /= np.std(sigin)
+        model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs)
+
+        # get PSD difference
+        spec, _ = model.amplitude_frequency()
+        if method == 'minmax':
+            spec_diff = spec.max(axis=1) - spec.min(axis=1)
+        elif method == 'firstlast':
+            spec_diff = spec[:, -1] - spec[:, 0]
+
+        # save in an array
+        if comod is None:
+            comod = np.zeros((low_fq_range.size, spec_diff.size))
+        comod[j] = spec_diff
+
+        if progress_bar:
+            bar.update(j)
+
+    return comod
 
 
 def get_maximum_pac(comodulogram, low_fq_range, high_fq_range):

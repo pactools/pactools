@@ -335,9 +335,9 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
     return sigs, fs, events
 
 
-def extract(sigs, fs, fc_array, n_cycles=None, bandwidth=1.0, fill=0,
-            draw='', ordar=8, enf=50.0, whiten_fill4=True,
-            random_noise=None, normalize=False, whitening='after'):
+def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
+            draw='', ordar=8, enf=50.0, random_noise=None, normalize=False,
+            whitening='after'):
     """
     Do fast preprocessing for several values of fc (the driver frequency).
 
@@ -346,10 +346,10 @@ def extract(sigs, fs, fc_array, n_cycles=None, bandwidth=1.0, fill=0,
 
     Example
     -------
-    for (low_sig, high_sig) in extract_multi(sigs, fs, fc_array):
+    for (low_sig, high_sig) in extract_multi(sigs, fs, low_fq_range):
         pass
     """
-    fc_array = np.atleast_1d(fc_array)
+    low_fq_range = np.atleast_1d(low_fq_range)
 
     # -------- apply whitening filter
     if whitening == 'before':
@@ -362,7 +362,7 @@ def extract(sigs, fs, fc_array, n_cycles=None, bandwidth=1.0, fill=0,
         random_noise = None
 
     # extract_and_fill the driver
-    for fc in fc_array:
+    for fc in low_fq_range:
         low_and_high = [extract_and_fill(
             sig, fs=fs, fc=fc, n_cycles=n_cycles, bandwidth=bandwidth,
             fill=fill, ordar=ordar, enf=enf, whiten_fill4=whitening == 'after',
