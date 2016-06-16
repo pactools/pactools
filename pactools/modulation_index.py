@@ -188,7 +188,7 @@ def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
     return MI
 
 
-def modulation_index(sig, fs,
+def modulation_index(fs, low_sig, high_sig=None,
                      low_fq_range=np.linspace(1.0, 10.0, 50),
                      low_fq_width=0.5,
                      high_fq_range=np.linspace(5.0, 150.0, 60),
@@ -205,8 +205,10 @@ def modulation_index(sig, fs,
 
     Parameters
     ----------
-    sig           : one dimension signal
     fs            : sampling frequency
+    low_sig       : one dimension signal where we extract the phase signal
+    high_sig      : one dimension signal where we extract the amplitude signal
+                    if None, we use low_sig for both signals
     low_fq_range  : low frequency range to compute the MI (phase signal)
     low_fq_width  : width of the band-pass filter
     high_fq_range : high frequency range to compute the MI (amplitude signal)
@@ -223,16 +225,23 @@ def modulation_index(sig, fs,
     MI            : Modulation Index,
                     shape (len(low_fq_range), len(high_fq_range))
     """
-    sig = sig.ravel()
-    sig = crop_for_fast_hilbert(sig)
+    low_sig = low_sig.ravel()
+    low_sig = crop_for_fast_hilbert(low_sig)
+    if high_sig is not None:
+        high_sig = high_sig.ravel()
+        high_sig = crop_for_fast_hilbert(high_sig)
+    else:
+        high_sig = low_sig
 
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
     high_fq_range = np.asarray(high_fq_range)
 
     # compute a number of band-pass filtered and Hilbert filtered signals
-    filtered_high = multiple_band_pass(sig, fs, high_fq_range, high_fq_width)
-    filtered_low = multiple_band_pass(sig, fs, low_fq_range, low_fq_width)
+    filtered_high = multiple_band_pass(high_sig, fs,
+                                       high_fq_range, high_fq_width)
+    filtered_low = multiple_band_pass(low_sig, fs,
+                                      low_fq_range, low_fq_width)
 
     MI = _modulation_index(filtered_low, filtered_high, method, fs,
                            n_surrogates, progress_bar, draw_phase)
@@ -246,3 +255,33 @@ def modulation_index(sig, fs,
         return MI, filtered_low, filtered_high
     else:
         return MI
+
+
+def argmax_2d(a):
+    return np.unravel_index(np.argmax(a), a.shape)
+
+
+def get_maximum_pac(comodulogram, low_fq_range, high_fq_range):
+    """Get maximum PAC value in a comodulogram.
+    'low_fq_range' and 'high_fq_range' must be the same than used in the
+    modulation_index function that computed 'comodulogram'.
+
+    Parameters
+    ----------
+    comodulogram  : PAC values, shape (len(low_fq_range), len(high_fq_range))
+    low_fq_range  : low frequency range (phase signal)
+    high_fq_range : high frequency range (amplitude signal)
+
+    Return
+    ------
+    low_fq    : low frequency of maximum PAC
+    high_fq   : high frequency of maximum PAC
+    pac_value : maximum PAC value
+    """
+    i, j = argmax_2d(comodulogram)
+    max_pac_value = comodulogram[i, j]
+
+    low_fq = low_fq_range[i]
+    high_fq = high_fq_range[j]
+
+    return low_fq, high_fq, max_pac_value
