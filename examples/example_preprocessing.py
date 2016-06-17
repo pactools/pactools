@@ -45,7 +45,7 @@ def params_rat():
 
     extract_params = {
         # band-pass filter
-        'fc_array': [3.0],  # carrier frequency
+        'low_fq_range': [3.0],  # carrier frequency
         'n_cycles': None,  # number of cycles in the band-pass filter
         'bandwidth': 1.0,  # bandwidth (Hz) of the band-pass filter
         # (use bandwidth OR n_cycles)

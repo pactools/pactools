@@ -15,3 +15,6 @@ tags
 .tags1
 
 .nfs*
+
+*.csv
+*.png

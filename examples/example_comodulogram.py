@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import mne
 
 from pactools.modulation_index import modulation_index
-from pactools.utils.spliter import blend_and_ravel
+from pactools.io.load_data_example import load_data_example
 
 
 def example_comodulogram():
@@ -12,17 +11,7 @@ def example_comodulogram():
     frequencies. The plot is automatically saved (cf. save_name), and the
     MI array is saved in csv.
     """
-    path = '/data/tdupre/rat_data/LTM1_L1-L2/'
-    filename = 'c2_e1_[0.0-30.0]-epo.fif'
-    loaded_epochs = mne.read_epochs(path + filename)
-
-    fs = loaded_epochs.info['sfreq']
-    sig = loaded_epochs.get_data()
-
-    #remove the first t_evok seconds with the ERP
-    t_evok = 1.0
-    sig = sig[:, 0, int(t_evok * fs):]
-    sig = blend_and_ravel(sig, n_blend=int(0.1 * fs))
+    sig, fs = load_data_example()
 
     # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
@@ -52,17 +41,7 @@ def example_phase_plot():
     This example also show a plot of the mean amplitude of the fast oscillation
     for each phase of the slow oscillation.
     """
-    path = '/data/tdupre/rat_data/LTM1_L1-L2/'
-    filename = 'c2_e1_[0.0-30.0]-epo.fif'
-    loaded_epochs = mne.read_epochs(path + filename)
-
-    fs = loaded_epochs.info['sfreq']
-    sig = loaded_epochs.get_data()
-
-    #remove the first t_evok seconds with the ERP
-    t_evok = 1.0
-    sig = sig[:, 0, int(t_evok * fs):]
-    sig = blend_and_ravel(sig, n_blend=int(0.1 * fs))
+    sig, fs = load_data_example()
 
     # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz

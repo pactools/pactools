@@ -1,5 +1,4 @@
 from __future__ import print_function
-import math
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -669,12 +668,12 @@ class BaseAR(object):
     # ------------------------------------------------ #
     # Functions to plot the models                     #
     # ------------------------------------------------ #
-    def _basis2spec(self, newcols, fmax=None, instantaneous=False,
+    def _basis2spec(self, newcols, frange=None, instantaneous=False,
                     sigdriv=None):
         """Compute the power spectral density for a given basis
 
         newcols : array giving the indexes of the columns
-        fmax    : maximum frequency
+        frange  : frequency range
 
         this method is not intended for general use, except as a
         factorisation of the code of methods plot_time_freq and
@@ -709,21 +708,22 @@ class BaseAR(object):
         # -------- estimate AR spectrum
         spec = -20.0 * np.log10(np.abs(AR_spec))
 
-        # -------- truncate to fmax
-        if fmax is not None:
-            nmax = int(math.ceil(fmax * nfft / self.fs))
-            nmax = min(nmax, 1 + nfft // 2)
-            spec = spec[range(nmax), :]
+        # -------- truncate to frange
+        if frange is not None:
+            frequencies = np.linspace(0, self.fs // 2, 1 + nfft // 2)
+            mask = np.logical_and(frequencies <= frange[1],
+                                  frequencies > frange[0])
+            spec = spec[mask, :]
         return spec
 
-    def amplitude_frequency(self, nbcols=256, fmax=None, mode='',
+    def amplitude_frequency(self, nbcols=256, frange=None, mode='',
                             xlim=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
-        fmax   : maximum frequency
+        frange : frequency range
         mode   : normalisation mode ('c' = centered, 'v' = unit variance)
-        xlim : minimum and maximum amplitude
+        xlim   : minimum and maximum amplitude
 
         returns:
         spec : ndarray containing the time-frequency psd
@@ -739,7 +739,7 @@ class BaseAR(object):
         amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
 
         # -------- compute spectra
-        spec = self._basis2spec(None, fmax, True, amplitudes[None, :])
+        spec = self._basis2spec(None, frange, True, amplitudes[None, :])
 
         # -------- normalize
         if 'c' in mode:
@@ -804,13 +804,11 @@ class BaseAR(object):
                                                  self.ordriv,
                                                  self.bic)
         try:
-            s += '.fit(sigin=ndarray%s[id=%d]' % (self.sigin.shape,
-                                                  id(self.sigin))
+            s += '.fit(sigin=ndarray%s' % self.sigin.shape
         except AttributeError:
             s += '.fit(sigin=None'
         try:
-            s += ', sigdriv=ndarray%s[id=%d]' % (self.sigdriv.shape,
-                                                 id(self.sigdriv))
+            s += ', sigdriv=ndarray%s' % self.sigdriv.shape
         except AttributeError:
             s += ', sigdriv=None'
         try:
@@ -821,27 +819,7 @@ class BaseAR(object):
         return s
 
     def __str__(self):
-        """Convert a model into a pretty-printable string"""
-
-        data = self.to_dict()
-        s = '%s(' % self.__class__.__name__
-        for k in sorted(data.keys()):
-            s += '\n    ' + k
-            value = data[k]
-            if k in ('bic', 'center', 'normalize',
-                     'ortho'):
-                s += (' = ' + str(value))
-            elif type(value) == np.ndarray:
-                if value.size > 1:
-                    s += (' : ndarray' + str(value.shape))
-                elif value.size == 1:
-                    s += (' = ' + str(value[0]))
-                else:
-                    s += (' = ' + str(value))
-            else:
-                s += (' = ' + str(value))
-        s += '\n)'
-        return s
+        return self.get_title(name=True, logl=False)
 
 
 def wgn_log_likelihood(eps, sigma2):

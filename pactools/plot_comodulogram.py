@@ -73,25 +73,26 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     return fig
 
 
-def plot_comodulograms(comodulograms, fs, fc_array,
+def plot_comodulograms(comodulograms, fs, low_fq_range,
                        titles, fig, axs,
                        cmap=None, vmin=None, vmax=None, unit=''):
     axs = np.array(axs).ravel()
+    tight_layout = True
     if isinstance(comodulograms, list):
         comodulograms = np.array(comodulograms)
 
     if comodulograms.ndim == 2:
         comodulograms = comodulograms[None, :, :]
+        tight_layout = False
 
     vmin = 0 if vmin is None else vmin
     vmax = comodulograms.max() if vmax is None else vmax
     cmap = plt.get_cmap('viridis')
 
     n_channels, n_fc, n_freq = comodulograms.shape
-    extend = (fc_array[0], fc_array[-1], 0, fs / 2.)
+    extend = (low_fq_range[0], low_fq_range[-1], 0, fs / 2.)
 
     # plot the image
-
     for i in range(n_channels):
         cax = axs[i].imshow(
             comodulograms[i].T, cmap=cmap, vmin=vmin, vmax=vmax,
@@ -100,7 +101,8 @@ def plot_comodulograms(comodulograms, fs, fc_array,
 
     axs[-1].set_xlabel('Driver frequency (Hz)')
     axs[0].set_ylabel('Signal frequency (Hz)')
-    fig.tight_layout()
+    if tight_layout:
+        fig.tight_layout()
 
     # plot the colorbar once
     ax = axs[0] if len(axs) == 1 else None

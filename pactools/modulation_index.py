@@ -76,7 +76,7 @@ def _modulation_index(filtered_low, filtered_high, method, fs, n_surrogates,
 
     # Calculate the modulation index for each couple
     if progress_bar:
-        bar = ProgressBar('modulation index', max_value=n_low)
+        bar = ProgressBar('comodulogram: %s' % method, max_value=n_low)
     MI = np.zeros((n_low, n_high))
     exp_phase = None
     for i in range(n_low):
@@ -259,8 +259,9 @@ def driven_comodulogram(fs, low_sig, high_sig, model, low_fq_range,
 
     comod = None
     if progress_bar:
-        bar = ProgressBar(max_value=len(low_fq_range) - 1,
-                          title='comod: %s' % model.get_title(name=True))
+        bar = ProgressBar(
+            max_value=len(low_fq_range) - 1,
+            title='comodulogram: %s' % model.get_title(name=True))
     for j, (sigdrivs, sigins) in enumerate(extract(
             sigs=sigs, fs=fs, low_fq_range=low_fq_range,
             bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
@@ -283,6 +284,10 @@ def driven_comodulogram(fs, low_sig, high_sig, model, low_fq_range,
             spec_diff = spec.max(axis=1) - spec.min(axis=1)
         elif method == 'firstlast':
             spec_diff = spec[:, -1] - spec[:, 0]
+
+        # crop the spectrum to high_fq_range
+        frequencies = np.linspace(0, fs // 2, spec_diff.size)
+        spec_diff = np.interp(high_fq_range, frequencies, spec_diff)
 
         # save in an array
         if comod is None:
