@@ -796,6 +796,24 @@ class BaseAR(object):
                 del(data[k])
         return data
 
+    def copy(self):
+        """Creates a (deep) copy of a model"""
+
+        A = self.__class__()
+        A.AR_ = np.copy(self.AR_)
+        A.G_ = np.copy(self.G_)
+        try:
+            A.basis_ = np.copy(A.basis_)
+        except AttributeError:
+            None
+
+        # -------- copy other attributes
+        data = self.to_dict()
+        for k in data.keys():
+            if k not in ('AR_', 'G_') and k[0] != '_':
+                setattr(A, k, data[k])
+        return A
+
     def __repr__(self):
         """Represent a model"""
 
