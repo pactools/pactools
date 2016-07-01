@@ -8,14 +8,15 @@ from .plot_comodulogram import add_colorbar
 from .modulation_index import multiple_band_pass
 
 
-def theta_trough_lock(sig, fs,
-                      low_fq=6.0,
-                      low_fq_width=2.0,
-                      high_fq_range=np.linspace(2.0, 160.0, 80),
-                      high_fq_width=8.0,
-                      t_plot=1.0,
-                      method=1,
-                      save_name=None):
+def time_frequency_peak_locking(sig, fs,
+                                low_fq=6.0,
+                                low_fq_width=2.0,
+                                high_fq_range=np.linspace(2.0, 160.0, 80),
+                                high_fq_width=8.0,
+                                t_plot=1.0,
+                                method=1,
+                                save_name=None,
+                                peak_or_trough='peak'):
     """
     Plot the theta-trough locked Time-frequency plot of mean power
     modulation time-locked to the theta trough
@@ -31,6 +32,7 @@ def theta_trough_lock(sig, fs,
     t_plot        : in second, time to plot around the troughs
     method        : in {0, 1}, choose band pass filter method
                     (in multiple_band_pass)
+    peak_or_trough: lock to the maximum of minimum of the slow oscillation
 
     """
     n_cycles = None
@@ -39,19 +41,22 @@ def theta_trough_lock(sig, fs,
     sig = sig.astype(np.float64).ravel()
     sig = crop_for_fast_hilbert(sig)
 
-    # compute a number of band-pass filtered and Hilbert filtered signals
+    # compute the slow oscillation
     sigdriv_complex = multiple_band_pass(sig, fs, low_fq, low_fq_width,
                                          method=method)[0]
     sigdriv = np.real(sigdriv_complex)
 
     if False:
+        extrema = 1 if peak_or_trough == 'peak' else -1
         # find the trough in the sigdriv with a peak finder
         thresh = (sigdriv.max() - sigdriv.min()) / 10.
         trough_loc, trough_mag = peak_finder(sigdriv, thresh=thresh,
-                                             extrema=-1)
+                                             extrema=extrema)
     else:
         # find the trough in the phase
         phase = np.angle(sigdriv_complex)
+        if peak_or_trough == 'peak':
+            phase = (phase + 2 * np.pi) % (2 * np.pi)
         trough_loc, _ = peak_finder(phase, extrema=1)
         trough_mag = sigdriv[trough_loc]
 
@@ -82,22 +87,18 @@ def theta_trough_lock(sig, fs,
     # subtract the mean power
     filtered_high -= filtered_high.mean(axis=1)[:, None]
 
-    mask = (trough_mag >= 0)
-
-    trough_loc_masked = trough_loc[mask]
-
-    fig, axs = plt.subplots(2, 1, sharex=True)
+    fig, axs = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
     axs = axs.ravel()
 
     # plot the lower part
     plot_trough_locked_time(
-        sig, fs, trough_loc=trough_loc_masked,
+        sig, fs, trough_loc=trough_loc,
         t_plot=t_plot, fig=fig, ax=axs[1], ylim=None)
 
     # plot the higher part
     plot_trough_locked_time_frequency(
         filtered_high, fs, high_fq_range,
-        trough_loc=trough_loc_masked, t_plot=t_plot, fig=fig, ax=axs[0],
+        trough_loc=trough_loc, t_plot=t_plot, fig=fig, ax=axs[0],
         vmin=None, vmax=None)
 
     # save the figure
@@ -138,6 +139,7 @@ def trough_locked_percentile(signals, fs, trough_loc, t_plot,
     indices = indices + np.arange(n_points) - n_points // 2
 
     n_troughs = indices.shape[0]
+    assert n_troughs > 0
 
     # compute the evoked signals (trough-locked mean)
     evoked_signals = np.zeros((n_signals, n_percentiles, n_points))
