@@ -44,7 +44,7 @@ def params_rat():
     }
 
     extract_params = {
-        # band-pass filter
+        # band-pass filter
         'low_fq_range': [3.0],  # carrier frequency
         'n_cycles': None,  # number of cycles in the band-pass filter
         'bandwidth': 1.0,  # bandwidth (Hz) of the band-pass filter
@@ -85,13 +85,13 @@ def example_preprocessing_channel_by_channel():
     Example of preprocessing of a raw file
     """
     # load parameters and preprocess the data
-    # (load raw file, decimate, dehumm, fill the 50 Hz gap)
+    # (load raw file, decimate, dehumm, fill the 50 Hz gap)
     preprocess_params, _ = params_rat()
     raw_file = preprocess_params['raw_file']
     save_dir = get_save_directory(raw_file)
     save_name = '%s/dehummed.mat' % save_dir
 
-    # skip preprocessing and load if the file exists
+    # skip preprocessing and load if the file exists
     if os.path.isfile(save_name):
         data = mat2sig(save_name)
         sigs, fs, events = data['sigs'], data['fs'], data['events']
@@ -139,13 +139,13 @@ def example_preprocessing_all_channels():
     Example of preprocessing of a raw file
     """
     # load parameters and preprocess the data
-    # (load raw file, decimate, dehumm, fill the 50 Hz gap)
+    # (load raw file, decimate, dehumm, fill the 50 Hz gap)
     preprocess_params, _ = params_rat()
     raw_file = preprocess_params['raw_file']
     save_dir = get_save_directory(raw_file)
     save_name = '%s/dehummed.mat' % save_dir
 
-    # skip preprocessing and load if the file exists
+    # skip preprocessing and load if the file exists
     if os.path.isfile(save_name):
         data = mat2sig(save_name)
         sigs, fs, events = data['sigs'], data['fs'], data['events']

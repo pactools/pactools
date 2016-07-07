@@ -62,7 +62,7 @@ def time_frequency_peak_locking(sig, fs,
 
     # plot the sigdriv troughs
     if True:
-        n_points = 3000
+        n_points = np.min(3000, sig.size)
         t = np.arange(n_points) / float(fs)
         plt.figure(figsize=(16, 5))
         plt.plot(t, sig[:n_points], label='signal')
@@ -214,7 +214,7 @@ def plot_trough_locked_time(sig, fs, trough_loc, t_plot,
     Compute and plot the trough-locked mean of the signal sig
     """
     # percentiles = [5, 'mean', 95]
-    # percentiles = ['mean']
+    # percentiles = ['mean']
     percentiles = ['std+', 'mean', 'std-']
     lines = 'gbg'
 

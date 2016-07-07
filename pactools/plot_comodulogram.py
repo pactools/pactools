@@ -92,7 +92,7 @@ def plot_comodulograms(comodulograms, fs, low_fq_range,
     n_channels, n_fc, n_freq = comodulograms.shape
     extend = (low_fq_range[0], low_fq_range[-1], 0, fs / 2.)
 
-    # plot the image
+    # plot the image
     for i in range(n_channels):
         cax = axs[i].imshow(
             comodulograms[i].T, cmap=cmap, vmin=vmin, vmax=vmax,

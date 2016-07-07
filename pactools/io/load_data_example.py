@@ -19,7 +19,7 @@ def load_data_example():
     t_evok = 1.0
     sig = sig[:, 0, int(t_evok * fs):]
 
-    # concatenate the epochs into one signal, with a smooth transition of 0.1s
+    # concatenate the epochs into one signal, with a smooth transition of 0.1s
     sig = blend_and_ravel(sig, n_blend=int(0.1 * fs))
 
     return sig, fs

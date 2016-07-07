@@ -31,17 +31,17 @@ def example_on_each_epoch():
             save_name = '%s_%d' % (channel_names[i_channel], epoch + 1)
             one_sig = channel_signal[epoch].ravel()
 
-            # array of frequency for phase signal
+            # array of frequency for phase signal
             low_fq_range = np.arange(0.1, 5.1, 0.1)
             low_fq_width = 0.5  # Hz
-            # array of frequency for amplitude signal
+            # array of frequency for amplitude signal
             high_fq_range = np.arange(1, fs / 2, 3)
             high_fq_width = 10.0  # Hz
 
             comods = []
             titles = []
             for method in ['tort', 'ozkurt']:
-                # compute the comodulograms
+                # compute the comodulograms
                 comod = modulation_index(
                     low_sig=one_sig, fs=fs, draw=False, method=method,
                     low_fq_range=low_fq_range, low_fq_width=low_fq_width,
@@ -93,17 +93,17 @@ def example_concatenating_epochs():
         one_sig = blend_and_ravel(channel_signal, int(fs * t_blend))
         save_name = '%s' % (channel_names[i_channel])
 
-        # array of frequency for phase signal
+        # array of frequency for phase signal
         low_fq_range = np.arange(0.1, 5.1, 0.1)
         low_fq_width = 0.5  # Hz
-        # array of frequency for amplitude signal
+        # array of frequency for amplitude signal
         high_fq_range = np.arange(1, fs / 2, 3)
         high_fq_width = 10.0  # Hz
 
         comods = []
         titles = []
         for method in ['tort', 'ozkurt']:
-            # compute the comodulograms
+            # compute the comodulograms
             comod = modulation_index(
                 low_sig=one_sig, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range, low_fq_width=low_fq_width,
@@ -115,7 +115,7 @@ def example_concatenating_epochs():
         # plot the results
         fig, axs = plt.subplots(1, 2, figsize=(15, 6))
 
-        # loop is not necessary if we have comodulogram with the same scales
+        # loop is not necessary if we have comodulogram with the same scales
         for i, comod in enumerate(comods):
             plot_comodulograms(comod, fs, low_fq_range, [titles[i]],
                                fig, [axs[i]], plt.get_cmap('viridis'),
