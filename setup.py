@@ -1,3 +1,4 @@
+import setuptools  # for python setup.py develop
 from distutils.core import setup
 
 setup(name='pactools',
