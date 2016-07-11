@@ -62,7 +62,7 @@ def time_frequency_peak_locking(sig, fs,
 
     # plot the sigdriv troughs
     if True:
-        n_points = np.min(3000, sig.size)
+        n_points = min(3000, sig.size)
         t = np.arange(n_points) / float(fs)
         plt.figure(figsize=(16, 5))
         plt.plot(t, sig[:n_points], label='signal')
