@@ -4,17 +4,21 @@ import matplotlib.gridspec as gridspec
 
 
 def compute_ticks(vmin, vmax, unit=''):
-    log_scale = np.floor(np.log10((vmax - vmin) / 3.0))
-    scale = 10. ** log_scale
-    vmax = np.floor(vmax / scale) * scale
-    vmin = np.ceil(vmin / scale) * scale
+    if vmax == vmin:
+        tick_labels = '%s'
+        ticks = np.array([vmin])
+    else:
+        log_scale = np.floor(np.log10((vmax - vmin) / 3.0))
+        scale = 10. ** log_scale
+        vmax = np.floor(vmax / scale) * scale
+        vmin = np.ceil(vmin / scale) * scale
 
-    range_scale = int((vmax - vmin) / scale)
-    step = np.ceil(range_scale / 7.) * scale
+        range_scale = int((vmax - vmin) / scale)
+        step = np.ceil(range_scale / 7.) * scale
 
-    tick_labels = '%%.%df' % max(0, -int(log_scale))
-    ticks = np.arange(vmin, vmax + step, step)
-    tick_labels += ' ' + unit
+        tick_labels = '%%.%df' % max(0, -int(log_scale))
+        tick_labels += ' ' + unit
+        ticks = np.arange(vmin, vmax + step, step)
 
     return ticks, tick_labels
 

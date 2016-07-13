@@ -60,7 +60,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     frequencies = np.linspace(frange[0], frange[1], n_frequency)
     for i, i_amplitude in enumerate(ploted_amplitudes[::-1]):
         ax.plot(frequencies, spec[:, i_amplitude], color=colors[i],
-                label=r'$x=%.2f$' % amplitudes[i_amplitude])
+                label=r'$x=%+.2f$' % amplitudes[i_amplitude])
 
     # plot simple periodogram
     if True:
@@ -74,7 +74,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         ax.plot(frequencies, psd, '--k', label='PSD')
 
     if title == '':
-        title = model.get_title(name=True, logl=True)
+        title = model.get_title(name=True)
     ax.set_title(title)
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power (dB)')

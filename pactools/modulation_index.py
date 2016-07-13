@@ -241,7 +241,7 @@ def modulation_index(fs, low_sig, high_sig=None,
 def driven_comodulogram(fs, low_sig, high_sig, model, low_fq_range,
                         low_fq_width, high_fq_range, method='minmax',
                         fill=4, ordar=12, enf=50., random_noise=None,
-                        normalize=True, whitening='after',
+                        normalize=True, whitening=None,
                         progress_bar=True):
     """
     Compute the driven comodulogram with a DAR model

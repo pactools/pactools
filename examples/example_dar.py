@@ -13,14 +13,17 @@ def example_dar():
     sig, fs = load_data_example()
 
     # Parameters for the PAC analysis
-    ordriv = 2  # typically 2
-    ordar = 20  # typically in [10, 30]
+    ordriv = 2  # typically in [0, 2]
+    ordar = 20  # typically in [4, 30]
     low_fq_width = 0.5  # Hz
     low_fq_range = [3.0]
 
     # extract the driver
     for low_sigs, high_sigs in extract(
-            [sig], fs, low_fq_range=low_fq_range, bandwidth=low_fq_width):
+            [sig], fs,
+            low_fq_range=low_fq_range,
+            bandwidth=low_fq_width,
+            whitening=None):
         sigdriv = low_sigs[0]
         sigin = high_sigs[0]
 
@@ -45,9 +48,25 @@ def example_compare_comodulogram():
     low_fq_range = np.arange(0.2, 5.2, 0.2)  # Hz
     high_fq_range = np.arange(0.2, 150., 4.0)  # Hz
 
+    # Define two models DAR:
+    dar_model_0 = DAR(ordriv=1, ordar=12, bic=False)
+    dar_model_1 = DAR(ordriv=1, ordar=16, bic=True)
+    # ordriv: order of the polynomial expansion of the driver.
+    #         Typically in [0, 2]. With 0, no PAC is present in the model
+    # ordar : order of the AutoRegressive part.
+    #         Typically in [4, 30]. A low value will give a smooth Power
+    #         Spectral Density.
+    # bic   : if True, a grid search is performed on both parameters
+    #         ordriv (in [0, ordriv]) and ordar (in [0, ordar]).
+    #         The couple of parameters with the best BIC will be selected.
+    #         The selection is done independently for all driver's frequencies.
+    #         If the signal is short, low values of (ordar, ordriv) will
+    #         be selected.
+
     fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(16, 12))
-    for i, method in enumerate(['ozkurt', 'tort', 'canolty',
-                                DAR(ordriv=2, ordar=10)]):
+
+    # The model is given to the 'method' parameter.
+    for i, method in enumerate(['tort', 'ozkurt', dar_model_0, dar_model_1]):
 
         comodulogram = modulation_index(
             low_sig=sig, fs=fs, draw=False, method=method,
@@ -65,5 +84,5 @@ def example_compare_comodulogram():
 
 
 if __name__ == '__main__':
-    #example_dar()
+    # example_dar()
     example_compare_comodulogram()
