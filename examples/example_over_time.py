@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mne
 
-from pactools.modulation_index import modulation_index, get_maximum_pac
+from pactools.comodulogram import comodulogram, get_maximum_pac
 from pactools.utils.spliter import Spliter, blend_and_ravel
 from pactools.plot_comodulogram import plot_comodulograms
 from pactools.utils.progress_bar import ProgressBar
@@ -69,7 +69,7 @@ def example_channel_by_channel():
             t_blend = 0.1
             data = blend_and_ravel(data[:n_epochs_min, 0], int(t_blend * fs))
 
-            comodulogram = modulation_index(
+            comod = comodulogram(
                 low_sig=data, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range,
                 low_fq_width=low_fq_width,
@@ -78,7 +78,7 @@ def example_channel_by_channel():
                 save_name=filename_full + save_name_suffix,
                 progress_bar=True)
 
-            comodulograms.append(comodulogram)
+            comodulograms.append(comod)
 
         # plot the comodulograms
         fig, axs = plt.subplots(2, len(comodulograms) // 2,
@@ -146,7 +146,7 @@ def example_all_channels():
             data = blend_and_ravel(data[:n_epochs_min, i_channel],
                                    int(t_blend * fs))
 
-            comodulogram = modulation_index(
+            comod = comodulogram(
                 low_sig=data, fs=fs, draw=False, method=method,
                 low_fq_range=low_fq_range,
                 low_fq_width=low_fq_width,
@@ -155,7 +155,7 @@ def example_all_channels():
                 save_name=filename_full + save_name_suffix,
                 progress_bar=True)
 
-            comodulograms.append(comodulogram)
+            comodulograms.append(comod)
 
         # plot the comodulograms
         fig, axs = plt.subplots(2, len(comodulograms) // 2,
@@ -271,7 +271,7 @@ def example_all_channels_maximum_pac():
                 n_epochs = n_epochs_min
 
             for epoch_data_low, epoch_data_high in zip(data_low, data_high):
-                comodulogram = modulation_index(
+                comod = comodulogram(
                     low_sig=epoch_data_low, high_sig=epoch_data_high,
                     fs=fs, draw=False, method=method,
                     low_fq_range=low_fq_range,
@@ -282,7 +282,7 @@ def example_all_channels_maximum_pac():
                     progress_bar=False)
 
                 low_fq, high_fq, max_pac_value = get_maximum_pac(
-                    comodulogram, low_fq_range, high_fq_range)
+                    comod, low_fq_range, high_fq_range)
 
                 results.append((low_fq, high_fq, max_pac_value))
             bar.update_with_increment_value(1)

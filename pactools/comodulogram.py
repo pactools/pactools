@@ -50,10 +50,10 @@ def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
     return res
 
 
-def _modulation_index(filtered_low, filtered_high, method, fs, n_surrogates,
-                      progress_bar, draw_phase):
+def _comodulogram(filtered_low, filtered_high, method, fs, n_surrogates,
+                  progress_bar, draw_phase):
     """
-    Helper for modulation_index
+    Helper for comodulogram
     """
     rng = RandomState(42)
 
@@ -165,19 +165,19 @@ def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
     return MI
 
 
-def modulation_index(fs, low_sig, high_sig=None,
-                     low_fq_range=np.linspace(1.0, 10.0, 50),
-                     low_fq_width=0.5,
-                     high_fq_range=np.linspace(5.0, 150.0, 60),
-                     high_fq_width=10.0,
-                     method='tort',
-                     n_surrogates=100,
-                     draw=False, save_name=None,
-                     vmin=None, vmax=None,
-                     progress_bar=True,
-                     draw_phase=False):
+def comodulogram(fs, low_sig, high_sig=None,
+                 low_fq_range=np.linspace(1.0, 10.0, 50),
+                 low_fq_width=0.5,
+                 high_fq_range=np.linspace(5.0, 150.0, 60),
+                 high_fq_width=10.0,
+                 method='tort',
+                 n_surrogates=100,
+                 draw=False, save_name=None,
+                 vmin=None, vmax=None,
+                 progress_bar=True,
+                 draw_phase=False):
     """
-    Compute the modulation index (MI) for Phase Amplitude Coupling (PAC).
+    Compute the comodulogram for Phase Amplitude Coupling (PAC).
 
     Parameters
     ----------
@@ -185,11 +185,11 @@ def modulation_index(fs, low_sig, high_sig=None,
     low_sig       : one dimension signal where we extract the phase signal
     high_sig      : one dimension signal where we extract the amplitude signal
                     if None, we use low_sig for both signals
-    low_fq_range  : low frequency range to compute the MI (phase signal)
-    low_fq_width  : width of the band-pass filter
-    high_fq_range : high frequency range to compute the MI (amplitude signal)
-    high_fq_width : width of the band-pass filter
-    method        : normalization method, in ('ozkurt', 'canolty', 'tort')
+    low_fq_range  : low frequency range (phase signal)
+    low_fq_width  : width of the band-pass filter (phase signal)
+    high_fq_range : high frequency range (amplitude signal)
+    high_fq_width : width of the band-pass filter (amplitude signal)
+    method        : modulation index method, in ('ozkurt', 'canolty', 'tort')
     n_surrogates  : number of surrogates computed in 'canolty's method
     draw          : if True, draw the comodulogram
     vmin, vmax    : if not None, it define the min/max value of the plot
@@ -197,8 +197,7 @@ def modulation_index(fs, low_sig, high_sig=None,
 
     Return
     ------
-    MI            : Modulation Index,
-                    shape (len(low_fq_range), len(high_fq_range))
+    comod         : Comodulogram, shape (len(low_fq_range), len(high_fq_range))
     """
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
@@ -219,8 +218,8 @@ def modulation_index(fs, low_sig, high_sig=None,
         filtered_low = multiple_band_pass(low_sig, fs,
                                           low_fq_range, low_fq_width)
 
-        MI = _modulation_index(filtered_low, filtered_high, method, fs,
-                               n_surrogates, progress_bar, draw_phase)
+        MI = _comodulogram(filtered_low, filtered_high, method, fs,
+                           n_surrogates, progress_bar, draw_phase)
     elif isinstance(method, DAR):
         MI = driven_comodulogram(fs, low_sig, high_sig, model=method,
                                  low_fq_range=low_fq_range,

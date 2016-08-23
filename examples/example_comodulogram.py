@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pactools.modulation_index import modulation_index
+from pactools.comodulogram import comodulogram
 from pactools.io.load_data_example import load_data_example
 
 
@@ -21,7 +21,7 @@ def example_comodulogram():
     method = 'tort'  # 'ozkurt', 'tort', 'canolty'
     save_name = 'example_figure_saved'
 
-    comodulogram = modulation_index(
+    comod = comodulogram(
         low_sig=sig, fs=fs, draw=True, method=method,
         low_fq_range=low_fq_range,
         low_fq_width=low_fq_width,
@@ -29,15 +29,15 @@ def example_comodulogram():
         high_fq_width=high_fq_width,
         save_name=save_name)
 
-    print(comodulogram.shape)
+    print(comod.shape)
     # save in csv
-    np.savetxt('example_data_saved.csv', comodulogram, delimiter=', ')
+    np.savetxt('example_data_saved.csv', comod, delimiter=', ')
     plt.show()
 
 
 def example_phase_plot():
     """
-    Example with only one MI computed for 1 couple of frequency.
+    Example with only one modulation_index computed for 1 couple of frequency.
     This example also show a plot of the mean amplitude of the fast oscillation
     for each phase of the slow oscillation.
     """
@@ -50,7 +50,7 @@ def example_phase_plot():
     high_fq_range = [85.0]  # Hz
     method = 'tort'  # 'ozkurt', 'tort', 'canolty'
 
-    MI = modulation_index(
+    modulation_index = comodulogram(
         low_sig=sig, fs=fs, draw=False, method=method,
         low_fq_range=low_fq_range,
         low_fq_width=low_fq_width,
@@ -58,7 +58,7 @@ def example_phase_plot():
         high_fq_width=high_fq_width,
         draw_phase=True)
 
-    print('index = %.5f ' % MI)
+    print('modulation index = %.5f ' % modulation_index)
     plt.show()
 
 if __name__ == '__main__':

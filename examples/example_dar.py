@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pactools.modulation_index import modulation_index
+from pactools.comodulogram import comodulogram
 from pactools.plot_comodulogram import plot_comodulograms
 from pactools.io.load_data_example import load_data_example
 from pactools.dar_model import DAR, plot_dar_lines
@@ -68,7 +68,7 @@ def example_compare_comodulogram():
     # The model is given to the 'method' parameter.
     for i, method in enumerate(['tort', 'ozkurt', dar_model_0, dar_model_1]):
 
-        comodulogram = modulation_index(
+        comod = comodulogram(
             low_sig=sig, fs=fs, draw=False, method=method,
             low_fq_range=low_fq_range,
             low_fq_width=low_fq_width,
@@ -76,7 +76,7 @@ def example_compare_comodulogram():
             high_fq_width=high_fq_width,
             n_surrogates=25)
 
-        plot_comodulograms(comodulogram, fs, low_fq_range,
+        plot_comodulograms(comod, fs, low_fq_range,
                            ['%s' % method], fig, [axs.ravel()[i]])
 
     fig.savefig('compare_comodulogram.png')

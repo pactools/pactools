@@ -88,7 +88,7 @@ def example_concatenating_epochs():
         #     save_name = '%s_%d' % (channel_names[i_channel], epoch + 1)
         #     one_sig = channel_signal[epoch].ravel()
 
-        # concatenante all epochs an blend to smooth transitions
+        # concatenante all epochs and blend to smooth transitions
         t_blend = 0.3  # sec
         one_sig = blend_and_ravel(channel_signal, int(fs * t_blend))
         save_name = '%s' % (channel_names[i_channel])
