@@ -9,57 +9,74 @@ from .utils.progress_bar import ProgressBar
 from .utils.spectrum import crop_for_fast_hilbert
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d
-from .plot_comodulogram import plot_comodulogram_histogram
+from .plot_comodulogram import plot_comodulograms
 from .preprocess import extract
 
 
-def multiple_band_pass(sig, fs, f_range, f_width, n_cycles=None, method=1):
+def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
+                       n_cycles=None, method=1):
     """
     Band-pass filter the signal at multiple frequencies
     """
     fixed_n_cycles = n_cycles
-    sig = crop_for_fast_hilbert(sig)
-    f_range = np.atleast_1d(f_range)
+
+    sigs = np.atleast_2d(sigs)
+    sigs = crop_for_fast_hilbert(sigs)
+    n_epochs, n_points = sigs.shape
+
+    frequency_range = np.atleast_1d(frequency_range)
+    n_frequencies = frequency_range.shape[0]
 
     if method == 1:
         fir = Carrier()
 
-    n_frequencies = f_range.shape[0]
-    res = np.zeros((n_frequencies, sig.shape[0]), dtype=np.complex128)
-    for i, f in enumerate(f_range):
-        # evaluate the number of cycle for this f_width and f
-        if fixed_n_cycles is None:
-            n_cycles = 1.65 * f / f_width
+    filtered = np.zeros((n_frequencies, n_epochs, n_points),
+                        dtype=np.complex128)
+    for ii in range(n_epochs):
+        for jj, frequency in enumerate(frequency_range):
+            # evaluate the number of cycle for this bandwidth and frequency
+            if fixed_n_cycles is None:
+                n_cycles = 1.65 * frequency / bandwidth
 
-        # 0--------- with mne.filter.band_pass_filter
-        if method == 0:
-            low_sig = band_pass_filter(
-                sig, Fs=fs, Fp1=f - f_width / 2.0, Fp2=f + f_width / 2.0,
-                l_trans_bandwidth=f_width / 4.0,
-                h_trans_bandwidth=f_width / 4.0,
-                n_jobs=1, method='iir')
+            # 0--------- with mne.filter.band_pass_filter
+            if method == 0:
+                low_sig = band_pass_filter(
+                    sigs[ii, :], Fs=fs,
+                    Fp1=frequency - bandwidth / 2.0,
+                    Fp2=frequency + bandwidth / 2.0,
+                    l_trans_bandwidth=bandwidth / 4.0,
+                    h_trans_bandwidth=bandwidth / 4.0,
+                    n_jobs=1, method='iir')
 
-        # 1--------- with pactools.Carrier
-        if method == 1:
-            fir.design(fs, f, n_cycles, None, zero_mean=True)
-            low_sig = fir.direct(sig)
+            # 1--------- with pactools.Carrier
+            if method == 1:
+                fir.design(fs, frequency, n_cycles, None, zero_mean=True)
+                low_sig = fir.direct(sigs[ii, :])
 
-        # common to the two methods
-        res[i, :] = hilbert(low_sig)
+            # common to the two methods
+            filtered[jj, ii, :] = hilbert(low_sig)
 
-    return res
+    return filtered
 
 
-def _comodulogram(filtered_low, filtered_high, method, fs, n_surrogates,
+def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
                   progress_bar, draw_phase):
     """
-    Helper for comodulogram
+    Compute the comodulogram for empirical metrics.
     """
     rng = RandomState(42)
 
-    tmax = filtered_low.shape[1]
-    n_low = filtered_low.shape[0]
-    n_high = filtered_high.shape[0]
+    mask = crop_for_fast_hilbert(mask)
+    # The modulation index is only computed where mask is True
+    if mask is not None:
+        filtered_low = filtered_low[:, mask == 1]
+        filtered_high = filtered_high[:, mask == 1]
+    else:
+        filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
+        filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
+
+    n_low, n_points = filtered_low.shape
+    n_high, _ = filtered_high.shape
 
     # phase of the low frequency signals
     for i in range(n_low):
@@ -75,8 +92,6 @@ def _comodulogram(filtered_low, filtered_high, method, fs, n_surrogates,
     filtered_high = np.real(filtered_high)
 
     # Calculate the modulation index for each couple
-    if progress_bar:
-        bar = ProgressBar('comodulogram: %s' % method, max_value=n_low)
     MI = np.zeros((n_low, n_high))
     exp_phase = None
     for i in range(n_low):
@@ -87,23 +102,24 @@ def _comodulogram(filtered_low, filtered_high, method, fs, n_surrogates,
             MI[i, j] = _one_modulation_index(
                 amplitude=filtered_high[j], phase=filtered_low[i],
                 exp_phase=exp_phase, norm_a=norm_a[j], method=method,
-                tmax=tmax, fs=fs, n_surrogates=n_surrogates,
+                n_points=n_points, fs=fs, n_surrogates=n_surrogates,
                 random_state=rng, draw_phase=draw_phase)
 
         if progress_bar:
-            bar.update(i + 1)
+            progress_bar.update_with_increment_value(1)
 
     return MI
 
 
 def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
-                          tmax, fs, n_surrogates, random_state, draw_phase):
+                          n_points, fs, n_surrogates, random_state,
+                          draw_phase):
     if method == 'ozkurt':
         # Modulation index as in Ozkurt 2011
         MI = np.abs(np.mean(amplitude * exp_phase))
 
         MI /= norm_a
-        MI *= np.sqrt(tmax)
+        MI *= np.sqrt(n_points)
 
     elif method == 'canolty':
         # Modulation index as in Canolty 2006
@@ -113,7 +129,7 @@ def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
             # compute surrogates MIs
             MI_surr = np.empty(n_surrogates)
             for s in range(n_surrogates):
-                shift = random_state.randint(fs, tmax - fs)
+                shift = random_state.randint(fs, n_points - fs)
                 exp_phase_s = np.roll(exp_phase, shift)
                 exp_phase_s *= amplitude
                 MI_surr[s] = np.abs(np.mean(exp_phase_s))
@@ -165,10 +181,10 @@ def _one_modulation_index(amplitude, phase, exp_phase, norm_a, method,
     return MI
 
 
-def comodulogram(fs, low_sig, high_sig=None,
+def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  low_fq_range=np.linspace(1.0, 10.0, 50),
-                 low_fq_width=0.5,
                  high_fq_range=np.linspace(5.0, 150.0, 60),
+                 low_fq_width=0.5,
                  high_fq_width=10.0,
                  method='tort',
                  n_surrogates=100,
@@ -181,35 +197,68 @@ def comodulogram(fs, low_sig, high_sig=None,
 
     Parameters
     ----------
-    fs            : sampling frequency
-    low_sig       : one dimension signal where we extract the phase signal
-    high_sig      : one dimension signal where we extract the amplitude signal
-                    if None, we use low_sig for both signals
-    low_fq_range  : low frequency range (phase signal)
-    low_fq_width  : width of the band-pass filter (phase signal)
-    high_fq_range : high frequency range (amplitude signal)
-    high_fq_width : width of the band-pass filter (amplitude signal)
-    method        : modulation index method, in ('ozkurt', 'canolty', 'tort')
-    n_surrogates  : number of surrogates computed in 'canolty's method
-    draw          : if True, draw the comodulogram
-    vmin, vmax    : if not None, it define the min/max value of the plot
-    draw_phase    : if True, plot the phase distribution in 'tort' index
+    fs : float,
+        Sampling frequency
+
+    low_sig : array, shape (n_epochs, n_points)
+        Input data for the phase signal
+
+    high_sig : array or None, shape (n_epochs, n_points)
+        Input data for the amplitude signal.
+        If None, we use low_sig for both signals
+
+    mask : array or list of array or None, shape (n_epochs, n_points)
+        The PAC is only evaluated with the unmasked element of low_sig and
+        high_sig. Masking is done after filtering and Hilbert transform.
+        If a list is given, the filtering is done only once and the
+        comodulogram is computed on each mask.
+
+    low_fq_range : array or list
+        List of filtering frequencies (phase signal)
+
+    high_fq_range : array or list
+        List of filtering frequencies (amplitude signal)
+
+    low_fq_width : float
+        Bandwidth of the band-pass filter (phase signal)
+
+    high_fq_width : float
+        Bandwidth of the band-pass filter (amplitude signal)
+
+    method : string in ('ozkurt', 'canolty', 'tort')
+        Modulation index method,
+
+    n_surrogates : int
+        Number of surrogates computed in 'canolty's method
+
+    draw : boolean
+        If True, plot the comodulogram
+
+    vmin, vmax : float or None
+        If not None, it define the min/max value of the plot
+
+    progress_bar : boolean
+        If True, a progress bar is shown in stdout
+
+    draw_phase : boolean
+        If True, plot the phase distribution in 'tort' index
 
     Return
     ------
-    comod         : Comodulogram, shape (len(low_fq_range), len(high_fq_range))
+    comod : array, shape (len(low_fq_range), len(high_fq_range))
+        Comodulogram for each couple of frequencies.
+        If a list of mask is given, it returns a list of comodulograms.
     """
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
     high_fq_range = np.asarray(high_fq_range)
 
+    mask_is_list = isinstance(mask, list)
+    if not mask_is_list:
+        mask = [mask]
+
     if method in ('ozkurt', 'canolty', 'tort'):
-        low_sig = low_sig.ravel()
-        low_sig = crop_for_fast_hilbert(low_sig)
-        if high_sig is not None:
-            high_sig = high_sig.ravel()
-            high_sig = crop_for_fast_hilbert(high_sig)
-        else:
+        if high_sig is None:
             high_sig = low_sig
 
         # compute a number of band-pass filtered and Hilbert filtered signals
@@ -218,85 +267,175 @@ def comodulogram(fs, low_sig, high_sig=None,
         filtered_low = multiple_band_pass(low_sig, fs,
                                           low_fq_range, low_fq_width)
 
-        MI = _comodulogram(filtered_low, filtered_high, method, fs,
-                           n_surrogates, progress_bar, draw_phase)
+        if progress_bar:
+            progress_bar = ProgressBar('comodulogram: %s' % method,
+                                       max_value=low_fq_range.size * len(mask))
+        comod_list = []
+        for this_mask in mask:
+            comod = _comodulogram(filtered_low, filtered_high, this_mask,
+                                  method, fs, n_surrogates, progress_bar,
+                                  draw_phase)
+            comod_list.append(comod)
+
     elif isinstance(method, DAR):
-        MI = driven_comodulogram(fs, low_sig, high_sig, model=method,
-                                 low_fq_range=low_fq_range,
-                                 low_fq_width=low_fq_width,
-                                 high_fq_range=high_fq_range,
-                                 progress_bar=progress_bar)
+        comod_list = driven_comodulogram(fs=fs, low_sig=low_sig,
+                                         high_sig=high_sig,
+                                         mask=mask, model=method,
+                                         low_fq_range=low_fq_range,
+                                         low_fq_width=low_fq_width,
+                                         high_fq_range=high_fq_range,
+                                         progress_bar=progress_bar)
     else:
         raise(ValueError, 'unknown method: %s' % method)
 
     if draw:
-        plot_comodulogram_histogram(MI, low_fq_range, low_fq_width,
-                                    high_fq_range, high_fq_width,
-                                    method, vmin, vmax, save_name)
+        plot_comodulograms(comod_list, fs, low_fq_range)
 
-    return MI
+    if not mask_is_list:
+        return comod_list[0]
+    else:
+        return comod_list
 
 
-def driven_comodulogram(fs, low_sig, high_sig, model, low_fq_range,
-                        low_fq_width, high_fq_range, method='minmax',
+def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
+                        high_fq_range, low_fq_width, method='minmax',
                         fill=4, ordar=12, enf=50., random_noise=None,
                         normalize=True, whitening=None,
                         progress_bar=True):
     """
-    Compute the driven comodulogram with a DAR model
+    Compute the comodulogram with a DAR model.
 
-    sig            : single signal
-    fs             : sampling frequency
-    model          : DAR instance
-    low_fq_range   : range of carrier frequency to scan
-    methods        : 'firstlast' or 'minmax'
+    Parameters
+    ----------
+    fs : float,
+        Sampling frequency
+
+    low_sig : array, shape (n_epochs, n_points)
+        Input data for the phase signal
+
+    high_sig : array or None, shape (n_epochs, n_points)
+        Input data for the amplitude signal.
+        If None, we use low_sig for both signals
+
+    mask : array or list of array or None, shape (n_epochs, n_points)
+        The PAC is only evaluated with the unmasked element of low_sig and
+        high_sig. Masking is done after filtering and Hilbert transform.
+        If a list is given, the filtering is done only once and the
+        comodulogram is computed on each mask.
+
+    model : DAR instance
+        DAR model to be used for the comodulogram
+
+    low_fq_range : array or list
+        List of filtering frequencies (phase signal)
+
+    high_fq_range : array or list
+        List of filtering frequencies (amplitude signal). This is not used for
+        filtering since DAR models do not need filtering of high frequencies.
+        This is only used to interpolate the spectrum, in order to
+        match the results of ``comodulogram``.
+
+    low_fq_width : float
+        Bandwidth of the band-pass filter (phase signal)
+
+    method : string in ('firstlast', 'minmax')
+        Modulation index method,
+
+    fill : int in (0, 1, 2, 3, 4)
+        Method to fill the spectral gap when removing the low frequencies
+
+    ordar : int
+        Order of the AR model used for whitening
+
+    enf : float
+        Electric network frequency, that will be removed
+
+    random_noise : array or None, shape (n_points)
+        Noise to be used to in the filling strategy
+
+    normalize : boolean
+        If True, the filtered signal is normalized
+
+    whitening : boolean
+        If True, the filtered signal is whitened
+
+    progress_bar : boolean
+        If True, a progress bar is shown in stdout
+
+    Return
+    ------
+    comod : array, shape (len(low_fq_range), len(high_fq_range))
+        Comodulogram for each couple of frequencies
     """
     if high_sig is None:
-        sigs = [low_sig.ravel()]
+        sigs = low_sig
     else:
-        sigs = [low_sig.ravel(), high_sig.ravel()]
+        sigs = np.r_[low_sig, high_sig]
+        n_epochs = low_sig.shape[0]
 
-    comod = None
+    mask_is_list = isinstance(mask, list)
+    if not mask_is_list:
+        mask = [mask]
+
+    comod_list = None
     if progress_bar:
         bar = ProgressBar(
-            max_value=len(low_fq_range) - 1,
+            max_value=len(low_fq_range) * len(mask),
             title='comodulogram: %s' % model.get_title(name=True))
-    for j, (sigdrivs, sigins) in enumerate(extract(
+    for j, (filtered_low, filtered_high) in enumerate(extract(
             sigs=sigs, fs=fs, low_fq_range=low_fq_range,
             bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
             random_noise=random_noise, normalize=normalize,
             whitening=whitening)):
 
         if high_sig is None:
-            sigin = sigins[0]
-            sigdriv = sigdrivs[0]
+            filtered_high = np.array(filtered_high)
+            filtered_low = np.array(filtered_low)
         else:
-            sigin = sigins[1]
-            sigdriv = sigdrivs[0]
+            filtered_high = np.array(filtered_high[n_epochs:])
+            filtered_low = np.array(filtered_low[:n_epochs])
 
-        sigin /= np.std(sigin)
-        model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs)
+        for i_mask, this_mask in enumerate(mask):
+            # mask the data
+            if this_mask is not None:
+                sigdriv = filtered_low[this_mask == 1]
+                sigin = filtered_high[this_mask == 1]
+            else:
+                sigdriv = filtered_low.reshape(filtered_low.shape[0], -1)
+                sigin = filtered_high.reshape(filtered_high.shape[0], -1)
+            sigin /= np.std(sigin)
 
-        # get PSD difference
-        spec, _ = model.amplitude_frequency()
-        if method == 'minmax':
-            spec_diff = spec.max(axis=1) - spec.min(axis=1)
-        elif method == 'firstlast':
-            spec_diff = spec[:, -1] - spec[:, 0]
+            # fit the model DAR on the data
+            model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs)
 
-        # crop the spectrum to high_fq_range
-        frequencies = np.linspace(0, fs // 2, spec_diff.size)
-        spec_diff = np.interp(high_fq_range, frequencies, spec_diff)
+            # get PSD difference
+            spec, _ = model.amplitude_frequency()
+            if method == 'minmax':
+                spec_diff = spec.max(axis=1) - spec.min(axis=1)
+            elif method == 'firstlast':
+                spec_diff = spec[:, -1] - spec[:, 0]
 
-        # save in an array
-        if comod is None:
-            comod = np.zeros((low_fq_range.size, spec_diff.size))
-        comod[j] = spec_diff
+            # crop the spectrum to high_fq_range
+            frequencies = np.linspace(0, fs // 2, spec_diff.size)
+            spec_diff = np.interp(high_fq_range, frequencies, spec_diff)
 
-        if progress_bar:
-            bar.update(j)
+            # initialize the results arrays
+            if comod_list is None:
+                comod_list = []
+                for _ in mask:
+                    comod_list.append(np.zeros((low_fq_range.size,
+                                                spec_diff.size)))
 
-    return comod
+            # save the results
+            comod_list[i_mask][j, :] = spec_diff
+
+            if progress_bar:
+                bar.update_with_increment_value(1)
+
+    if not mask_is_list:
+        return comod_list[0]
+    else:
+        return comod_list
 
 
 def get_maximum_pac(comodulogram, low_fq_range, high_fq_range):

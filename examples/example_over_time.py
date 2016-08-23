@@ -8,6 +8,7 @@ from pactools.comodulogram import comodulogram, get_maximum_pac
 from pactools.utils.spliter import Spliter, blend_and_ravel
 from pactools.plot_comodulogram import plot_comodulograms
 from pactools.utils.progress_bar import ProgressBar
+from pactools.dar_model import DAR
 
 
 raw_file_name = 'LTM1_L1-L2'
@@ -223,6 +224,7 @@ def example_all_channels_maximum_pac():
     high_fq_range = np.arange(60., 110., 5.0)
     high_fq_width = 12.0
     method = 'tort'
+    method = DAR(ordar=10, ordriv=1)
 
     # splits over time
     t_start, t_stop = -30., 60.  # sec

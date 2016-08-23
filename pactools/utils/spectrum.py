@@ -2,6 +2,7 @@
 Estimator of power spectral densities
 """
 from __future__ import print_function
+from itertools import chain
 
 import numpy as np
 import scipy as sp
@@ -357,8 +358,11 @@ def prime_factors(n):
     Decomposition in prime factor.
     Used to find signal length that speed up Hilbert transform.
     """
+    assert n > 0
+    assert isinstance(n, int)
+
     decomposition = []
-    for i in range(2, int(np.sqrt(n)) + 1):
+    for i in chain([2], range(3, int(np.sqrt(n)) + 1, 2)):
         while n % i == 0:
             n = n // i
             decomposition.append(i)

@@ -78,16 +78,21 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
 
 
 def plot_comodulograms(comodulograms, fs, low_fq_range,
-                       titles, fig, axs,
+                       titles=None, fig=None, axs=None,
                        cmap=None, vmin=None, vmax=None, unit=''):
-    axs = np.array(axs).ravel()
-    tight_layout = True
     if isinstance(comodulograms, list):
         comodulograms = np.array(comodulograms)
 
+    tight_layout = True
     if comodulograms.ndim == 2:
         comodulograms = comodulograms[None, :, :]
         tight_layout = False
+
+    n_comods = comodulograms.shape[0]
+
+    if fig is None:
+        fig, axs = plt.subplots(1, n_comods, figsize=(4 * n_comods, 3))
+    axs = np.array(axs).ravel()
 
     vmin = 0 if vmin is None else vmin
     vmax = comodulograms.max() if vmax is None else vmax
@@ -101,7 +106,9 @@ def plot_comodulograms(comodulograms, fs, low_fq_range,
         cax = axs[i].imshow(
             comodulograms[i].T, cmap=cmap, vmin=vmin, vmax=vmax,
             aspect='auto', origin='lower', extent=extend, interpolation='none')
-        axs[i].set_title(titles[i], fontsize=12)
+
+        if titles is not None:
+            axs[i].set_title(titles[i], fontsize=12)
 
     axs[-1].set_xlabel('Driver frequency (Hz)')
     axs[0].set_ylabel('Signal frequency (Hz)')
