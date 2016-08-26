@@ -50,7 +50,7 @@ def example_comodulogram_with_mask():
     low_fq_range = np.arange(0.2, 5.2, 0.2)  # Hz
     high_fq_range = np.arange(0.2, 150., 5.0)  # Hz
     method = 'tort'  # 'ozkurt', 'tort', 'canolty'
-    method = DAR(ordar=10, ordriv=2)
+    method = DAR(ordar=10, ordriv=1)
     save_name = 'example_figure_saved'
 
     # here we use masks to select the time windows

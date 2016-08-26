@@ -66,9 +66,9 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
     """
     rng = RandomState(42)
 
-    mask = crop_for_fast_hilbert(mask)
     # The modulation index is only computed where mask is True
     if mask is not None:
+        mask = crop_for_fast_hilbert(mask)
         filtered_low = filtered_low[:, mask == 1]
         filtered_high = filtered_high[:, mask == 1]
     else:
@@ -373,6 +373,8 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         sigs = np.r_[low_sig, high_sig]
         n_epochs = low_sig.shape[0]
 
+    sigs = np.atleast_2d(sigs)
+
     mask_is_list = isinstance(mask, list)
     if not mask_is_list:
         mask = [mask]
@@ -386,7 +388,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             sigs=sigs, fs=fs, low_fq_range=low_fq_range,
             bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
             random_noise=random_noise, normalize=normalize,
-            whitening=whitening)):
+            whitening=whitening, draw='')):
 
         if high_sig is None:
             filtered_high = np.array(filtered_high)
@@ -396,17 +398,12 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             filtered_low = np.array(filtered_low[:n_epochs])
 
         for i_mask, this_mask in enumerate(mask):
-            # mask the data
-            if this_mask is not None:
-                sigdriv = filtered_low[this_mask == 1]
-                sigin = filtered_high[this_mask == 1]
-            else:
-                sigdriv = filtered_low.reshape(filtered_low.shape[0], -1)
-                sigin = filtered_high.reshape(filtered_high.shape[0], -1)
+            sigdriv = filtered_low
+            sigin = filtered_high
             sigin /= np.std(sigin)
 
             # fit the model DAR on the data
-            model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs)
+            model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs, mask=this_mask)
 
             # get PSD difference
             spec, _ = model.amplitude_frequency()

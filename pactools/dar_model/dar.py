@@ -46,17 +46,17 @@ class DAR(BaseLattice):
         ki : array containing the original parcor coefficients
 
         returns:
-        g : array containing the factors (size (1, tmax - 1))
+        g : array containing the factors (size (n_epochs, n_points - 1))
 
         """
         e_forward = self.forward_residual
         e_backward = self.backward_residual
-        tmax = self.crop_end(self.sigin).size
+        n_epochs, n_points = self.crop_end(self.sigin).shape
 
-        g = e_forward[p, 1:tmax] * e_backward[p - 1, 0:tmax - 1]
-        g += e_backward[p, 1:tmax] * e_forward[p - 1, 1:tmax]
-        g *= 0.5 * (1.0 - ki[0, 1:tmax] ** 2)   # phi'[k[p,t]])
-        return np.reshape(g, (1, tmax - 1))
+        g = e_forward[p, :, 1:n_points] * e_backward[p - 1, :, 0:n_points - 1]
+        g += e_backward[p, :, 1:n_points] * e_forward[p - 1, :, 1:n_points]
+        g *= 0.5 * (1.0 - ki[:, 1:n_points] ** 2)   # phi'[k[p,t]])
+        return np.reshape(g, (n_epochs, n_points - 1))
 
     def common_hessian(self, p, ki):
         """Compute common factor in Hessian. The Hessian is computed as
@@ -73,19 +73,19 @@ class DAR(BaseLattice):
         ki : array containing the original parcor coefficients
 
         returns:
-        h : array containing the factors (size (1, tmax - 1))
+        h : array containing the factors (size (n_epochs, n_points - 1))
 
         """
         e_forward = self.forward_residual
         e_backward = self.backward_residual
-        tmax = self.crop_end(self.sigin).size
+        n_epochs, n_points = self.crop_end(self.sigin).shape
 
-        h1 = e_forward[p - 1, 1:tmax] ** 2
-        h1 += e_backward[p - 1, 0:tmax - 1] ** 2
-        h1 *= (0.5 * (1.0 - ki[0, 1:tmax] ** 2)) ** 2
+        h1 = e_forward[p - 1, :, 1:n_points] ** 2
+        h1 += e_backward[p - 1, :, 0:n_points - 1] ** 2
+        h1 *= (0.5 * (1.0 - ki[:, 1:n_points] ** 2)) ** 2
 
-        h2 = e_forward[p, 1:tmax] * e_backward[p - 1, 0:tmax - 1]
-        h2 += e_backward[p, 1:tmax] * e_forward[p - 1, 1:tmax]
-        h2 *= (-0.5 * ki[0, 1:tmax] * (1.0 - ki[0, 1:tmax] ** 2))
+        h2 = e_forward[p, :, 1:n_points] * e_backward[p - 1, :, 0:n_points - 1]
+        h2 += e_backward[p, :, 1:n_points] * e_forward[p - 1, :, 1:n_points]
+        h2 *= (-0.5 * ki[:, 1:n_points] * (1.0 - ki[:, 1:n_points] ** 2))
 
-        return np.reshape(h1 + h2, (1, tmax - 1))
+        return np.reshape(h1 + h2, (n_epochs, n_points - 1))

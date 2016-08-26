@@ -2,6 +2,7 @@ from __future__ import print_function
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy import linalg
 from scipy import stats
 
@@ -22,8 +23,8 @@ class BaseAR(object):
                  center=True,
                  iter_gain=10,
                  epsilon=1.0e-4,
-                 iter_newton=None,
-                 eps_newton=None,
+                 iter_newton=0,
+                 eps_newton=0.001,
                  ordriv_d=0,
                  progress_bar=False):
         """Creates a filtered STAR model with Taylor expansion
@@ -36,8 +37,8 @@ class BaseAR(object):
         center     : subtract mean from signal [boolean]
         iter_gain  : maximum number of iteration in gain estimation
         epsilon    : threshold to stop iterations in gain estimation
-        iter_newton: used only in BaseLattice
-        eps_newton : used only in BaseLattice
+        iter_newton : maximum number of Newton-Raphson iterations
+        eps_newton  : threshold to stop Newton-Raphson iterations
         ordriv_d   : ordriv for driver's derivative
 
         """
@@ -59,13 +60,14 @@ class BaseAR(object):
         self.basis_ = None
         self.fit_size = 1
 
-    def fit(self, sigin, sigdriv, fs,
+    def fit(self, sigin, sigdriv, fs, mask=None,
             fit_size=1, use_driver_phase=False):
         """Estimates a filtered STAR model with Taylor expansion
 
         sigin     : signal that is to be modeled
         sigdriv   : signal that drives the model
         fs        : sampling frequency
+        mask      : mask to select where signals are used to fit the model
         fit_size         : ratio of the signal used in the fit
         use_driver_phase : if True, we divide the driver by its amplitude
 
@@ -83,6 +85,11 @@ class BaseAR(object):
         # -------- save signals as attributes of the model
         self.sigin = np.atleast_2d(np.array(sigin, dtype='float64'))
         self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64'))
+
+        self.mask = mask
+        if mask is not None:
+            self.mask = np.atleast_2d(np.array(mask, dtype='float64'))
+
         if self.center:
             self.sigin -= np.mean(self.sigin)
 
@@ -143,20 +150,20 @@ class BaseAR(object):
             normalize = False
 
         sigdriv = np.atleast_2d(sigdriv)
-        _, tmax = sigdriv.shape
+        n_epochs, n_points = sigdriv.shape
 
         # -------- memorize in alpha the various transforms
         alpha = np.eye(ordriv + ordriv_d + 1)
 
         # -------- create the basis
-        basis = np.empty((ordriv + ordriv_d + 1, tmax))
-        basis[0] = np.ones(tmax)
+        basis = np.empty((ordriv + ordriv_d + 1, n_epochs * n_points))
+        basis[0] = 1.0
 
         # -------- create derivative
         if ordriv_d > 0:
             sigdriv_d = np.copy(sigdriv)
-            sigdriv_d[0] -= np.roll(sigdriv[0], 1)
-            sigdriv_d[0, 0] = sigdriv_d[0, 1]
+            sigdriv_d -= np.roll(sigdriv, shift=1, axis=1)
+            sigdriv_d[:, 0] = sigdriv_d[:, 1]
             sigdriv_d *= sigdriv.std() / sigdriv_d.std()
 
         orders = np.r_[np.arange(1, ordriv + 1), np.arange(1, ordriv_d + 1)]
@@ -165,9 +172,9 @@ class BaseAR(object):
         for k, (order, deriv) in enumerate(zip(orders, derivative)):
             k += 1
             if deriv:
-                basis[k] = sigdriv_d ** order
+                basis[k] = sigdriv_d.ravel() ** order
             else:
-                basis[k] = sigdriv ** order
+                basis[k] = sigdriv.ravel() ** order
 
             if ortho:
                 # correct current component with corrected components
@@ -178,19 +185,20 @@ class BaseAR(object):
                 # recompute the expression over initial components
                 alpha[k, :k] = np.dot(alpha[k, :k], alpha[:k, :k])
             if normalize:
-                scale = np.sqrt(float(tmax) / squared_norm(basis[k]))
+                scale = np.sqrt(float(n_epochs * n_points) /
+                                squared_norm(basis[k]))
                 basis[k] *= scale
                 alpha[k, :k + 1] *= scale
 
         # -------- save basis and transformation matrix
         # (basis_ = transform_ * rawbasis)
         if save_basis:
-            self.basis_ = basis
+            self.basis_ = basis.reshape(-1, n_epochs, n_points)
             self.transform_ = alpha
         else:
             if self.normalize or self.ortho:
                 basis = np.dot(self.transform_, basis)
-            return basis
+            return basis.reshape(-1, n_epochs, n_points)
 
     def estimate_ar(self):
         """Estimates the AR model on a signal
@@ -210,14 +218,14 @@ class BaseAR(object):
         # -------- verify all parameters for the estimator
         if self.ordar < 1:
             raise ValueError('baseAR: self.ordar is zero or negative')
-        if self.ordriv is None:
-            raise ValueError('baseAR: self.ordriv is not yet defined (None)')
+        if self.ordriv < 0:
+            raise ValueError('baseAR: self.ordriv is negative')
         if self.basis_ is None:
             raise ValueError('baseAR: basis does not yet exist')
 
         # -------- compute the final estimate
         if self.progress_bar:
-            bar = ProgressBar(title='%s' % self.__class__.__name__)
+            bar = ProgressBar(title=self.get_title(name=True))
         for AR_ in self.last_model():
             self.AR_ = AR_
             self.ordar_ = AR_.shape[0]
@@ -227,27 +235,27 @@ class BaseAR(object):
         self.ordriv_ = self.ordriv
 
     def crop_end(self, sig):
-        _, tmax = sig.shape
         fit_size = min(1, self.fit_size)
         if fit_size == 1:
             return sig
         else:
-            tmax = int(tmax * fit_size)
-            return sig[:, :tmax]
+            n_points = sig.shape[-1]
+            n_points = int(n_points * fit_size)
+            return sig[..., :n_points]
 
     def crop_begin(self, sig):
-        _, tmax = sig.shape
         fit_size = min(1, self.fit_size)
         if fit_size == 1:
             return sig
         else:
-            tmax = int(tmax * fit_size)
-            return sig[:, tmax:]
+            n_points = sig.shape[-1]
+            n_points = int(n_points * fit_size)
+            return sig[..., n_points:]
 
     def degrees_of_freedom(self):
         return ((self.get_ordar() + 1) * (self.get_ordriv() + 1))
 
-    def get_title(self, name=False, logl=False):
+    def get_title(self, name=False, logl=False, bic=False):
         title = ''
         if name:
             title += self.__class__.__name__
@@ -263,6 +271,9 @@ class BaseAR(object):
         if logl:
             logL = self.get_logl()
             title += 'logL=%.4f' % logL
+        if bic:
+            bic = self.get_bic()
+            title += '_BIC=%.4f' % bic
         return title
 
     def get_ordar(self):
@@ -445,7 +456,7 @@ class BaseAR(object):
         """
         # -------- estimate the gain (self.G_) given the following data
         # self.ordriv    : order of the regression of the parameters
-        # self.residual_ : residual signal (from ordar to tmax)
+        # self.residual_ : residual signal (from ordar to n_points)
         # self.basis_    : basis of functions (build from sigdriv)
 
         # -------- compute these intermediate quantities
@@ -459,15 +470,27 @@ class BaseAR(object):
 
         # -------- crop the beginning of the signal (for left out data)
         basis = self.crop_begin(self.basis_)
+        mask = self.crop_begin(self.mask) if self.mask is not None else None
 
         residual = self.residual_
 
         # -------- crop the ordar first values
         residual = residual[:, ordar:]
-        basis = basis[:, ordar:]
+        basis = basis[:, :, ordar:]
+        if mask is not None:
+            mask = mask[:, ordar:]
+
+        # concatenate the epochs since it does not change the computations
+        # as in estimating the AR coefficients
+        if mask is not None:
+            residual = residual[mask != 0]
+            basis = basis[:, mask != 0]
+            mask = mask[mask != 0].reshape(1, -1)
+        residual = residual.reshape(1, -1)
+        basis = basis.reshape(basis.shape[0], -1)
 
         residual2 = residual ** 2
-        _, tmax = residual.shape
+        n_points = residual.size
         resreg = basis * residual
         self.G_ = np.zeros((1, self.ordriv_ + 1))
 
@@ -482,11 +505,11 @@ class BaseAR(object):
         if self.ordriv_ > 0:
             index = np.argsort(basis[1, :])  # indexes to sort the basis
         else:
-            index = np.arange(tmax, dtype=int)
+            index = np.arange(n_points, dtype=int)
 
         nbslices = 3 * (self.ordriv_ + 1)  # number of slices
-        lenslice = tmax // nbslices        # length of a slice
-        e = np.zeros(nbslices)            # log energies
+        lenslice = n_points // nbslices    # length of a slice
+        e = np.zeros(nbslices)             # log energies
 
         # -------- prepare least-squares equations
         tmp = lenslice * np.arange(nbslices + 1)
@@ -496,10 +519,15 @@ class BaseAR(object):
         for k, (this_min, this_max) in enumerate(zip(kmin, kmax)):
             e[k] = np.mean(residual2[0, index[this_min:this_max]])
 
+        if mask is not None:
+            masked_basis = basis * mask
+        else:
+            masked_basis = basis
+
         e = 0.5 * np.log(e)
         R = np.dot(basis[:, index[kmid]],
-                   basis[:, index[kmid]].T)
-        r = np.dot(e, basis[:, index[kmid]].T)
+                   masked_basis[:, index[kmid]].T)
+        r = np.dot(e, masked_basis[:, index[kmid]].T)
 
         # -------- regularize matrix R
         v = np.resize(linalg.eigvalsh(R), (1, self.ordriv + 1))
@@ -521,6 +549,7 @@ class BaseAR(object):
             logsigma = np.dot(self.G_, basis)
             sigma2 = np.exp(2 * logsigma)
 
+            # TODO: add weighting if mask is not None
             loglike[itnum] = wgn_log_likelihood(residual, sigma2)
 
             gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
@@ -532,8 +561,11 @@ class BaseAR(object):
                 break
         self.residual_bis_ = residual / np.sqrt(sigma2)
 
-    def develop_gain(self, basis, squared=False, log=False):
-        G_cols = np.dot(self.G_, basis)
+    def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
+        # n_basis, n_epochs, n_points = basis.shape
+        # 1, n_basis = self.G_.shape
+        # n_epochs, n_points = gain.shape
+        G_cols = np.tensordot(self.G_.ravel(), basis, axes=([0], [0]))
         if squared:
             G_cols *= 2
         if not log:
@@ -550,10 +582,10 @@ class BaseAR(object):
         basis = self.crop_begin(self.basis_)
 
         # -------- estimate the gain
-        gain2 = self.develop_gain(basis[0:, skip:], squared=True)
+        gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(self.residual_[0:, skip:], gain2)
+        logL = wgn_log_likelihood(self.residual_[:, skip:], gain2)
 
         tmax = gain2.size
 
@@ -717,7 +749,7 @@ class BaseAR(object):
         return spec
 
     def amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                            xlim=None):
+                            xlim=None, fmax=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -740,6 +772,9 @@ class BaseAR(object):
 
         # -------- compute spectra
         spec = self._basis2spec(None, frange, True, amplitudes[None, :])
+
+        # keep the only epoch
+        spec = spec[:, 0, :]
 
         # -------- normalize
         if 'c' in mode:
@@ -775,16 +810,115 @@ class BaseAR(object):
         return AR_cols, xlim
 
     def get_sigdriv_bounds(self, sigdriv=None):
-        if sigdriv is None:
-            sigdriv = self.sigdriv
-
         if self.use_driver_phase:
             bounds = [-1, 1]
+
         else:
+            if sigdriv is None:
+                sigdriv = self.sigdriv
+            if self.mask is not None:
+                sigdriv = sigdriv[self.mask != 0]
             bounds = np.percentile(sigdriv, [5, 95])
         bound_min = min(-bounds[0], bounds[1])
         bounds = (-bound_min, bound_min)
         return bounds
+
+    def driven_gain(self, draw='rg', fig=None, ylim=None, n_bins=100,
+                    bin_residual=True, sigdriv=None, scale='dB',
+                    residual=None, title=None):
+        """
+        Compute the driven gain for n_bins values of the driver amplitude.
+        Draw 'r' the residual and/or 'g' the estimated gain.
+        """
+        if sigdriv is None:
+            sigdriv = self.sigdriv
+        sigdriv = self.crop_begin(np.atleast_2d(sigdriv))
+
+        if self.mask is not None:
+            mask = self.crop_begin(self.mask)
+            sigdriv = sigdriv[mask != 0]
+
+        sigdriv = sigdriv.ravel()
+
+        if not bin_residual or 'r' not in draw:
+            # uniform binning
+            bounds = self.get_sigdriv_bounds(sigdriv)
+            sigdriv_bins = np.linspace(bounds[0], bounds[1], n_bins + 1)
+
+        else:
+            # non-uniform binning
+            sigdriv_bins = np.percentile(sigdriv,
+                                         np.linspace(5, 95, n_bins + 1))
+
+        # compute the G_ coefficients for each instant
+        newbasis = self.make_basis(sigdriv=sigdriv_bins[None, :])
+        if scale == 'dB':
+            G_cols_dB = self.develop_gain(newbasis, sigdriv_bins,
+                                          squared=True, log=True)
+            G_cols_dB *= 20.0 / np.log(10)
+        else:
+            G_cols_dB = self.develop_gain(newbasis, sigdriv_bins,
+                                          squared=True, log=False)
+
+        # bin the raw residual with respect to sigdriv values (sigdriv_bins)
+        if 'r' in draw:
+            if residual is None:
+                residual = self.crop_begin(self.residual_)
+
+            if self.mask is not None:
+                residual = residual[mask != 0]
+
+            residual = residual.ravel() ** 2  # with copy
+
+            if not bin_residual:
+                # do not bin the residual
+                binned_res_mean = residual
+            else:
+                # bin the residual
+                bin_indices = np.digitize(sigdriv, sigdriv_bins) - 1
+                binned_res_mean = np.zeros(n_bins)
+                for b in range(n_bins):
+                    if np.any(bin_indices == b):
+                        this_res = residual[bin_indices == b]
+                        binned_res_mean[b] = np.mean(this_res)
+
+            if scale == 'dB':
+                binned_res_mean = 20.0 * np.log10(binned_res_mean)
+
+        if draw:
+            if fig is None:
+                fig = plt.figure('driven gain')
+            try:
+                ax = fig.gca()
+            except:
+                ax = fig
+
+            if 'g' in draw:
+                ax.plot(sigdriv_bins, G_cols_dB[0])
+            if 'r' in draw:
+                if bin_residual:
+                    ax.plot(0.5 * (sigdriv_bins[:-1] + sigdriv_bins[1:]),
+                            binned_res_mean,
+                            'o', alpha=0.5)
+                    # color=ax.lines[-1].get_color())
+                else:
+                    ax.plot(sigdriv,
+                            binned_res_mean,
+                            ',', alpha=0.1)
+
+            ax.set_ylabel('Gain (%s)' % scale)
+            ax.set_xlabel('Driver amplitude')
+            if title is None:
+                title = self.get_title(name=True)
+            ax.set_title(title)
+            ax.grid('on')
+            if ylim is not None:
+                ax.set_ylim(ylim)
+
+        if 'r' in draw:
+            return G_cols_dB, binned_res_mean
+        else:
+            return G_cols_dB
 
     # ------------------------------------------------ #
     def to_dict(self):

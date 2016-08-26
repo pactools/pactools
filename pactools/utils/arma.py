@@ -95,11 +95,12 @@ def ai2ki(ar):
 
     """
     parcor = np.copy(ar)
-    ordar, _ = ar.shape
+    ordar, n_epochs, n_points = ar.shape
     for i in range(ordar - 1, -1, -1):
         if i > 0:
-            parcor[0:i, :] -= parcor[i:i + 1, :] * np.flipud(parcor[0:i, :])
-            parcor[0:i, :] *= 1.0 / (1.0 - parcor[i:i + 1, :] ** 2)
+            parcor[0:i, :, :] -= (parcor[i:i + 1, :, :] *
+                                  np.flipud(parcor[0:i, :, :]))
+            parcor[0:i, :, :] *= 1.0 / (1.0 - parcor[i:i + 1, :, :] ** 2)
     return parcor
 
 
@@ -113,11 +114,11 @@ def ki2ai(parcor):
 
     """
     ar = np.zeros_like(parcor)
-    ordar, _ = parcor.shape
+    ordar, n_epochs, n_points = parcor.shape
     for i in range(ordar):
         if i > 0:
-            ar[0:i, :] += parcor[i:i + 1, :] * np.flipud(ar[0:i, :])
-        ar[i, :] = parcor[i, :]
+            ar[0:i, :, :] += parcor[i:i + 1, :, :] * np.flipud(ar[0:i, :, :])
+        ar[i, :, :] = parcor[i, :, :]
 
     # ok, at least in stationary models
     return ar

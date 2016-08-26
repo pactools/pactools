@@ -48,8 +48,8 @@ class BaseLattice(BaseAR):
         else:
             newbasis = self.make_basis(sigdriv=sigdriv)
 
-        _, tmax = sigdriv.shape
-        tmax = tmax - ordar_
+        n_epochs, n_points = sigdriv.shape
+
         if sigin_init is None:
             sigin_init = np.random.randn(1, ordar_)
         sigin_init = np.atleast_2d(sigin_init)
@@ -59,15 +59,15 @@ class BaseLattice(BaseAR):
                               (sigin_init.shape[1], ordar_))
 
         # initialization
-        signal = np.zeros(tmax + ordar_)
+        signal = np.zeros(n_points)
         signal[:ordar_] = sigin_init[0, -ordar_:]
 
         # compute basis corresponding to sigdriv
         newbasis = self.make_basis(sigdriv=sigdriv)
 
         # synthesis of the signal
-        random_sig = np.random.randn(1, tmax)
-        burn_in = np.random.randn(1, ordar_)
+        random_sig = np.random.randn(n_epochs, n_points - ordar_)
+        burn_in = np.random.randn(n_epochs, ordar_)
         sigout = self.synthesize(random_sig, burn_in=burn_in,
                                  newbasis=newbasis)
 
@@ -100,43 +100,46 @@ class BaseLattice(BaseAR):
         # -------- prepare excitation signal and burn in phase
         if burn_in is None:
             tburn = 0
-            e = random_sig
+            excitation = random_sig
         else:
             tburn = burn_in.size
-            e = np.hstack((burn_in, random_sig))
+            excitation = np.hstack((burn_in, random_sig))
+
+        n_basis, n_epochs, n_points = basis.shape
+        n_epochs, n_points_minus_ordar_ = random_sig.shape
 
         # -------- allocate arrays for forward and backward residuals
-        e_forward = np.zeros(ordar + 1)
-        e_backward = np.zeros(ordar + 1)
+        e_forward = np.zeros(n_epochs, ordar + 1)
+        e_backward = np.zeros(n_epochs, ordar + 1)
 
-        # -------- prepare parcor coefficients, shape = (ordar, tmax)
-        parcor = self.decode(np.dot(self.AR_, basis))
-        gain = np.exp(np.dot(self.G_, basis))
+        # -------- prepare parcor coefficients
+        parcor_list = self.develop_parcor(self.AR_, basis)
+        parcor_list = self.decode(parcor_list)
+
+        gain = self.develop_gain(basis, squared=False, log=False)
 
         # -------- create the output signal
-        tmax = random_sig.size
-        sigout = np.zeros(tmax)
-        for t in range(-tburn, tmax):
-            e_forward[ordar] = e[0, t + tburn] * gain[0, max(t, 0)]
+        sigout = np.zeros(n_epochs, n_points_minus_ordar_)
+        for t in range(-tburn, n_points_minus_ordar_):
+            e_forward[:, ordar] = excitation[:, t + tburn] * gain[0, max(t, 0)]
             for p in range(ordar, 0, -1):
-                e_forward[p - 1] = (e_forward[p]
-                                    - parcor[p - 1, max(t, 0)]
-                                    * e_backward[p - 1])
+                e_forward[:, p - 1] = (e_forward[:, p]
+                                       - parcor_list[p - 1, :, max(t, 0)]
+                                       * e_backward[:, p - 1])
             for p in range(ordar, 0, -1):
-                e_backward[p] = (e_backward[p - 1]
-                                 + parcor[p - 1, max(t, 0)]
-                                 * e_forward[p - 1])
-            e_backward[0] = e_forward[0]
-            sigout[max(t, 0)] = e_forward[0]
-        sigout.shape = (1, tmax)
+                e_backward[:, p] = (e_backward[:, p - 1]
+                                    + parcor_list[p - 1, :, max(t, 0)]
+                                    * e_forward[:, p - 1])
+            e_backward[:, 0] = e_forward[:, 0]
+            sigout[:, max(t, 0)] = e_forward[:, 0]
 
         return sigout
 
-    def cell(self, parcor, forward_residual, backward_residual, tmax=None):
+    def cell(self, parcor_list, forward_residual, backward_residual):
         """Apply a single cell of the direct lattice filter
         to whiten the original signal
 
-        parcor            : array, lattice coefficients
+        parcor_list       : array, lattice coefficients
         forward_residual  : array, forward residual from previous cell
         backward_residual : array, backward residual from previous cell
 
@@ -147,18 +150,14 @@ class BaseLattice(BaseAR):
         backward_residual : backward residual after this cell
 
         """
-        if tmax is None:
-            tmax = self.sigin.size
         f_residual = np.copy(forward_residual)
         b_residual = np.zeros(backward_residual.shape)
-        delayed = np.copy(backward_residual[:1, 0:tmax - 1])
-        delayed.shape = (1, tmax - 1)
+        delayed = np.copy(backward_residual[:, 0:-1])
 
         # -------- apply the cell
-        b_residual[:1, 1:tmax] = delayed + (parcor[:1, 1:tmax]
-                                            * f_residual[:1, 1:tmax])
-        b_residual[0, 0] = parcor[0, 0] * f_residual[0, 0]
-        f_residual[:1, 1:tmax] += parcor[:1, 1:tmax] * delayed
+        b_residual[:, 1:] = delayed + (parcor_list[:, 1:] * f_residual[:, 1:])
+        b_residual[:, 0] = parcor_list[:, 0] * f_residual[:, 0]
+        f_residual[:, 1:] += parcor_list[:, 1:] * delayed
         return f_residual, b_residual
 
     def whiten(self):
@@ -175,16 +174,30 @@ class BaseLattice(BaseAR):
 
         # -------- select ordar (prefered: ordar_)
         ordar = self.get_ordar()
-        tmax = sigin.size
+        n_epochs, n_points = sigin.shape
 
         residual = np.copy(sigin)
         backward = np.copy(sigin)
         for k in range(ordar):
-            parcor = np.reshape(np.dot(self.AR_[k], basis), (1, tmax))
-            parcor = self.decode(parcor)
-            residual, backward = self.cell(parcor, residual, backward, tmax)
+            parcor_list = self.develop_parcor(self.AR_[k], basis)
+            parcor_list = self.decode(parcor_list)
+            residual, backward = self.cell(parcor_list, residual, backward)
 
         return residual, backward
+
+    def develop_parcor(self, LAR, basis):
+        single_dim = LAR.ndim == 1
+        LAR = np.atleast_2d(LAR)
+
+        # n_basis, n_epochs, n_points = basis.shape
+        # ordar, n_basis = LAR.shape
+        # ordar, n_epochs, n_points = lar_list.shape
+        lar_list = np.tensordot(LAR, basis, axes=([1], [0]))
+
+        if single_dim:
+            # n_epochs, n_points = lar_list.shape
+            lar_list = lar_list[0, :, :]
+        return lar_list
 
     # ------------------------------------------------ #
     # Functions that should be overloaded              #
@@ -227,7 +240,7 @@ class BaseLattice(BaseAR):
         ki : array containing the original parcor coefficients
 
         returns:
-        g : array containing the factors (size (1, tmax - 1))
+        g : array containing the factors (size (n_epochs, n_points - 1))
 
         """
         pass
@@ -248,7 +261,7 @@ class BaseLattice(BaseAR):
         ki : array containing the original parcor coefficients
 
         returns:
-        h : array containing the factors (size (1, tmax - 1))
+        h : array containing the factors (size (n_epochs, n_points - 1))
 
         """
         pass
@@ -276,42 +289,69 @@ class BaseLattice(BaseAR):
         sigin = self.crop_end(self.sigin)
         basis = self.crop_end(self.basis_)
 
+        mask = self.mask
+        if mask is not None:
+            mask = self.crop_end(self.mask)
+            mask = np.sqrt(mask)  # cf. weighted least-square
+            masked_basis = basis * mask
+        else:
+            masked_basis = basis
+
         # -------- select signal, basis and regression signals
-        _, tmax = sigin.shape
+        n_basis, n_epochs, n_points = basis.shape
         ordriv_p1 = self.ordriv + 1
         ordar_ = self.ordar
-        scale = 1.0 / tmax
+        scale = 1.0  # / n_points
 
         # -------- prepare residual signals
         forward_res = np.copy(sigin)
         backward_res = np.copy(sigin)
 
-        # -------- model at order 0
-        AR_ = np.empty((0, ordriv_p1))
-        self.forward_residual = np.empty((ordar_ + 1, tmax))
-        self.backward_residual = np.empty((ordar_ + 1, tmax))
+        self.forward_residual = np.empty((ordar_ + 1, n_epochs, n_points))
+        self.backward_residual = np.empty((ordar_ + 1, n_epochs, n_points))
         self.forward_residual[0] = forward_res
         self.backward_residual[0] = backward_res
+
+        # -------- model at order 0
+        AR_ = np.empty((0, ordriv_p1))
         yield AR_
 
         # -------- loop on successive orders
         for k in range(0, ordar_):
             # -------- prepare initial estimation (driven parcor)
-            forward_reg = basis * forward_res
-            backward_reg = basis * backward_res
-            R = scale * (np.dot(forward_reg[0:, 1:],
-                                forward_reg[0:, 1:].T)
-                         + np.dot(backward_reg[0:, :-1],
-                                  backward_reg[0:, :-1].T))
-            r = (scale * 2.0) * np.dot(forward_reg[0:, 1:],
-                                       backward_res[:1, :-1].T)
+            if mask is not None:
+                # the mask and basis are not delay as backward_res /!\
+                forward_res = mask[:, k + 1:] * forward_res[:, k + 1:]
+                backward_res = mask[:, k + 1:] * backward_res[:, k:-1]
+            else:
+                forward_res = forward_res[:, k + 1:]
+                backward_res = backward_res[:, k:-1]
+
+            forward_regressor = basis[:, :, k + 1:] * forward_res
+            backward_regressor = basis[:, :, k + 1:] * backward_res
+            R = (np.dot(forward_regressor.reshape(n_basis, -1),
+                        forward_regressor.reshape(n_basis, -1).T)
+                 + np.dot(backward_regressor.reshape(n_basis, -1),
+                          backward_regressor.reshape(n_basis, -1).T))
+            r = np.dot(forward_regressor.reshape(n_basis, -1),
+                       backward_res.reshape(-1, 1))
+
+            R *= scale
+            r *= scale * 2.0
             parcor = -np.linalg.solve(R, r).T
-            parcor_list = np.dot(parcor, basis)
+
+            # n_basis, n_epochs, n_points = basis.shape
+            # n_epochs, n_points = parcor_list.shape
+            parcor_list = self.develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
+            if mask is not None:
+                parcor_list *= mask
 
-            R = scale * np.dot(basis, basis.T)
-            r = scale * np.dot(basis, self.encode(parcor_list).T)
+            R = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
+                               masked_basis[:, :, k:].reshape(n_basis, -1).T)
+            r = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
+                               self.encode(parcor_list[:, k:]).reshape(-1, 1))
             LAR = np.linalg.solve(R, r).T
 
             # -------- Newton-Raphson refinement
@@ -322,31 +362,41 @@ class BaseLattice(BaseAR):
                 itnum += 1
 
                 # -------- compute next residual
-                lar_list = np.dot(LAR, basis)
+                lar_list = self.develop_parcor(LAR.ravel(), basis)
                 parcor_list = self.decode(lar_list)
                 forward_res_next, backward_res_next = self.cell(
-                    parcor_list, forward_res, backward_res, tmax)
+                    parcor_list,
+                    self.forward_residual[k],
+                    self.backward_residual[k])
                 self.forward_residual[k + 1] = forward_res_next
                 self.backward_residual[k + 1] = backward_res_next
 
                 # -------- correct the current vector
-                g = self.common_gradient(k + 1, parcor_list).T
-                gradient = 2.0 * np.dot(basis[:, 1:tmax], g)
-                gradient.shape = (self.ordriv + 1, 1)
+                g = self.common_gradient(k + 1, parcor_list)
+                # n_epochs, n_points - 1 = g.shape = h.shape
+                # n_basis, n_epochs, n_points = basis.shape
+                gradient = 2.0 * np.dot(
+                    basis[:, :, 1:n_points].reshape(n_basis, -1),
+                    g.reshape(-1, 1))
+                gradient.shape = (ordriv_p1, 1)
+
                 h = self.common_hessian(k + 1, parcor_list)
-                hessian = 2.0 * np.dot(basis[:, 1:tmax] * h,
-                                       basis[:, 1:tmax].T)
+                hessian = 2.0 * np.dot(
+                    (basis[:, :, 1:n_points] * h).reshape(n_basis, -1),
+                    basis[:, :, 1:n_points].reshape(n_basis, -1).T)
 
                 dLAR = np.reshape(linalg.solve(hessian, gradient),
-                                  (1, self.ordriv + 1))
+                                  (1, ordriv_p1))
                 LAR -= dLAR
 
             # -------- save current cell and residuals
-            lar_list = np.dot(LAR, basis)
+            lar_list = self.develop_parcor(LAR.ravel(), basis)
             parcor_list = self.decode(lar_list)
 
             forward_res, backward_res = self.cell(
-                parcor_list, forward_res, backward_res, tmax)
+                parcor_list,
+                self.forward_residual[k],
+                self.backward_residual[k])
             self.forward_residual[k + 1] = forward_res
             self.backward_residual[k + 1] = backward_res
 
@@ -365,13 +415,13 @@ class BaseLattice(BaseAR):
 
         # -------- crop the beginning of the signal
         sigin = self.crop_begin(self.sigin)
-        tmax = sigin.size
+        n_epochs, n_points = sigin.shape
 
         if not recompute:
             # -------- if residual are stored, simply return the right one
             try:
                 self.residual_ = np.reshape(self.forward_residual[self.ordar_],
-                                            (1, tmax))
+                                            (n_epochs, n_points))
             # -------- otherwise, compute the prediction error
             except AttributeError:
                 recompute = True
@@ -384,28 +434,27 @@ class BaseLattice(BaseAR):
 
         newcols : array giving the indexes of the columns
         newbasis : if None, we use the basis used for fitting (self.basis_)
-                    else, we use the given basis.
+                   else, we use the given basis.
         returns:
         ARcols : array containing the AR parts
         Gcols  : array containing the gains
 
-        The size of ARcols is (1+ordar, len(newcols))
-        The size of Gcols is (1, len(newcols))
+        The size of ARcols is (1 + ordar, n_epochs, len(newcols))
+        The size of Gcols is (1, n_epochs, len(newcols))
 
         """
         if newbasis is None:
-            basisplot = self.basis_[:, newcols]
+            basisplot = self.basis_[..., newcols]
         else:
-            basisplot = newbasis[:, newcols]
-        _, nbcols = basisplot.shape
+            basisplot = newbasis[..., newcols]
+        n_basis, n_epochs, n_points = basisplot.shape
         ordar = self.get_ordar()
 
         # -------- expand on the basis
-        AR_cols = np.ones((1, nbcols))
+        AR_cols = np.ones((1, n_epochs, n_points))
         if ordar > 0:
-            ki = np.dot(self.AR_, basisplot)
-            ki = self.decode(ki)
-            AR_cols = np.vstack((AR_cols,
-                                 ki2ai(ki)))
-        G_cols = np.exp(np.dot(self.G_, basisplot))
+            parcor_list = self.develop_parcor(self.AR_, basisplot)
+            parcor_list = self.decode(parcor_list)
+            AR_cols = np.vstack((AR_cols, ki2ai(parcor_list)))
+        G_cols = self.develop_gain(basisplot, squared=False, log=False)
         return (AR_cols, G_cols)

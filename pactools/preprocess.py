@@ -157,9 +157,12 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum(
                 [white_sig, low_sig, white_sig - low_sig,
-                 white_sig - wide_low_sig, wide_low_sig, high_sig],
-                labels=['s', 'l', 's-l', 's-wl', 'wl', 'h'], fs=fs,
+                 wide_low_sig, white_sig - wide_low_sig, high_sig],
+                labels=None, fs=fs,
                 colors='bggrrk')
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'wide_driver', 'signal-wide_driver',
+                        'high_frequencies'], loc=0)
     else:
         raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
 
@@ -350,10 +353,11 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
         pass
     """
     low_fq_range = np.atleast_1d(low_fq_range)
+    sigs = np.atleast_2d(sigs)
 
     # -------- apply whitening filter
     if whitening == 'before':
-        sigs = [whiten(sig, fs=fs, ordar=ordar, draw='') for sig in sigs]
+        sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
         show_plot(draw)
 
     if fill in [2, 4]:
@@ -366,12 +370,12 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
         low_and_high = [extract_and_fill(
             sig, fs=fs, fc=fc, n_cycles=n_cycles, bandwidth=bandwidth,
             fill=fill, ordar=ordar, enf=enf, whiten_fill4=whitening == 'after',
-            random_noise=random_noise) for sig in sigs]
+            random_noise=random_noise, draw=draw) for sig in sigs]
         low_sigs = [both[0] for both in low_and_high]
         high_sigs = [both[1] for both in low_and_high]
 
         if whitening == 'after' and fill != 4:
-            high_sigs = [whiten(high_sig, fs=fs, ordar=ordar, draw='')
+            high_sigs = [whiten(high_sig, fs=fs, ordar=ordar, draw=draw)
                          for high_sig in high_sigs]
 
         # -------- normalize variances
