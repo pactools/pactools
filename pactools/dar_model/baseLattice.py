@@ -301,7 +301,7 @@ class BaseLattice(BaseAR):
         n_basis, n_epochs, n_points = basis.shape
         ordriv_p1 = self.ordriv + 1
         ordar_ = self.ordar
-        scale = 1.0  # / n_points
+        scale = 1.0  / n_points
 
         # -------- prepare residual signals
         forward_res = np.copy(sigin)

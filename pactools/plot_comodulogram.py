@@ -8,7 +8,7 @@ def compute_ticks(vmin, vmax, unit=''):
         tick_labels = '%s'
         ticks = np.array([vmin])
     else:
-        log_scale = np.floor(np.log10((vmax - vmin) / 3.0))
+        log_scale = np.floor(np.log10((vmax - vmin) / 5.0))
         scale = 10. ** log_scale
         vmax = np.floor(vmax / scale) * scale
         vmin = np.ceil(vmin / scale) * scale
