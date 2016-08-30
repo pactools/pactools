@@ -109,13 +109,13 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
 
     # plot the filtered_low_real troughs
     if draw_peaks:
-        n_points = min(3000, low_sig.size)
-        t = np.arange(n_points) / float(fs)
+        n_point_plot = min(3000, low_sig.shape[1])
+        t = np.arange(n_point_plot) / float(fs)
         plt.figure(figsize=(16, 5))
-        plt.plot(t, low_sig[0, :n_points], label='signal')
-        plt.plot(t, filtered_low_real[0, :n_points], label='driver')
-        plt.plot(trough_loc[trough_loc < n_points] / float(fs),
-                 trough_mag[trough_loc < n_points], 'o', label='trough')
+        plt.plot(t, low_sig[0, :n_point_plot], label='signal')
+        plt.plot(t, filtered_low_real[0, :n_point_plot], label='driver')
+        plt.plot(trough_loc[trough_loc < n_point_plot] / float(fs),
+                 trough_mag[trough_loc < n_point_plot], 'o', label='trough')
         plt.xlabel('Time (sec)')
         plt.title("Driver's trough detection")
         plt.legend(loc=0)
@@ -179,6 +179,12 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None,
 
         peak_inds_list.extend(peak_inds + i_epoch * n_points)
         peak_mags_list.extend(peak_mags)
+
+    if peak_inds_list == []:
+        raise ValueError("No %s detected. The signal might be to short, "
+                         "or the mask to strong. You can also try to reduce "
+                         "the plotted time window `t_plot`."
+                         % ["trough", "peak"][(extrema + 1) // 2])
 
     return np.array(peak_inds_list), np.array(peak_mags_list)
 
