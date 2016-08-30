@@ -115,7 +115,8 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
         Colormap used in the plot. If None, it uses 'viridis' colormap.
 
     vmin, vmax : float or None
-        If not None, it define the min/max value of the plot
+        If not None, they define the min/max value of the plot, else they are
+        set to (0, comodulograms.max()).
 
     unit : string (default: '')
         Unit of the comodulogram
