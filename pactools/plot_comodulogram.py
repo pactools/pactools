@@ -80,6 +80,48 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
 def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
                        titles=None, fig=None, axs=None,
                        cmap=None, vmin=None, vmax=None, unit=''):
+    """
+    Plot one or more comodulograms.
+
+    Parameters
+    ----------
+    comodulograms : array, shape (len(low_fq_range), len(high_fq_range))
+        Comodulogram for each couple of frequencies. If a list of comodulograms
+        is given, or if the shape of the array is (n_channels,
+        len(low_fq_range), len(high_fq_range)), it plots each comodulogram in
+        each ax given in `axs`.
+
+    fs : float,
+        Sampling frequency
+
+    low_fq_range : array or list
+        List of filtering frequencies (phase signal)
+
+    high_fq_range : array or list
+        List of filtering frequencies (amplitude signal)
+
+    titles : list of string or None
+        List of titles for each comodulogram
+
+    fig : matplotlib.figure.Figure or None
+        Figure instance where the comodulograms are drawn.
+        If None, a new figure is created.
+
+    axs : list or array of matplotlib.axes._subplots.AxesSubplot
+        Axes where the comodulograms are drawn. If None, a new figure is
+        created. Typical use is: fig, axs = plt.subplots(3, 4)
+
+    cmap : colormap or None
+        Colormap used in the plot. If None, it uses 'viridis' colormap.
+
+    vmin, vmax : float or None
+        If not None, they define the min/max value of the plot, else they are
+        set to (0, comodulograms.max()).
+
+    unit : string (default: '')
+        Unit of the comodulogram
+
+    """
     if isinstance(comodulograms, list):
         comodulograms = np.array(comodulograms)
 
@@ -90,15 +132,16 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
 
     n_comods = comodulograms.shape[0]
 
-    if fig is None:
+    if fig is None or axs is None:
         fig, axs = plt.subplots(1, n_comods, figsize=(4 * n_comods, 3))
     axs = np.array(axs).ravel()
 
     vmin = 0 if vmin is None else vmin
     vmax = comodulograms.max() if vmax is None else vmax
-    cmap = plt.get_cmap('viridis')
+    if cmap is None:
+        cmap = plt.get_cmap('viridis')
 
-    n_channels, n_fc, n_freq = comodulograms.shape
+    n_channels, n_low_fq, n_high_fq = comodulograms.shape
     extent = [low_fq_range[0], low_fq_range[-1],
               high_fq_range[0], high_fq_range[-1]]
 
