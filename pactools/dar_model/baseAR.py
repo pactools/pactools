@@ -480,8 +480,8 @@ class BaseAR(object):
         if mask is not None:
             mask = mask[:, ordar:]
 
-        # concatenate the epochs since it does not change the computations
-        # as in estimating the AR coefficients
+        # concatenate the epochs since it does not change the computations
+        # as in estimating the AR coefficients
         if mask is not None:
             residual = residual[mask != 0]
             basis = basis[:, mask != 0]
@@ -562,9 +562,9 @@ class BaseAR(object):
         self.residual_bis_ = residual / np.sqrt(sigma2)
 
     def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
-        # n_basis, n_epochs, n_points = basis.shape
-        # 1, n_basis = self.G_.shape
-        # n_epochs, n_points = gain.shape
+        # n_basis, n_epochs, n_points = basis.shape
+        # 1, n_basis = self.G_.shape
+        # n_epochs, n_points = gain.shape
         G_cols = np.tensordot(self.G_.ravel(), basis, axes=([0], [0]))
         if squared:
             G_cols *= 2
@@ -773,7 +773,7 @@ class BaseAR(object):
         # -------- compute spectra
         spec = self._basis2spec(None, frange, True, amplitudes[None, :])
 
-        # keep the only epoch
+        # keep the only epoch
         spec = spec[:, 0, :]
 
         # -------- normalize

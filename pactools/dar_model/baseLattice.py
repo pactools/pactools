@@ -188,14 +188,13 @@ class BaseLattice(BaseAR):
     def develop_parcor(self, LAR, basis):
         single_dim = LAR.ndim == 1
         LAR = np.atleast_2d(LAR)
-
-        # n_basis, n_epochs, n_points = basis.shape
-        # ordar, n_basis = LAR.shape
-        # ordar, n_epochs, n_points = lar_list.shape
+        # n_basis, n_epochs, n_points = basis.shape
+        # ordar, n_basis = LAR.shape
+        # ordar, n_epochs, n_points = lar_list.shape
         lar_list = np.tensordot(LAR, basis, axes=([1], [0]))
 
         if single_dim:
-            # n_epochs, n_points = lar_list.shape
+            # n_epochs, n_points = lar_list.shape
             lar_list = lar_list[0, :, :]
         return lar_list
 
@@ -292,7 +291,7 @@ class BaseLattice(BaseAR):
         mask = self.mask
         if mask is not None:
             mask = self.crop_end(self.mask)
-            mask = np.sqrt(mask)  # cf. weighted least-square
+            mask = np.sqrt(mask)  # cf. weighted least-square
             masked_basis = basis * mask
         else:
             masked_basis = basis
@@ -340,8 +339,8 @@ class BaseLattice(BaseAR):
             r *= scale * 2.0
             parcor = -np.linalg.solve(R, r).T
 
-            # n_basis, n_epochs, n_points = basis.shape
-            # n_epochs, n_points = parcor_list.shape
+            # n_basis, n_epochs, n_points = basis.shape
+            # n_epochs, n_points = parcor_list.shape
             parcor_list = self.develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
@@ -373,8 +372,8 @@ class BaseLattice(BaseAR):
 
                 # -------- correct the current vector
                 g = self.common_gradient(k + 1, parcor_list)
-                # n_epochs, n_points - 1 = g.shape = h.shape
-                # n_basis, n_epochs, n_points = basis.shape
+                # n_epochs, n_points - 1 = g.shape = h.shape
+                # n_basis, n_epochs, n_points = basis.shape
                 gradient = 2.0 * np.dot(
                     basis[:, :, 1:n_points].reshape(n_basis, -1),
                     g.reshape(-1, 1))
