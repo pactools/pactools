@@ -289,7 +289,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         raise(ValueError, 'unknown method: %s' % method)
 
     if draw:
-        plot_comodulograms(comod_list, fs, low_fq_range)
+        plot_comodulograms(comod_list, fs, low_fq_range, high_fq_range)
 
     if not mask_is_list:
         return comod_list[0]

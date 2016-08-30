@@ -77,7 +77,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     return fig
 
 
-def plot_comodulograms(comodulograms, fs, low_fq_range,
+def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
                        titles=None, fig=None, axs=None,
                        cmap=None, vmin=None, vmax=None, unit=''):
     if isinstance(comodulograms, list):
@@ -99,13 +99,14 @@ def plot_comodulograms(comodulograms, fs, low_fq_range,
     cmap = plt.get_cmap('viridis')
 
     n_channels, n_fc, n_freq = comodulograms.shape
-    extend = (low_fq_range[0], low_fq_range[-1], 0, fs / 2.)
+    extent = [low_fq_range[0], low_fq_range[-1],
+              high_fq_range[0], high_fq_range[-1]]
 
     # plot the image
     for i in range(n_channels):
         cax = axs[i].imshow(
             comodulograms[i].T, cmap=cmap, vmin=vmin, vmax=vmax,
-            aspect='auto', origin='lower', extent=extend, interpolation='none')
+            aspect='auto', origin='lower', extent=extent, interpolation='none')
 
         if titles is not None:
             axs[i].set_title(titles[i], fontsize=12)
