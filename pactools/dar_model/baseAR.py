@@ -4,6 +4,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import linalg
+from scipy.signal import fftconvolve
 from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
@@ -83,12 +84,16 @@ class BaseAR(object):
             sigin = np.atleast_2d(sigin)[:, :sigdriv.size]
 
         # -------- save signals as attributes of the model
-        self.sigin = np.atleast_2d(np.array(sigin, dtype='float64'))
-        self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64'))
+        self.sigin = np.atleast_2d(np.array(sigin, dtype='float64',
+                                            order='C'))
+        self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64',
+                                              order='C'))
 
         self.mask = mask
         if mask is not None:
             self.mask = np.atleast_2d(np.array(mask, dtype='float64'))
+
+        self.remove_far_masked_data()
 
         if self.center:
             self.sigin -= np.mean(self.sigin)
@@ -233,6 +238,34 @@ class BaseAR(object):
                 bar.update(float(self.ordar_) / self.ordar,
                            title=self.get_title(name=True))
         self.ordriv_ = self.ordriv
+
+    def remove_far_masked_data(self):
+        """Remove unnecessary data which is masked
+        and far (> self.ordar) from the unmasked data.
+        """
+        if self.mask is None:
+            return
+
+        # convolution with a delay kernel,
+        # so we keep the close points before the mask
+        kernel = np.ones(self.ordar * 2 + 1)
+        kernel[-self.ordar:] = 0.
+        delayed_mask = fftconvolve(self.mask, kernel[None, :], mode='same')
+        # remove numerical error from fftconvolve
+        delayed_mask[np.abs(delayed_mask) < 1e-13] = 0.
+
+        time_selection = delayed_mask.sum(axis=0) != 0
+        epoch_selection = delayed_mask.sum(axis=1) != 0
+
+        if not np.any(time_selection) or not np.any(epoch_selection):
+            raise ValueError("The mask seems to be empty.")
+
+        self.mask = self.mask[epoch_selection, :]
+        self.sigin = self.sigin[epoch_selection, :]
+        self.sigdriv = self.sigdriv[epoch_selection, :]
+        self.mask = (self.mask[:, time_selection])
+        self.sigin = np.ascontiguousarray(self.sigin[:, time_selection])
+        self.sigdriv = (self.sigdriv[:, time_selection])
 
     def crop_end(self, sig):
         fit_size = min(1, self.fit_size)

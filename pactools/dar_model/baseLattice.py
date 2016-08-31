@@ -300,7 +300,7 @@ class BaseLattice(BaseAR):
         n_basis, n_epochs, n_points = basis.shape
         ordriv_p1 = self.ordriv + 1
         ordar_ = self.ordar
-        scale = 1.0  / n_points
+        scale = 1.0 / n_points
 
         # -------- prepare residual signals
         forward_res = np.copy(sigin)
@@ -328,12 +328,16 @@ class BaseLattice(BaseAR):
 
             forward_regressor = basis[:, :, k + 1:] * forward_res
             backward_regressor = basis[:, :, k + 1:] * backward_res
-            R = (np.dot(forward_regressor.reshape(n_basis, -1),
-                        forward_regressor.reshape(n_basis, -1).T)
-                 + np.dot(backward_regressor.reshape(n_basis, -1),
-                          backward_regressor.reshape(n_basis, -1).T))
-            r = np.dot(forward_regressor.reshape(n_basis, -1),
-                       backward_res.reshape(-1, 1))
+
+            # this reshape method will throw an error if a copy is needed
+            forward_regressor.shape = (n_basis, -1)
+            backward_regressor.shape = (n_basis, -1)
+            backward_res.shape = (1, -1)
+
+            R = (np.dot(forward_regressor, forward_regressor.T) +
+                 np.dot(backward_regressor, backward_regressor.T))
+            r = np.dot(forward_regressor, backward_res.T)
+            backward_res.shape = (n_epochs, -1)
 
             R *= scale
             r *= scale * 2.0
