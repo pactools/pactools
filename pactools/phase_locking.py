@@ -59,6 +59,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     save_name : string or None
         Name to use for saving the plot.
         If None, a name is generated based on some parameters.
+        If False, the figure is not saved
 
     peak_or_trough: in {'peak', 'trough'}
         Lock to the maximum (peak) of minimum (trough) of the slow oscillation
@@ -76,6 +77,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
 
     low_sig = np.atleast_2d(low_sig)
     low_sig = crop_for_fast_hilbert(low_sig)
+    mask = crop_for_fast_hilbert(mask)
 
     if high_sig is None:
         high_sig = low_sig
@@ -131,8 +133,8 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
 
     # plot the higher part
     plot_trough_locked_time_frequency(
-        filtered_high, fs, high_fq_range, trough_loc=trough_loc,
-        t_plot=t_plot, fig=fig, ax=axs[0], vmin=None, vmax=None)
+        filtered_high, fs, high_fq_range, trough_loc=trough_loc, t_plot=t_plot,
+        mask=mask, fig=fig, ax=axs[0], vmin=None, vmax=None)
 
     # plot the lower part
     plot_trough_locked_time(
@@ -143,7 +145,8 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     if save_name is None:
         save_name = ('%s_wlo%.2f_whi%.1f'
                      % (method, low_fq_width, high_fq_width))
-    fig.savefig(save_name + '.png')
+    if save_name:
+        fig.savefig(save_name + '.png')
 
     return fig
 
@@ -250,7 +253,7 @@ def trough_locked_percentile(signals, fs, trough_loc, t_plot,
 
 
 def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
-                                      trough_loc, t_plot,
+                                      trough_loc, t_plot, mask=None,
                                       fig=None, ax=None,
                                       vmin=None, vmax=None):
     """
@@ -258,14 +261,22 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
     """
     # normalize each signal independently
     # n_frequencies, n_epochs, n_points = filtered_high.shape
-    filtered_high -= filtered_high.mean(axis=2)[:, :, None]
-    filtered_high /= filtered_high.std(axis=2)[:, :, None]
+
+    # normalization is done everywhere, but mean is computed
+    #  only where mask == 1
+    mean = filtered_high[:, mask == 1].mean(axis=1)[:, None, None]
+    std = filtered_high[:, mask == 1].std(axis=1)[:, None, None]
+
+    filtered_high -= mean
+    filtered_high /= std
+
     # get the power (np.abs(filtered_high) ** 2)
     filtered_high *= np.conj(filtered_high)
     filtered_high = np.real(filtered_high)
 
-    # subtract the mean power
-    filtered_high -= filtered_high.mean(axis=2)[:, :, None]
+    # subtract the mean power.
+    mean = filtered_high[:, mask == 1].mean(axis=1)[:, None, None]
+    filtered_high -= mean
 
     # compute the evoked signals (trough-locked mean)
     evoked_signals = trough_locked_percentile(filtered_high, fs,
