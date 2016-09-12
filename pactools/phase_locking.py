@@ -277,7 +277,7 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
         ax = fig.gca()
 
     # plot
-    vmax = evoked_signals.max() if vmax is None else vmax
+    vmax = np.abs(evoked_signals).max() if vmax is None else vmax
     vmin = -vmax
     cax = ax.imshow(evoked_signals,
                     cmap=plt.get_cmap('RdBu_r'),
