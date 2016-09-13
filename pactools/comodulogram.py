@@ -300,7 +300,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                         high_fq_range, low_fq_width, method='minmax',
                         fill=4, ordar=12, enf=50., random_noise=None,
-                        normalize=True, whitening=None,
+                        normalize=True, whitening='after',
                         progress_bar=True):
     """
     Compute the comodulogram with a DAR model.

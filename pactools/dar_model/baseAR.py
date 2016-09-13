@@ -733,8 +733,7 @@ class BaseAR(object):
     # ------------------------------------------------ #
     # Functions to plot the models                     #
     # ------------------------------------------------ #
-    def _basis2spec(self, newcols, frange=None, instantaneous=False,
-                    sigdriv=None):
+    def _basis2spec(self, sigdriv, frange=None):
         """Compute the power spectral density for a given basis
 
         newcols : array giving the indexes of the columns
@@ -748,15 +747,11 @@ class BaseAR(object):
         ordar = self.get_ordar()
 
         # -------- estimate AR and Gain columns
-        if sigdriv is not None:
-            AR_cols, G_cols, _, _ = self.develop_all(
-                sigdriv=sigdriv, instantaneous=instantaneous)
-        else:
-            try:
-                AR_cols, G_cols = self.develop(newcols,
-                                               instantaneous=instantaneous)
-            except:
-                AR_cols, G_cols = self.develop(newcols)
+        AR_cols, G_cols, _, _ = self.develop_all(sigdriv=sigdriv)
+
+        # keep the only epoch
+        AR_cols = AR_cols[:, 0, :]
+        G_cols = G_cols[0, :][None, :]
 
         # -------- estimate AR spectrum
         nfft = 256
@@ -804,10 +799,7 @@ class BaseAR(object):
         amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
 
         # -------- compute spectra
-        spec = self._basis2spec(None, frange, True, amplitudes[None, :])
-
-        # keep the only epoch
-        spec = spec[:, 0, :]
+        spec = self._basis2spec(amplitudes[None, :], frange)
 
         # -------- normalize
         if 'c' in mode:

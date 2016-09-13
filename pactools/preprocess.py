@@ -137,7 +137,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
     elif fill == 4:
         # replacing driver by a wide-band white noise
 
-        factor = 4.0
+        factor = 8.0
         if n_cycles is not None:
             n_cycles /= factor
         else:
