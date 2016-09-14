@@ -76,7 +76,7 @@ def example_compare_comodulogram():
             high_fq_width=high_fq_width,
             n_surrogates=25)
 
-        plot_comodulograms(comod, fs, low_fq_range,
+        plot_comodulograms(comod, fs, low_fq_range, high_fq_range,
                            ['%s' % method], fig, [axs.ravel()[i]])
 
     fig.savefig('compare_comodulogram.png')

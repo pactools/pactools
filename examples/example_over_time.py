@@ -87,7 +87,8 @@ def example_channel_by_channel():
                                 figsize=(1.4 * len(comodulograms), 5.))
         titles = ['cs- %s' % (parts[i]) for i in range(len(parts))]
         titles += ['cs+ %s' % (parts[i]) for i in range(len(parts))]
-        plot_comodulograms(comodulograms, fs, low_fq_range, titles, fig, axs)
+        plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
+                           titles, fig, axs)
 
         # add suptitle
         fig.subplots_adjust(top=0.85)
@@ -164,7 +165,8 @@ def example_all_channels():
                                 figsize=(1.4 * len(comodulograms), 5.))
         titles = ['cs- %s' % (parts[i]) for i in range(len(parts))]
         titles += ['cs+ %s' % (parts[i]) for i in range(len(parts))]
-        plot_comodulograms(comodulograms, fs, low_fq_range, titles, fig, axs)
+        plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
+                           titles, fig, axs)
 
         # add suptitle
         fig.subplots_adjust(top=0.85)

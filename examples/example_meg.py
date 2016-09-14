@@ -54,9 +54,9 @@ def example_on_each_epoch():
             fig, axs = plt.subplots(1, 2, figsize=(15, 6))
 
             for i, comod in enumerate(comods):
-                plot_comodulograms(comod, fs, low_fq_range, [titles[i]],
-                                   fig, [axs[i]], plt.get_cmap('viridis'),
-                                   None, None)
+                plot_comodulograms(comod, fs, low_fq_range, high_fq_range,
+                                   [titles[i]], fig, [axs[i]],
+                                   plt.get_cmap('viridis'), None, None)
 
             # save the figure
             fig.savefig(save_name)
@@ -117,9 +117,9 @@ def example_concatenating_epochs():
 
         # loop is not necessary if we have comodulogram with the same scales
         for i, comod in enumerate(comods):
-            plot_comodulograms(comod, fs, low_fq_range, [titles[i]],
-                               fig, [axs[i]], plt.get_cmap('viridis'),
-                               None, None)
+            plot_comodulograms(comod, fs, low_fq_range, high_fq_range,
+                               [titles[i]], fig, [axs[i]],
+                               plt.get_cmap('viridis'), None, None)
 
         # save the figure
         fig.savefig(save_name)
