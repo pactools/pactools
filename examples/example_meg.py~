@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import mne
 
 from pactools.utils.spliter import blend_and_ravel
-from pactools.comodulogram import comodulogram
+from pactools.modulation_index import modulation_index
 from pactools.plot_comodulogram import plot_comodulograms
 
 
