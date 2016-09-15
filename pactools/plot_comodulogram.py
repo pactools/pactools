@@ -79,7 +79,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
 
 def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
                        titles=None, fig=None, axs=None,
-                       cmap=None, vmin=None, vmax=None, unit=''):
+                       cmap=None, vmin=None, vmax=None, unit='', cbar=True, label=True):
     """
     Plot one or more comodulograms.
 
@@ -121,6 +121,11 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
     unit : string (default: '')
         Unit of the comodulogram
 
+    cbar : True or False
+        Display colorbar or not
+
+    label : True or False
+        Display labels or not	
     """
     if isinstance(comodulograms, list):
         comodulograms = np.array(comodulograms)
@@ -154,11 +159,13 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
         if titles is not None:
             axs[i].set_title(titles[i], fontsize=12)
 
-    axs[-1].set_xlabel('Driver frequency (Hz)')
-    axs[0].set_ylabel('Signal frequency (Hz)')
+    if label == True:
+        axs[-1].set_xlabel('Driver frequency (Hz)')
+        axs[0].set_ylabel('Signal frequency (Hz)')
     if tight_layout:
         fig.tight_layout()
 
     # plot the colorbar once
-    ax = axs[0] if len(axs) == 1 else None
-    add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
+    if cbar == True:
+        ax = axs[0] if len(axs) == 1 else None
+        add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
