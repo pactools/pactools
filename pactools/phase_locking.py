@@ -77,7 +77,8 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
 
     low_sig = np.atleast_2d(low_sig)
     low_sig = crop_for_fast_hilbert(low_sig)
-    mask = crop_for_fast_hilbert(mask)
+    if mask is not None:
+        mask = crop_for_fast_hilbert(mask)
 
     if high_sig is None:
         high_sig = low_sig
@@ -260,12 +261,17 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
     Plot the theta-trough locked Time-frequency
     """
     # normalize each signal independently
-    # n_frequencies, n_epochs, n_points = filtered_high.shape
+    n_frequencies, n_epochs, n_points = filtered_high.shape
 
     # normalization is done everywhere, but mean is computed
     #  only where mask == 1
-    mean = filtered_high[:, mask == 1].mean(axis=1)[:, None, None]
-    std = filtered_high[:, mask == 1].std(axis=1)[:, None, None]
+    if mask is not None:
+        masked_filtered_high = filtered_high[:, mask == 1]
+    else:
+        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+
+    mean = masked_filtered_high.mean(axis=1)[:, None, None]
+    std = masked_filtered_high.std(axis=1)[:, None, None]
 
     filtered_high -= mean
     filtered_high /= std
@@ -275,7 +281,11 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
     filtered_high = np.real(filtered_high)
 
     # subtract the mean power.
-    mean = filtered_high[:, mask == 1].mean(axis=1)[:, None, None]
+    if mask is not None:
+        masked_filtered_high = filtered_high[:, mask == 1]
+    else:
+        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+    mean = masked_filtered_high.mean(axis=1)[:, None, None]
     filtered_high -= mean
 
     # compute the evoked signals (trough-locked mean)

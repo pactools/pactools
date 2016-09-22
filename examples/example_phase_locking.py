@@ -65,5 +65,5 @@ def example_phase_locking_with_mask():
 
 if __name__ == '__main__':
 
-    # example_phase_locking()
-    example_phase_locking_with_mask()
+    example_phase_locking()
+    # example_phase_locking_with_mask()
