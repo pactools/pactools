@@ -27,20 +27,22 @@ class BaseAR(object):
                  iter_newton=0,
                  eps_newton=0.001,
                  ordriv_d=0,
-                 progress_bar=False):
+                 progress_bar=False,
+                 fit_size=1):
         """Creates a filtered STAR model with Taylor expansion
 
-        ordar      : order of the autoregressive model
-        ordriv     : order of the taylor expansion
-        bic        : select order through BIC [boolean]
-        normalize  : normalize basis (to unit energy) [boolean]
-        ortho      : orthogonalize basis [boolean]
-        center     : subtract mean from signal [boolean]
-        iter_gain  : maximum number of iteration in gain estimation
-        epsilon    : threshold to stop iterations in gain estimation
+        ordar       : order of the autoregressive model
+        ordriv      : order of the taylor expansion
+        bic         : select order through BIC [boolean]
+        normalize   : normalize basis (to unit energy) [boolean]
+        ortho       : orthogonalize basis [boolean]
+        center      : subtract mean from signal [boolean]
+        iter_gain   : maximum number of iteration in gain estimation
+        epsilon     : threshold to stop iterations in gain estimation
         iter_newton : maximum number of Newton-Raphson iterations
         eps_newton  : threshold to stop Newton-Raphson iterations
-        ordriv_d   : ordriv for driver's derivative
+        ordriv_d    : ordriv for driver's derivative
+        fit_size    : ratio of the signal used in the fit
 
         """
         # -------- save parameters
@@ -59,17 +61,16 @@ class BaseAR(object):
 
         # -------- prepare other arrays
         self.basis_ = None
-        self.fit_size = 1
+        self.fit_size = fit_size
 
-    def fit(self, sigin, sigdriv, fs, mask=None,
-            fit_size=1, use_driver_phase=False):
+    def fit(self, sigin, sigdriv, fs, mask=None, use_driver_phase=False):
         """Estimates a filtered STAR model with Taylor expansion
 
         sigin     : signal that is to be modeled
         sigdriv   : signal that drives the model
         fs        : sampling frequency
         mask      : mask to select where signals are used to fit the model
-        fit_size         : ratio of the signal used in the fit
+
         use_driver_phase : if True, we divide the driver by its amplitude
 
         start, filein and filedriv are only given for information
@@ -105,7 +106,6 @@ class BaseAR(object):
 
         # -------- informations on the signals
         self.fs = fs
-        self.fit_size = fit_size
 
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
@@ -425,10 +425,12 @@ class BaseAR(object):
         ordriv = self.ordriv - self.ordriv_d
         ordriv_d = self.ordriv_d
 
-        best_BIC = np.inf
+        best_criterion = np.inf
         logL = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
         AIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
         BIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
+
+        criterion = 'AIC' if self.fit_size < 1 else 'AIC'
 
         # -------- loop on ordriv with a copy of the estimator
         if self.progress_bar:
@@ -457,14 +459,14 @@ class BaseAR(object):
                     A.estimate_gain()
 
                     A.reset_logl_aic_bic()
-                    this_BIC = A.get_bic()
+                    this_criterion = A.get_criterion(criterion)
                     logL[ordar_, ordriv_, ordriv_d_] = A.get_logl()
                     AIC[ordar_, ordriv_, ordriv_d_] = A.get_aic()
-                    BIC[ordar_, ordriv_, ordriv_d_] = this_BIC
+                    BIC[ordar_, ordriv_, ordriv_d_] = A.get_bic()
 
                     # -------- actualize the best model
-                    if this_BIC < best_BIC:
-                        best_BIC = this_BIC
+                    if this_criterion < best_criterion:
+                        best_criterion = this_criterion
                         self.ordar_ = ordar_
                         self.ordriv_ = ordriv_ + ordriv_d_
                         self.ordriv_d_ = ordriv_d_
