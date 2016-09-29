@@ -45,12 +45,11 @@ def example_compare_comodulogram():
     # Parameters for the PAC analysis
     low_fq_width = 0.5  # Hz
     high_fq_width = 12.0  # Hz
-    low_fq_range = np.arange(0.2, 5.2, 0.2)  # Hz
-    high_fq_range = np.arange(0.2, 150., 4.0)  # Hz
+    low_fq_range = np.arange(1.0, 6.2, 0.2)  # Hz
+    high_fq_range = np.arange(10., fs / 2, 4.0)  # Hz
 
     # Define two models DAR:
-    dar_model_0 = DAR(ordriv=1, ordar=12, bic=False)
-    dar_model_1 = DAR(ordriv=1, ordar=16, bic=True)
+    dar_model = DAR(ordriv=1, ordar=12, bic=False)
     # ordriv: order of the polynomial expansion of the driver.
     #         Typically in [0, 2]. With 0, no PAC is present in the model
     # ordar : order of the AutoRegressive part.
@@ -63,10 +62,13 @@ def example_compare_comodulogram():
     #         If the signal is short, low values of (ordar, ordriv) will
     #         be selected.
 
+    n_surrogates = 0
+    contours = 4.0 if n_surrogates > 1 else None
+
     fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(16, 12))
 
     # The model is given to the 'method' parameter.
-    for i, method in enumerate(['tort', 'ozkurt', dar_model_0, dar_model_1]):
+    for i, method in enumerate(['tort', 'ozkurt', 'canolty', dar_model]):
 
         comod = comodulogram(
             low_sig=sig, fs=fs, draw=False, method=method,
@@ -74,12 +76,13 @@ def example_compare_comodulogram():
             low_fq_width=low_fq_width,
             high_fq_range=high_fq_range,
             high_fq_width=high_fq_width,
-            n_surrogates=25)
+            n_surrogates=n_surrogates)
 
         plot_comodulograms(comod, fs, low_fq_range, high_fq_range,
-                           ['%s' % method], fig, [axs.ravel()[i]])
+                           ['%s' % method], fig, [axs.ravel()[i]],
+                           contours=contours)
 
-    fig.savefig('compare_comodulogram.png')
+    fig.savefig('compare_comodulogram_%ds.png' % n_surrogates)
     plt.show()
 
 
