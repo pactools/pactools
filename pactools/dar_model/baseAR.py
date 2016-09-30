@@ -114,7 +114,8 @@ class BaseAR(object):
         # -------- estimation of the model
         if self.bic:
             # -------- select the best order
-            self.AIC, self.BIC, self.logL, self.tmax = self.order_selection()
+            self.AIC, self.BIC, self.logL, self.tmax = self.order_selection(
+                self.bic)
             self.estimate_error()
             self.estimate_gain()
 
@@ -409,7 +410,7 @@ class BaseAR(object):
         self.AIC = None
         self.tmax = None
 
-    def order_selection(self):
+    def order_selection(self, criterion):
         """Select the order of the model
 
         Returns the values of the criterion (a tuple containing the
@@ -430,7 +431,11 @@ class BaseAR(object):
         AIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
         BIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
 
-        criterion = 'AIC' if self.fit_size < 1 else 'AIC'
+        # backward compatibility
+        if not isinstance(criterion, str) and criterion:
+            criterion = 'BIC'
+        if criterion.lower() == 'logl':
+            criterion = '-logl'
 
         # -------- loop on ordriv with a copy of the estimator
         if self.progress_bar:
