@@ -103,19 +103,16 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
 
         for j in range(n_high):
-
-            # compute surrogates MIs
+            # number of  surrogates MIs
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = np.empty(n_iterations)
-            for s in range(n_iterations):
-                if s == 0:
-                    shift = 0
-                else:
-                    # shift at least minimum_shift sec
 
-                    shift = random_state.randint(
-                        n_minimum_shift, n_points - n_minimum_shift)
+            # shift at least minimum_shift sec
+            shifts = random_state.randint(
+                n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
+            shifts[0] = 0
 
+            for s, shift in enumerate(shifts):
                 MI_surr[s] = _one_modulation_index(
                     amplitude=filtered_high[j],
                     phase_preprocessed=phase_preprocessed,
@@ -439,18 +436,16 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         n_epochs, n_points = sigdriv.shape
 
         for i_mask, this_mask in enumerate(mask):
-
-            # compute surrogates MIs
+            # number of  surrogates MIs
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = None
-            for s in range(n_iterations):
-                if s == 0:
-                    shift = 0
-                else:
-                    # shift at least minimum_shift sec
-                    shift = random_state.randint(
-                        n_minimum_shift, n_points - n_minimum_shift)
 
+            # shift at least minimum_shift sec
+            shifts = random_state.randint(
+                n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
+            shifts[0] = 0
+
+            for s, shift in enumerate(shifts):
                 spec_diff = _one_driven_modulation_index(model, sigin, sigdriv,
                                                          fs, this_mask, method,
                                                          high_fq_range, shift)
