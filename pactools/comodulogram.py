@@ -107,10 +107,8 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = np.empty(n_iterations)
 
-            # shift at least minimum_shift sec
-            shifts = random_state.randint(
-                n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
-            shifts[0] = 0
+            shifts = get_shifts(random_state, n_points, n_minimum_shift,
+                                n_iterations)
 
             for s, shift in enumerate(shifts):
                 MI_surr[s] = _one_modulation_index(
@@ -149,14 +147,18 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     # Modulation index as in [Tort & al 2010]
     elif method == 'tort':
         # mean amplitude distribution along phase bins
-        n_bins = 18
-        amplitude_dist = np.zeros(n_bins)
-        for b in range(n_bins):
-            selection = amplitude[phase_preprocessed == b]
-            if selection.size == 0:  # no sample in that bin
-                raise(RuntimeError,
-                      "Not enough data to fill every phase bin")
-            amplitude_dist[b] = np.mean(selection)
+        for n_bins in range(18, 8, -2):
+            amplitude_dist = np.zeros(n_bins)
+            for b in range(n_bins):
+                selection = amplitude[phase_preprocessed == b]
+                if selection.size == 0:  # no sample in that bin
+                    continue
+                amplitude_dist[b] = np.mean(selection)
+            if np.any(amplitude_dist == 0):
+                continue
+
+        if np.any(amplitude_dist == 0):
+            raise RuntimeError("Not enough data to fill %d bins !" % n_bins)
 
         # Kullback-Leibler divergence of the distribution vs uniform
         amplitude_dist /= np.sum(amplitude_dist)
@@ -177,9 +179,9 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
             plt.title('Tort index: %.3f' % MI)
 
     else:
-        raise(ValueError,
-              "Unknown method for modulation index: Got '%s' instead "
-              "of one in ('canolty', 'ozkurt', 'tort')" % method)
+        raise ValueError("Unknown method for modulation index: Got '%s' "
+                         "instead of one in ('canolty', 'ozkurt', 'tort')" %
+                         method)
 
     return MI
 
@@ -302,7 +304,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                                          random_state=random_state,
                                          minimum_shift=minimum_shift)
     else:
-        raise(ValueError, 'unknown method: %s' % method)
+        raise ValueError('unknown method: %s' % method)
 
     if draw:
         contours = 4.0 if n_surrogates > 1 else None
@@ -440,10 +442,8 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = None
 
-            # shift at least minimum_shift sec
-            shifts = random_state.randint(
-                n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
-            shifts[0] = 0
+            shifts = get_shifts(random_state, n_points, n_minimum_shift,
+                                n_iterations)
 
             for s, shift in enumerate(shifts):
                 spec_diff = _one_driven_modulation_index(model, sigin, sigdriv,
@@ -502,14 +502,34 @@ def _one_driven_modulation_index(model, sigin, sigdriv, fs, mask, method,
     return spec_diff
 
 
-def get_maximum_pac(comodulogram, low_fq_range, high_fq_range):
+def get_shifts(random_state, n_points, n_minimum_shift, n_iterations):
+    """ Compute the shifts for the surrogate analysis"""
+    # shift at least minimum_shift seconds, i.e. n_minimum_shift points
+    if n_iterations > 1:
+        if n_points - n_minimum_shift < n_minimum_shift:
+            raise ValueError("The minimum shift is longer than the "
+                             "visible data.")
+
+        shifts = random_state.randint(
+            n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
+    else:
+        shifts = np.array([0])
+    # the first has no shift since this is for the initial computation
+    shifts[0] = 0
+
+    return shifts
+
+
+def get_maximum_pac(comodulograms, low_fq_range, high_fq_range):
     """Get maximum PAC value in a comodulogram.
     'low_fq_range' and 'high_fq_range' must be the same than used in the
     modulation_index function that computed 'comodulogram'.
 
     Parameters
     ----------
-    comodulogram  : PAC values, shape (len(low_fq_range), len(high_fq_range))
+    comodulograms : PAC values, shape (len(low_fq_range), len(high_fq_range))
+                    If a list or a 3D array is given, it returns an array of
+                    each value for each comodulogram.
     low_fq_range  : low frequency range (phase signal)
     high_fq_range : high frequency range (amplitude signal)
 
@@ -519,10 +539,35 @@ def get_maximum_pac(comodulogram, low_fq_range, high_fq_range):
     high_fq   : high frequency of maximum PAC
     pac_value : maximum PAC value
     """
-    i, j = argmax_2d(comodulogram)
-    max_pac_value = comodulogram[i, j]
+    if isinstance(comodulograms, list):
+        comodulograms = np.array(comodulograms)
 
-    low_fq = low_fq_range[i]
-    high_fq = high_fq_range[j]
+    # only one comodulogram
+    return_array = True
+    if comodulograms.ndim == 2:
+        comodulograms = comodulograms[None, :, :]
+        return_array = False
 
-    return low_fq, high_fq, max_pac_value
+    # check that the sizes match
+    n_comod, n_low, n_high = comodulograms.shape
+    n_low_2, n_high_2 = len(low_fq_range), len(high_fq_range)
+    if n_low_2 != n_low or n_high_2 != n_high:
+        raise ValueError("Array shapes do not match: (%d, %d) and (%d, %d)" %
+                         (n_low, n_high, n_low_2, n_high_2))
+
+    # compute the maximum of the comodulogram, and get the frequencies
+    max_pac_value = np.zeros(n_comod)
+    low_fq = np.zeros(n_comod)
+    high_fq = np.zeros(n_comod)
+    for k, comodulogram in enumerate(comodulograms):
+        i, j = argmax_2d(comodulogram)
+        max_pac_value[k] = comodulogram[i, j]
+
+        low_fq[k] = low_fq_range[i]
+        high_fq[k] = high_fq_range[j]
+
+    # return arrays or floats
+    if return_array:
+        return low_fq, high_fq, max_pac_value
+    else:
+        return low_fq[0], high_fq[0], max_pac_value[0]
