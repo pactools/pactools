@@ -227,9 +227,9 @@ class Bicoherence(Spectrum):
         normalization = np.zeros((n_freq, n_freq), dtype=np.float64)
 
         # iterate on blocks
-        block = np.arange(self.blklen)
         count = 0
         for i_epoch in range(n_epochs):
+            block = np.arange(self.blklen)
             while block[-1] < n_points:
                 F = sp.fft(w * sigs[i_epoch, block], self.fftlen, 0)[:n_freq]
                 F1 = F[None, :]
@@ -369,7 +369,7 @@ def compute_n_fft(signals):
     n_fft = signals.shape[-1]
     while prime_factors(n_fft)[-1] > 20:
         n_fft += 1
-    return
+    return n_fft
 
 
 def prime_factors(n):

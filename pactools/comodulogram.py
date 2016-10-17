@@ -62,7 +62,8 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
 
 
 def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
-                  progress_bar, draw_phase, minimum_shift, random_state):
+                  progress_bar, draw_phase, minimum_shift, random_state,
+                  filtered_low_2):
     """
     Compute the comodulogram for empirical metrics.
     """
@@ -70,9 +71,14 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
     if mask is not None:
         filtered_low = filtered_low[:, mask == 1]
         filtered_high = filtered_high[:, mask == 1]
+        if method == 'vanwijk':
+            filtered_low_2 = filtered_low_2[:, mask == 1]
     else:
         filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
         filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
+        if method == 'vanwijk':
+            filtered_low_2 = filtered_low_2.reshape(filtered_low_2.shape[0],
+                                                    -1)
 
     n_low, n_points = filtered_low.shape
     n_high, _ = filtered_high.shape
@@ -90,6 +96,12 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             norm_a[j] = norm(filtered_high[j])
     filtered_high = np.real(filtered_high)
 
+    # amplitude of the low frequency signals
+    if method == 'vanwijk':
+        for i in range(n_low):
+            filtered_low_2[i] = np.abs(filtered_low_2[i])
+        filtered_low_2 = np.real(filtered_low_2)
+
     # Calculate the modulation index for each couple
     MI = np.zeros((n_low, n_high))
     for i in range(n_low):
@@ -103,6 +115,11 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
                                        np.cos(filtered_low[i]),
                                        np.sin(filtered_low[i])]
+        elif method == 'vanwijk':
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
+                                       np.cos(filtered_low[i]),
+                                       np.sin(filtered_low[i]),
+                                       filtered_low_2[i]]
         else:
             phase_preprocessed = np.exp(1j * filtered_low[i])
 
@@ -119,8 +136,7 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
                     amplitude=filtered_high[j],
                     phase_preprocessed=phase_preprocessed,
                     norm_a=norm_a[j], method=method,
-                    n_points=n_points, fs=fs, shift=shift,
-                    draw_phase=draw_phase)
+                    shift=shift, draw_phase=draw_phase)
 
             MI[i, j] = MI_surr[0]
             if n_iterations > 2:
@@ -134,7 +150,7 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
 
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
-                          n_points, fs, shift, draw_phase):
+                          shift, draw_phase):
     # shift for the surrogate analysis
     if shift != 0:
         phase_preprocessed = np.roll(phase_preprocessed, shift)
@@ -142,10 +158,10 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     # Modulation index as in [Ozkurt & al 2011]
     if method == 'ozkurt':
         MI = np.abs(np.mean(amplitude * phase_preprocessed))
-        MI *= np.sqrt(n_points) / norm_a
+        MI *= np.sqrt(amplitude.size) / norm_a
 
     # Modulation index as in [Penny & al 2008]
-    elif method == 'penny':
+    elif method in ('penny', 'vanwijk', ):
         # solve a linear regression problem:
         # amplitude = np.dot(phase_preprocessed) * beta
         PtP = np.dot(phase_preprocessed.T, phase_preprocessed)
@@ -223,12 +239,16 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
                             step=step, fs=fs)
     bicoh = estimator.fit(sigs=sig, method=method)
 
-    # interpoalte to get the same shape than with other methods
+    # remove the redundant part
     n_freq = bicoh.shape[0]
+    np.flipud(bicoh)[np.triu_indices(n_freq, 1)] = 0
+    bicoh[np.triu_indices(n_freq, 1)] = 0
+
+    # interpolate to get the same shape than with other methods
     frequencies = np.linspace(0, fs / 2., n_freq)
-    func = interp2d(frequencies, frequencies, bicoh,
+    func = interp2d(frequencies, frequencies, bicoh.T,
                     kind='linear', bounds_error=True)
-    comod = func(low_fq_range, high_fq_range).T
+    comod = func(high_fq_range, low_fq_range)
 
     return comod
 
@@ -248,7 +268,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  random_state=None,
                  bicoherence_block_length=512,
                  bicoherence_fft_length=None,
-                 bicoherence_step=None):
+                 bicoherence_step=None,
+                 low_fq_width_2=4.0):
     """
     Compute the comodulogram for Phase Amplitude Coupling (PAC).
 
@@ -284,8 +305,16 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     high_fq_width : float
         Bandwidth of the band-pass filter (amplitude signal)
 
-    method : string in ('ozkurt', 'canolty', 'tort', 'penny')
-        Modulation index method,
+    method : string or DAR instance
+        Modulation index method:
+            - String in ('ozkurt', 'canolty', 'tort', 'penny'), for a PAC
+                estimation based on filtering and using the Hilbert transform.
+            - String in ('vanwijk', ) for a joint AAC and PAC estimation
+                based on filtering and using the Hilbert transform.
+            - String in ('sigl', 'nagashima', 'hagihira', 'bispectrum'), for a
+                PAC estimation based on the bicoherence.
+            - DAR instance, for a PAC estimation based on a driven
+                autoregressive model.
 
     n_surrogates : int
         Number of surrogates computed for the z-score
@@ -320,6 +349,10 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         Step between two blocks for bicoherence analysis. If None, it is equal
         to bicoherence_block_length (i.e. no overlap)
 
+    low_fq_width_2 : float
+        Bandwidth of the band-pass filters centered on low_fq_range, for
+        the amplitude signal. Used only with 'vanwijk' method.
+
     Return
     ------
     comod : array, shape (len(low_fq_range), len(high_fq_range))
@@ -338,24 +371,31 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     if not mask_is_list:
         mask = [mask]
 
-    if method in ('ozkurt', 'canolty', 'tort', 'penny'):
+    if method in ('ozkurt', 'canolty', 'tort', 'penny', 'vanwijk'):
         if high_sig is None:
             high_sig = low_sig
+
+        if progress_bar:
+            progress_bar = ProgressBar('comodulogram: %s' % method,
+                                       max_value=low_fq_range.size * len(mask))
 
         # compute a number of band-pass filtered and Hilbert filtered signals
         filtered_high = multiple_band_pass(high_sig, fs,
                                            high_fq_range, high_fq_width)
         filtered_low = multiple_band_pass(low_sig, fs,
                                           low_fq_range, low_fq_width)
+        if method == 'vanwijk':
+            filtered_low_2 = multiple_band_pass(low_sig, fs,
+                                                low_fq_range, low_fq_width_2)
+        else:
+            filtered_low_2 = None
 
-        if progress_bar:
-            progress_bar = ProgressBar('comodulogram: %s' % method,
-                                       max_value=low_fq_range.size * len(mask))
         comod_list = []
         for this_mask in mask:
             comod = _comodulogram(filtered_low, filtered_high, this_mask,
                                   method, fs, n_surrogates, progress_bar,
-                                  draw_phase, minimum_shift, random_state)
+                                  draw_phase, minimum_shift, random_state,
+                                  filtered_low_2)
             comod_list.append(comod)
 
     # compute PAC with the bispectrum/bicoherence

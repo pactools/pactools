@@ -44,6 +44,7 @@ class ProgressBar():
         self.start = time.time()
 
         self.closed = False
+        self.update(initial_value)
 
     def update(self, cur_value, title=None):
         """Update progressbar with current value of process
