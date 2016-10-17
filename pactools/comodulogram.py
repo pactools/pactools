@@ -1,11 +1,14 @@
+import warnings
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
+from scipy.interpolate import interp2d
 from mne.filter import band_pass_filter
 
 from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
-from .utils.spectrum import crop_for_fast_hilbert
+from .utils.spectrum import crop_for_fast_hilbert, Bicoherence
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d, check_random_state
 from .plot_comodulogram import plot_comodulograms
@@ -88,8 +91,6 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             norm_a[j] = norm(filtered_high[j])
     filtered_high = np.real(filtered_high)
 
-    n_minimum_shift = int(minimum_shift * fs)
-
     # Calculate the modulation index for each couple
     MI = np.zeros((n_low, n_high))
     for i in range(n_low):
@@ -111,7 +112,7 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = np.empty(n_iterations)
 
-            shifts = get_shifts(random_state, n_points, n_minimum_shift,
+            shifts = get_shifts(random_state, n_points, minimum_shift, fs,
                                 n_iterations)
 
             for s, shift in enumerate(shifts):
@@ -202,6 +203,39 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     return MI
 
 
+def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
+                 low_fq_range, high_fq_range):
+    """Helper for the bicoherence methods"""
+    # The modulation index is only computed where mask is True
+    if mask is not None:
+        mask = np.squeeze(mask)
+        if mask.ndim > 1:
+            warnings.warn("For bicoherence method (e.g. %s) the mask has "
+                          "to be unidimensional, and the same mask is "
+                          "applied on all epochs. Got shape %s, so only the "
+                          "first row of the mask is used." %
+                          (method, mask.shape, ), UserWarning)
+            mask = mask[0, :]
+        mask = crop_for_fast_hilbert(mask)
+        sig = crop_for_fast_hilbert(sig)
+        sig = sig[:, mask == 1]
+
+    n_epochs, n_points = sig.shape
+
+    estimator = Bicoherence(blklen=block_length, fftlen=fft_length,
+                            step=step, fs=fs)
+    bicoh = estimator.fit(sigs=sig, method=method)
+
+    # interpoalte to get the same shape than with other methods
+    n_freq = bicoh.shape[0]
+    frequencies = np.linspace(0, fs / 2., n_freq)
+    func = interp2d(frequencies, frequencies, bicoh,
+                    kind='linear', bounds_error=True)
+    comod = func(low_fq_range, high_fq_range).T
+
+    return comod
+
+
 def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  low_fq_range=np.linspace(1.0, 10.0, 50),
                  high_fq_range=np.linspace(5.0, 150.0, 60),
@@ -214,7 +248,10 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  progress_bar=True,
                  draw_phase=False,
                  minimum_shift=1.0,
-                 random_state=None):
+                 random_state=None,
+                 bicoherence_block_length=512,
+                 bicoherence_fft_length=None,
+                 bicoherence_step=None):
     """
     Compute the comodulogram for Phase Amplitude Coupling (PAC).
 
@@ -233,6 +270,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     mask : array or list of array or None, shape (n_epochs, n_points)
         The PAC is only evaluated with the unmasked element of low_sig and
         high_sig. Masking is done after filtering and Hilbert transform.
+        If the method computes the bicoherence, the mask has to be
+        unidimensional (n_points, ) and the same mask is applied on all epochs.
         If a list is given, the filtering is done only once and the
         comodulogram is computed on each mask.
 
@@ -272,6 +311,18 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     random_state : None, int or np.random.RandomState instance
         Seed or random number generator for the surrogate analysis
 
+    bicoherence_block_length : int
+        Block length for bicoherence analysis
+
+    bicoherence_fft_length: int or None
+        Length of the FFT in bicoherence analysis. Must be greater or equal to
+        bicoherence_block_length. If greater, zero-padding will be applied. If
+        None, it is eqaul to bicoherence_block_length.
+
+    bicoherence_step : int or None
+        Step between two blocks for bicoherence analysis. If None, it is equal
+        to bicoherence_block_length (i.e. no overlap)
+
     Return
     ------
     comod : array, shape (len(low_fq_range), len(high_fq_range))
@@ -309,6 +360,28 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                                   method, fs, n_surrogates, progress_bar,
                                   draw_phase, minimum_shift, random_state)
             comod_list.append(comod)
+
+    # compute PAC with the bispectrum/bicoherence
+    elif method in ('sigl', 'nagashima', 'hagihira', 'bispectrum'):
+        if high_sig is not None:
+            raise ValueError("Impossible to use a bicoherence on two signals, "
+                             "please try another method.")
+
+        if progress_bar:
+            progress_bar = ProgressBar('bicoherence: %s' % method,
+                                       max_value=len(mask))
+
+        comod_list = []
+        for this_mask in mask:
+            comod = _bicoherence(fs=fs, sig=low_sig,
+                                 mask=this_mask, method=method,
+                                 block_length=bicoherence_block_length,
+                                 fft_length=bicoherence_fft_length,
+                                 step=bicoherence_step,
+                                 low_fq_range=low_fq_range,
+                                 high_fq_range=high_fq_range)
+            comod_list.append(comod)
+            progress_bar.update_with_increment_value(1)
 
     elif isinstance(method, DAR):
         comod_list = driven_comodulogram(fs=fs, low_sig=low_sig,
@@ -429,8 +502,6 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     if not mask_is_list:
         mask = [mask]
 
-    n_minimum_shift = int(minimum_shift * fs)
-
     comod_list = None
     if progress_bar:
         bar = ProgressBar(
@@ -460,7 +531,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             n_iterations = max(1, 1 + n_surrogates)
             MI_surr = None
 
-            shifts = get_shifts(random_state, n_points, n_minimum_shift,
+            shifts = get_shifts(random_state, n_points, minimum_shift, fs,
                                 n_iterations)
 
             for s, shift in enumerate(shifts):
@@ -520,8 +591,9 @@ def _one_driven_modulation_index(model, sigin, sigdriv, fs, mask, method,
     return spec_diff
 
 
-def get_shifts(random_state, n_points, n_minimum_shift, n_iterations):
+def get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
     """ Compute the shifts for the surrogate analysis"""
+    n_minimum_shift = int(fs * minimum_shift)
     # shift at least minimum_shift seconds, i.e. n_minimum_shift points
     if n_iterations > 1:
         if n_points - n_minimum_shift < n_minimum_shift:

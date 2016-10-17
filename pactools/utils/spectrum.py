@@ -6,6 +6,7 @@ from itertools import chain
 
 import numpy as np
 import scipy as sp
+from scipy.linalg import hankel
 import matplotlib.pyplot as plt
 
 
@@ -208,17 +209,16 @@ class Bicoherence(Spectrum):
             blklen=blklen, fftlen=fftlen, step=step,
             wfunc=wfunc, fs=fs)
 
-    def fit(self, sig, method='hagihira'):
+    def fit(self, sigs, method='hagihira'):
         """
         computes the estimation (in dB) for one signal
 
-        sig     : signal from which one computes the power spectrum
-                  (if self.donorm = True) or impulse response used
-                  to compute a transfer function (set donorm to False)
+        sigs     : signal from which one computes the bicoherence
         """
-        from scipy.linalg import hankel
-        sig = sig.ravel()
         self.method = method
+
+        sigs = np.atleast_2d(sigs)
+        n_epochs, n_points = sigs.shape
 
         w = self.wfunc(self.blklen)
         n_freq = self.fftlen // 2 + 1
@@ -228,28 +228,29 @@ class Bicoherence(Spectrum):
         # iterate on blocks
         block = np.arange(self.blklen)
         count = 0
-        while block[-1] < sig.size:
-            F = sp.fft(w * sig[block], self.fftlen, 0)[:n_freq]
-            F1 = F[None, :]
-            F2 = F1.T
-            mask = hankel(np.arange(n_freq))
-            F12 = np.conjugate(F)[mask]
+        for i_epoch in range(n_epochs):
+            while block[-1] < n_points:
+                F = sp.fft(w * sigs[i_epoch, block], self.fftlen, 0)[:n_freq]
+                F1 = F[None, :]
+                F2 = F1.T
+                mask = hankel(np.arange(n_freq))
+                F12 = np.conjugate(F)[mask]
 
-            product = F1 * F2 * F12
-            bicoherence += product
-            if method == 'sigl':
-                normalization += square(F1) * square(F2) * square(F12)
-            elif method == 'nagashima':
-                normalization += square(F1 * F2) * square(F12)
-            elif method == 'hagihira':
-                normalization += np.abs(product)
-            elif method == 'bispectrum':
-                pass
-            else:
-                raise(ValueError("Method '%s' unkown." % method))
+                product = F1 * F2 * F12
+                bicoherence += product
+                if method == 'sigl':
+                    normalization += square(F1) * square(F2) * square(F12)
+                elif method == 'nagashima':
+                    normalization += square(F1 * F2) * square(F12)
+                elif method == 'hagihira':
+                    normalization += np.abs(product)
+                elif method == 'bispectrum':
+                    pass
+                else:
+                    raise(ValueError("Method '%s' unkown." % method))
 
-            count = count + 1
-            block = block + self.step
+                count = count + 1
+                block = block + self.step
 
         bicoherence = np.real(np.abs(bicoherence))
 
@@ -263,8 +264,8 @@ class Bicoherence(Spectrum):
 
         if count == 0:
             raise IndexError(
-                'bicoherence: first block has %d samples but sig has %d '
-                'samples' % (block[-1] + 1, sig.size))
+                'bicoherence: first block needs %d samples but sigs has shape '
+                '%s' % (self.blklen, sigs.shape))
 
         self.bicoherence = bicoherence
         return bicoherence
