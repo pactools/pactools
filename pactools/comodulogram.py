@@ -8,7 +8,7 @@ from mne.filter import band_pass_filter
 
 from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
-from .utils.spectrum import crop_for_fast_hilbert, Bicoherence
+from .utils.spectrum import compute_n_fft, Bicoherence
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d, check_random_state
 from .plot_comodulogram import plot_comodulograms
@@ -23,7 +23,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
     fixed_n_cycles = n_cycles
 
     sigs = np.atleast_2d(sigs)
-    sigs = crop_for_fast_hilbert(sigs)
+    n_fft = compute_n_fft(sigs)
     n_epochs, n_points = sigs.shape
 
     frequency_range = np.atleast_1d(frequency_range)
@@ -56,7 +56,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
                 low_sig = fir.direct(sigs[ii, :])
 
             # common to the two methods
-            filtered[jj, ii, :] = hilbert(low_sig)
+            filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
 
     return filtered
 
@@ -68,7 +68,6 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
     """
     # The modulation index is only computed where mask is True
     if mask is not None:
-        mask = crop_for_fast_hilbert(mask)
         filtered_low = filtered_low[:, mask == 1]
         filtered_high = filtered_high[:, mask == 1]
     else:
@@ -216,8 +215,6 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
                           "first row of the mask is used." %
                           (method, mask.shape, ), UserWarning)
             mask = mask[0, :]
-        mask = crop_for_fast_hilbert(mask)
-        sig = crop_for_fast_hilbert(sig)
         sig = sig[:, mask == 1]
 
     n_epochs, n_points = sig.shape

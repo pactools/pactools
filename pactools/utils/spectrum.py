@@ -7,6 +7,7 @@ from itertools import chain
 import numpy as np
 import scipy as sp
 from scipy.linalg import hankel
+from scipy.signal import hilbert
 import matplotlib.pyplot as plt
 
 
@@ -302,26 +303,32 @@ class Bicoherence(Spectrum):
 
 def phase_amplitude(signals, phase=True, amplitude=True):
     """Extract instantaneous phase and amplitude with Hilbert transform"""
-    from scipy.signal import hilbert
-
     # one dimension array
     if signals.ndim == 1:
         signals = signals[None, :]
         one_dim = True
-    else:
+    elif signals.ndim == 2:
         one_dim = False
+    else:
+        raise ValueError('Impoosible to compute phase_amplitude with ndim ='
+                         ' %s.' % (signals.ndim, ))
 
-    signals = crop_for_fast_hilbert(signals)
+    n_epochs, n_points = signals.shape
+    n_fft = compute_n_fft(signals)
 
     sig_phase = np.empty(signals.shape) if phase else None
     sig_amplitude = np.empty(signals.shape) if amplitude else None
     for i, sig in enumerate(signals):
-        sig_complex = hilbert(sig.ravel())
+        sig_complex = hilbert(sig, n_fft)
 
         if phase:
             sig_phase[i] = np.angle(sig_complex)
         if amplitude:
             sig_amplitude[i] = np.abs(sig_complex)
+
+    # go back to the initial numebr of time points
+    sig_phase = sig_phase[:, :n_points]
+    sig_amplitude = sig_amplitude[:, :n_points]
 
     # one dimension array
     if one_dim:
@@ -352,6 +359,17 @@ def crop_for_fast_hilbert(signals):
         while prime_factors(tmax)[-1] > 20:
             tmax -= 1
         return signals[:, :tmax]
+
+
+def compute_n_fft(signals):
+    """
+    Compute the number of element in the FFT to have a good prime
+    decomposition, for hilbert filter.
+    """
+    n_fft = signals.shape[-1]
+    while prime_factors(n_fft)[-1] > 20:
+        n_fft += 1
+    return
 
 
 def prime_factors(n):
