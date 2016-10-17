@@ -94,13 +94,17 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
     MI = np.zeros((n_low, n_high))
     for i in range(n_low):
         # preproces the phase array
-        if method != 'tort':
-            phase_preprocessed = np.exp(1j * filtered_low[i])
-        else:
+        if method == 'tort':
             n_bins = 18
             phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
+        elif method == 'penny':
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
+                                       np.cos(filtered_low[i]),
+                                       np.sin(filtered_low[i])]
+        else:
+            phase_preprocessed = np.exp(1j * filtered_low[i])
 
         for j in range(n_high):
             # number of  surrogates MIs
@@ -139,6 +143,18 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     if method == 'ozkurt':
         MI = np.abs(np.mean(amplitude * phase_preprocessed))
         MI *= np.sqrt(n_points) / norm_a
+
+    # Modulation index as in [Penny & al 2008]
+    elif method == 'penny':
+        # solve a linear regression problem:
+        # amplitude = np.dot(phase_preprocessed) * beta
+        PtP = np.dot(phase_preprocessed.T, phase_preprocessed)
+        PtA = np.dot(phase_preprocessed.T, amplitude[:, None])
+        beta = np.linalg.solve(PtP, PtA)
+        residual = amplitude - np.dot(phase_preprocessed, beta).ravel()
+        ss_amplitude = amplitude.std() ** 2
+        ss_residual = residual.std() ** 2
+        MI = (ss_amplitude - ss_residual) / ss_amplitude
 
     # Modulation index as in [Canolty & al 2006]
     elif method == 'canolty':
@@ -232,7 +248,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     high_fq_width : float
         Bandwidth of the band-pass filter (amplitude signal)
 
-    method : string in ('ozkurt', 'canolty', 'tort')
+    method : string in ('ozkurt', 'canolty', 'tort', 'penny')
         Modulation index method,
 
     n_surrogates : int
@@ -263,6 +279,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         If a list of mask is given, it returns a list of comodulograms.
     """
     random_state = check_random_state(random_state)
+    if isinstance(method, str):
+        method = method.lower()
 
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
@@ -272,7 +290,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     if not mask_is_list:
         mask = [mask]
 
-    if method in ('ozkurt', 'canolty', 'tort'):
+    if method in ('ozkurt', 'canolty', 'tort', 'penny'):
         if high_sig is None:
             high_sig = low_sig
 
