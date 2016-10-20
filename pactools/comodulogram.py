@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
-from scipy.interpolate import interp2d
+from scipy.interpolate import interp1d, interp2d
 from mne.filter import band_pass_filter
 
 from .dar_model.dar import DAR
@@ -246,13 +246,9 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
     np.flipud(bicoh)[np.triu_indices(n_freq, 1)] = 0
     bicoh[np.triu_indices(n_freq, 1)] = 0
 
-    # interpolate to get the same shape than with other methods
     frequencies = np.linspace(0, fs / 2., n_freq)
-    func = interp2d(frequencies, frequencies, bicoh.T,
-                    kind='linear', bounds_error=True)
-    comod = func(high_fq_range, low_fq_range)
-    # if n_high or n_low is equal to one
-    comod.shape = (low_fq_range.size, high_fq_range.size)
+    comod = _interpolate(frequencies, frequencies, bicoh,
+                         high_fq_range, low_fq_range)
 
     return comod
 
@@ -282,12 +278,8 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
     if method == 'colgin':
         coherence = np.real(np.abs(coherence))
 
-        # interpolate to get the same shape than with other methods
-        func = interp2d(np.arange(n_high), frequencies, coherence.T,
-                        kind='linear', bounds_error=True)
-        comod = func(np.arange(n_high), low_fq_range)
-        # if n_high or n_low is equal to one
-        comod.shape = (low_fq_range.size, n_high)
+        comod = _interpolate(np.arange(n_high), frequencies, coherence,
+                             np.arange(n_high), low_fq_range)
 
     # Phase slope index as in [Jiang & al 2015]
     elif method == 'jiang':
@@ -304,17 +296,33 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
         phase_slope_index = np.imag(phase_slope_index)
         frequencies = frequencies[k:-k]
 
-        # interpolate to get the same shape than with other methods
-        func = interp2d(np.arange(n_high), frequencies, phase_slope_index.T,
-                        kind='linear', bounds_error=False)
-        comod = func(np.arange(n_high), low_fq_range)
-        # if n_high or n_low is equal to one
-        comod.shape = (low_fq_range.size, n_high)
+        comod = _interpolate(np.arange(n_high), frequencies, phase_slope_index,
+                             np.arange(n_high), low_fq_range)
 
     else:
         raise ValueError('Unknown method %s' % (method, ))
 
     return comod
+
+
+def _interpolate(x1, y1, z1, x2, y2):
+    """helper to interpolate in 1d or 2d"""
+    # interpolate to get the same shape than with other methods
+    if x1.size > 1 and y1.size > 1:
+        func = interp2d(x1, y1, z1.T, kind='linear', bounds_error=False)
+        z2 = func(x2, y2)
+    elif x1.size == 1 and y1.size > 1:
+        func = interp1d(y1, z1.ravel(), kind='linear', bounds_error=False)
+        z2 = func(y2)
+    elif y1.size == 1 and x1.size > 1:
+        func = interp1d(x1, z1.ravel(), kind='linear', bounds_error=False)
+        z2 = func(x2)
+    else:
+        raise ValueError("You can't interpolate a scalar.")
+
+    # interp2d is not intuitive and return this shape:
+    z2.shape = (y2.size, x2.size)
+    return z2
 
 
 def comodulogram(fs, low_sig, high_sig=None, mask=None,
