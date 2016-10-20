@@ -43,7 +43,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
                                 high_fq_range, high_fq_width,
                                 method, vmin=None, vmax=None,
                                 save_name=None):
-    vmin = 0 if vmin is None else vmin
+    vmin = min(0, comodulogram.min()) if vmin is None else vmin
     vmax = comodulogram.max() if vmax is None else vmax
     fig = plt.figure(figsize=(15, 11))
     gs = gridspec.GridSpec(9, 9)
@@ -145,8 +145,15 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
         fig, axs = plt.subplots(1, n_comods, figsize=(4 * n_comods, 3))
     axs = np.array(axs).ravel()
 
-    vmin = 0 if vmin is None else vmin
-    vmax = comodulograms.max() if vmax is None else vmax
+    if vmin is None and vmax is None:
+        vmin = min(0, comodulograms.min())
+        vmax = max(0, comodulograms.max())
+        if vmin < 0 and vmax > 0:
+            vmax = max(vmax, -vmin)
+            vmin = -vmax
+            if cmap is None:
+                cmap = plt.get_cmap('RdBu_r')
+
     if cmap is None:
         cmap = plt.get_cmap('viridis')
 

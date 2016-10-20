@@ -35,49 +35,31 @@ class Spectrum(object):
         self.donorm = donorm
         self.psd = []
 
-    class Blklen(object):
-        def __get__(self, instance, owner):
-            return self.blklen
+    def check_params(self):
+        # blklen
+        if self.blklen < 0:
+            raise ValueError('Block length is negative')
+        self.blklen = int(self.blklen)
 
-        def __set__(self, instance, value):
-            if value < 0:
-                raise ValueError(
-                    'spectrum: block length is negative')
-            self.blklen = value
-    blklen = Blklen()
+        # fftlen
+        if self.fftlen is None:
+            fftlen = int(self.blklen)
+        else:
+            fftlen = int(self.fftlen)
+        if not is_power2(fftlen):
+            raise ValueError('FFT length should be a power of 2')
+        if fftlen < self.blklen:
+            raise ValueError('Block length is greater than FFT length')
 
-    class Fftlen(object):
-        def __get__(self, instance, owner):
-            if self.fftlen is None:
-                return instance.blklen
-            else:
-                return self.fftlen
+        # step
+        if self.step is None:
+            step = int(self.blklen // 2)
+        else:
+            step = int(self.step)
+        if step <= 0 or step > self.blklen:
+            raise ValueError('Invalid step between blocks: %s' % (step, ))
 
-        def __set__(self, instance, value):
-            if (value not in {2 ** x for x in range(4, 20)} and
-               value is not None):
-                raise ValueError(
-                    'spectrum: FFT length should be in: 2**4, 2**5...2**20')
-            if value is not None and value < instance.blklen:
-                raise ValueError(
-                    'spectrum: block length is greater than FFT length')
-            self.fftlen = value
-
-    fftlen = Fftlen()
-
-    class Step(object):
-        def __get__(self, instance, owner):
-            if self.step is None:
-                return instance.blklen // 2
-            else:
-                return self.step
-
-        def __set__(self, instance, value):
-            if value is not None and (value <= 0 or value > instance.blklen):
-                raise ValueError(
-                    'spectrum: invalid step between blocks')
-            self.step = value
-    step = Step()
+        return fftlen, step
 
     def periodogram(self, signals, hold=False):
         """
@@ -91,12 +73,13 @@ class Spectrum(object):
                   if False, the list is emptied and only the current
                   estimation is stored
         """
+        fftlen, step = self.check_params()
         if len(signals.shape) < 2:
             signals = signals[None, :]
 
-        w = self.wfunc(self.blklen)
+        window = self.wfunc(self.blklen)
         n_signals, tmax = signals.shape
-        psd = np.zeros((n_signals, self.fftlen))
+        psd = np.zeros((n_signals, fftlen))
 
         for i, sig in enumerate(signals):
             block = np.arange(self.blklen)
@@ -104,9 +87,9 @@ class Spectrum(object):
             # iterate on blocks
             count = 0
             while block[-1] < sig.size:
-                psd[i] += np.abs(sp.fft(w * sig[block], self.fftlen, 0)) ** 2
+                psd[i] += np.abs(sp.fft(window * sig[block], fftlen, 0)) ** 2
                 count = count + 1
-                block = block + self.step
+                block = block + step
             if count == 0:
                 raise IndexError(
                     'spectrum: first block has %d samples but sig has %d '
@@ -114,7 +97,7 @@ class Spectrum(object):
 
             # normalize
             if self.donorm:
-                scale = 1.0 / (count * (np.sum(w) ** 2))
+                scale = 1.0 / (count * (np.sum(window) ** 2))
             else:
                 scale = 1.0 / count
             psd[i] *= scale
@@ -137,6 +120,7 @@ class Spectrum(object):
         labels : list of label of the plots
         replicate: number of replication of the spectrum across frequencies
         """
+        fftlen, _ = self.check_params()
         if labels is None:
             plot_legend = False
             labels = [''] * len(self.psd)
@@ -165,7 +149,7 @@ class Spectrum(object):
             fig.set_xscale('linear')
 
         fmax = self.fs / 2
-        freq = np.linspace(0, fmax, self.fftlen // 2 + 1)
+        freq = np.linspace(0, fmax, fftlen // 2 + 1)
 
         if len(self.psd) > 1:
             plt.hold(True)
@@ -174,7 +158,7 @@ class Spectrum(object):
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
                 fig.plot(freq + i * fmax,
-                         psd[:, 0:self.fftlen // 2 + 1].T[::(-1) ** i],
+                         psd[:, 0:fftlen // 2 + 1].T[::(-1) ** i],
                          label=label, color=color)
 
         fig.grid(True)
@@ -186,9 +170,103 @@ class Spectrum(object):
         return fig
 
     def main_frequency(self):
-        freq = np.linspace(0, self.fs / 2, self.fftlen // 2 + 1)
-        psd = self.psd[-1][0, 0:self.fftlen // 2 + 1]
+        fftlen, _ = self.check_params()
+        freq = np.linspace(0, self.fs / 2, fftlen // 2 + 1)
+        psd = self.psd[-1][0, 0:fftlen // 2 + 1]
         return freq[np.argmax(psd)]
+
+
+class Coherence(Spectrum):
+    def __init__(self, blklen=1024, fftlen=None, step=None, wfunc=np.hamming,
+                 fs=1):
+        """
+        initalizes an estimator
+
+        blklen : length of each signal block
+        fftlen : length of FFT (it is expected that fftlen >= blklen)
+                 set to blklen if None
+        step   : step between successive blocks
+                 set to blklen // 2 if None
+        wfunc  : function used to compute weitghting function
+        fs     : sampling frequency
+
+        """
+        super(Coherence, self).__init__(
+            blklen=blklen, fftlen=fftlen, step=step,
+            wfunc=wfunc, fs=fs)
+
+        self.coherence = None
+
+    def fit(self, sigs_a, sigs_b):
+        """
+        Computes the coherence for two signals.
+        It is symmetrical, and slightly faster if n_signals_a < n_signals_b.
+
+        Parameters
+        ----------
+        sigs_a    : signal of shape (n_signals_a, n_epochs, n_points)
+        sigs_b    : signal of shape (n_signals_b, n_epochs, n_points)
+
+        Returns
+        -------
+        coherence : complex coherence of sigs_a and sigs_b over all epochs
+            shape (n_signals_a, n_signals_b, n_freqs)
+        """
+        fftlen, step = self.check_params()
+
+        n_signals_a, n_epochs, n_points = sigs_a.shape
+        n_signals_b, n_epochs, n_points = sigs_b.shape
+        if sigs_a.shape[1:] != sigs_b.shape[1:]:
+            raise ValueError('Incompatible shapes: %s and %s' %
+                             (sigs_a.shape[1:], sigs_b.shape[1:]))
+
+        window = self.wfunc(self.blklen)
+        n_freq = fftlen // 2 + 1
+        coherence = np.zeros((n_signals_a, n_signals_b, n_freq),
+                             dtype=np.complex128)
+        norm_a = np.zeros((n_signals_a, n_freq), dtype=np.float64)
+        norm_b = np.zeros((n_signals_b, n_freq), dtype=np.float64)
+
+        # iterate on blocks
+        count = 0
+        for i_epoch in range(n_epochs):
+            block = np.arange(self.blklen)
+            while block[-1] < n_points:
+
+                for i_a in range(n_signals_a):
+                    F_a = sp.fft(window * sigs_a[i_a, i_epoch, block],
+                                 fftlen, 0)[:n_freq]
+                    norm_a[i_a] += square(F_a)
+
+                    for i_b in range(n_signals_b):
+                        F_b = sp.fft(window * sigs_b[i_b, i_epoch, block],
+                                     fftlen, 0)[:n_freq]
+                        # compute only once
+                        if i_a == 0:
+                            norm_b[i_b] += square(F_b)
+
+                        coherence[i_a, i_b] += F_a * np.conjugate(F_b)
+
+                count = count + 1
+                block = block + step
+
+        normalization = np.sqrt(norm_a[:, None, :] * norm_b[None, :, :])
+        coherence /= normalization
+
+        if count == 0:
+            raise IndexError(
+                'bicoherence: first block needs %d samples but sigs has shape '
+                '%s' % (self.blklen, sigs_a.shape))
+
+        self.coherence = coherence
+        return self.coherence
+
+    def plot(self, fig=None, ax=None):
+        """Not Implemented"""
+        return fig
+
+    def main_frequency(self):
+        pass
 
 
 class Bicoherence(Spectrum):
@@ -212,17 +290,18 @@ class Bicoherence(Spectrum):
 
     def fit(self, sigs, method='hagihira'):
         """
-        computes the estimation (in dB) for one signal
+        computes the bicoherence for one signal
 
         sigs     : signal from which one computes the bicoherence
         """
+        fftlen, step = self.check_params()
         self.method = method
 
         sigs = np.atleast_2d(sigs)
         n_epochs, n_points = sigs.shape
 
-        w = self.wfunc(self.blklen)
-        n_freq = self.fftlen // 2 + 1
+        window = self.wfunc(self.blklen)
+        n_freq = fftlen // 2 + 1
         bicoherence = np.zeros((n_freq, n_freq), dtype=np.complex128)
         normalization = np.zeros((n_freq, n_freq), dtype=np.float64)
 
@@ -231,7 +310,7 @@ class Bicoherence(Spectrum):
         for i_epoch in range(n_epochs):
             block = np.arange(self.blklen)
             while block[-1] < n_points:
-                F = sp.fft(w * sigs[i_epoch, block], self.fftlen, 0)[:n_freq]
+                F = sp.fft(window * sigs[i_epoch, block], fftlen, 0)[:n_freq]
                 F1 = F[None, :]
                 F2 = F1.T
                 mask = hankel(np.arange(n_freq))
@@ -251,7 +330,7 @@ class Bicoherence(Spectrum):
                     raise(ValueError("Method '%s' unkown." % method))
 
                 count = count + 1
-                block = block + self.step
+                block = block + step
 
         bicoherence = np.real(np.abs(bicoherence))
 
@@ -272,7 +351,6 @@ class Bicoherence(Spectrum):
         return bicoherence
 
     def plot(self, fig=None, ax=None):
-
         if fig is None:
             fig = plt.figure()
         if ax is None:
@@ -390,6 +468,30 @@ def prime_factors(n):
     if n != 1:
         decomposition.append(n)
     return decomposition
+
+
+def is_power2(num):
+    """Test if number is a power of 2
+
+    Parameters
+    ----------
+    num : int
+        Number.
+
+    Returns
+    -------
+    b : bool
+        True if is power of 2.
+
+    Examples
+    --------
+    >>> is_power2(2 ** 3)
+    True
+    >>> is_power2(5)
+    False
+    """
+    num = int(num)
+    return num != 0 and ((num & (num - 1)) == 0)
 
 
 def compute_vmin_vmax(spec, vmin=None, vmax=None, tick=0.01, percentile=1):

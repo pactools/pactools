@@ -8,7 +8,7 @@ from mne.filter import band_pass_filter
 
 from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
-from .utils.spectrum import compute_n_fft, Bicoherence
+from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d, check_random_state
 from .plot_comodulogram import plot_comodulograms
@@ -89,12 +89,11 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
     filtered_low = np.real(filtered_low)
 
     # amplitude of the high frequency signals
+    filtered_high = np.real(np.abs(filtered_high))
     norm_a = np.zeros(n_high)
-    for j in range(n_high):
-        filtered_high[j] = np.abs(filtered_high[j])
-        if method == 'ozkurt':
+    if method == 'ozkurt':
+        for j in range(n_high):
             norm_a[j] = norm(filtered_high[j])
-    filtered_high = np.real(filtered_high)
 
     # amplitude of the low frequency signals
     if method == 'vanwijk':
@@ -211,11 +210,22 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
             plt.title('Tort index: %.3f' % MI)
 
     else:
-        raise ValueError("Unknown method for modulation index: Got '%s' "
-                         "instead of one in ('canolty', 'ozkurt', 'tort')" %
-                         method)
+        raise ValueError("Unknown method: %s" % (method, ))
 
     return MI
+
+
+def same_mask_on_all_epoch_warning(sig, mask, method):
+    mask = np.squeeze(mask)
+    if mask.ndim > 1:
+        warnings.warn("For coherence methods (e.g. %s) the mask has "
+                      "to be unidimensional, and the same mask is "
+                      "applied on all epochs. Got shape %s, so only the "
+                      "first row of the mask is used." %
+                      (method, mask.shape, ), UserWarning)
+        mask = mask[0, :]
+    sig = sig[..., mask == 1]
+    return sig
 
 
 def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
@@ -223,15 +233,7 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
     """Helper for the bicoherence methods"""
     # The modulation index is only computed where mask is True
     if mask is not None:
-        mask = np.squeeze(mask)
-        if mask.ndim > 1:
-            warnings.warn("For bicoherence method (e.g. %s) the mask has "
-                          "to be unidimensional, and the same mask is "
-                          "applied on all epochs. Got shape %s, so only the "
-                          "first row of the mask is used." %
-                          (method, mask.shape, ), UserWarning)
-            mask = mask[0, :]
-        sig = sig[:, mask == 1]
+        sig = same_mask_on_all_epoch_warning(sig, mask, method)
 
     n_epochs, n_points = sig.shape
 
@@ -249,6 +251,61 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
     func = interp2d(frequencies, frequencies, bicoh.T,
                     kind='linear', bounds_error=True)
     comod = func(high_fq_range, low_fq_range)
+
+    return comod
+
+
+def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
+               progress_bar, minimum_shift, random_state, low_fq_range,
+               low_fq_width):
+    """Compute the PAC with the coherence."""
+    if mask is not None:
+        low_sig = same_mask_on_all_epoch_warning(low_sig, mask, method)
+        filtered_high = same_mask_on_all_epoch_warning(
+            filtered_high, mask, method)
+
+    # amplitude of the high frequency signals
+    filtered_high = np.real(np.abs(filtered_high))
+
+    # as in [Jiang & al 2015]
+    fftlen = 2 ** int(np.ceil(np.log2(fs / low_fq_width)))
+    blklen = fftlen // 2  # zero-padding
+
+    estimator = Coherence(blklen=blklen, fftlen=fftlen, fs=fs)
+    coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
+    n_high, n_freq = coherence.shape
+    frequencies = np.linspace(0, fs / 2., n_freq)
+
+    # Coherence as in [Colgin & al 2009]
+    if method == 'colgin':
+        coherence = np.real(np.abs(coherence))
+
+        # interpolate to get the same shape than with other methods
+        func = interp2d(np.arange(n_high), frequencies, coherence.T,
+                        kind='linear', bounds_error=True)
+        comod = func(np.arange(n_high), low_fq_range)
+
+    # Phase slope index as in [Jiang & al 2015]
+    elif method == 'jiang':
+        product = coherence[:, 1:] * np.conjugate(coherence[:, :-1])
+
+        # we use a kernel of k * 2 with respect to product, i.e. a kernel of
+        # k * 2 + 1 with respect to coherence
+        k = 2
+        kernel = np.ones(2 * k)
+        phase_slope_index = np.zeros((n_high, n_freq - (2 * k)),
+                                     dtype=np.complex128)
+        for i in range(n_high):
+            phase_slope_index[i] = np.convolve(product[i], kernel, 'valid')
+        phase_slope_index = np.imag(phase_slope_index)
+        frequencies = frequencies[k:-k]
+
+        # interpolate to get the same shape than with other methods
+        func = interp2d(np.arange(n_high), frequencies, phase_slope_index.T,
+                        kind='linear', bounds_error=False)
+        comod = func(np.arange(n_high), low_fq_range)
+    else:
+        raise ValueError('Unknown method %s' % (method, ))
 
     return comod
 
@@ -307,12 +364,15 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
     method : string or DAR instance
         Modulation index method:
-            - String in ('ozkurt', 'canolty', 'tort', 'penny'), for a PAC
+            - String in ('ozkurt', 'canolty', 'tort', 'penny', ), for a PAC
                 estimation based on filtering and using the Hilbert transform.
             - String in ('vanwijk', ) for a joint AAC and PAC estimation
                 based on filtering and using the Hilbert transform.
-            - String in ('sigl', 'nagashima', 'hagihira', 'bispectrum'), for a
-                PAC estimation based on the bicoherence.
+            - String in ('sigl', 'nagashima', 'hagihira', 'bispectrum', ), for
+                a PAC estimation based on the bicoherence.
+            - String in ('colgin', ) for a PAC estimation
+                and in ('jiang', ) for a PAC directionality estimation,
+                based on filtering and computing coherence.
             - DAR instance, for a PAC estimation based on a driven
                 autoregressive model.
 
@@ -370,6 +430,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     mask_is_list = isinstance(mask, list)
     if not mask_is_list:
         mask = [mask]
+    n_masks = len(mask)
 
     if method in ('ozkurt', 'canolty', 'tort', 'penny', 'vanwijk'):
         if high_sig is None:
@@ -377,7 +438,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
         if progress_bar:
             progress_bar = ProgressBar('comodulogram: %s' % method,
-                                       max_value=low_fq_range.size * len(mask))
+                                       max_value=low_fq_range.size * n_masks)
 
         # compute a number of band-pass filtered and Hilbert filtered signals
         filtered_high = multiple_band_pass(high_sig, fs,
@@ -398,6 +459,28 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                                   filtered_low_2)
             comod_list.append(comod)
 
+    elif method in ('jiang', 'colgin'):
+        if high_sig is None:
+            high_sig = low_sig
+
+        if progress_bar:
+            progress_bar = ProgressBar('coherence: %s' % method,
+                                       max_value=n_masks)
+
+        # compute a number of band-pass filtered and Hilbert filtered signals
+        filtered_high = multiple_band_pass(high_sig, fs,
+                                           high_fq_range, high_fq_width)
+
+        comod_list = []
+        for this_mask in mask:
+            comod = _coherence(low_sig, filtered_high, this_mask,
+                               method, fs, n_surrogates, progress_bar,
+                               minimum_shift, random_state,
+                               low_fq_range, low_fq_width)
+            comod_list.append(comod)
+            if progress_bar:
+                progress_bar.update_with_increment_value(1)
+
     # compute PAC with the bispectrum/bicoherence
     elif method in ('sigl', 'nagashima', 'hagihira', 'bispectrum'):
         if high_sig is not None:
@@ -406,7 +489,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
         if progress_bar:
             progress_bar = ProgressBar('bicoherence: %s' % method,
-                                       max_value=len(mask))
+                                       max_value=n_masks)
 
         comod_list = []
         for this_mask in mask:
@@ -418,7 +501,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                                  low_fq_range=low_fq_range,
                                  high_fq_range=high_fq_range)
             comod_list.append(comod)
-            progress_bar.update_with_increment_value(1)
+            if progress_bar:
+                progress_bar.update_with_increment_value(1)
 
     elif isinstance(method, DAR):
         comod_list = driven_comodulogram(fs=fs, low_sig=low_sig,
