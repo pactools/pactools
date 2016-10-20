@@ -251,6 +251,8 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
     func = interp2d(frequencies, frequencies, bicoh.T,
                     kind='linear', bounds_error=True)
     comod = func(high_fq_range, low_fq_range)
+    # if n_high or n_low is equal to one
+    comod.shape = (low_fq_range.size, high_fq_range.size)
 
     return comod
 
@@ -284,6 +286,8 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
         func = interp2d(np.arange(n_high), frequencies, coherence.T,
                         kind='linear', bounds_error=True)
         comod = func(np.arange(n_high), low_fq_range)
+        # if n_high or n_low is equal to one
+        comod.shape = (low_fq_range.size, n_high)
 
     # Phase slope index as in [Jiang & al 2015]
     elif method == 'jiang':
@@ -304,6 +308,9 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
         func = interp2d(np.arange(n_high), frequencies, phase_slope_index.T,
                         kind='linear', bounds_error=False)
         comod = func(np.arange(n_high), low_fq_range)
+        # if n_high or n_low is equal to one
+        comod.shape = (low_fq_range.size, n_high)
+
     else:
         raise ValueError('Unknown method %s' % (method, ))
 
@@ -317,7 +324,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  high_fq_width=10.0,
                  method='tort',
                  n_surrogates=0,
-                 draw=False, save_name=None,
+                 draw=False,
                  vmin=None, vmax=None,
                  progress_bar=True,
                  draw_phase=False,

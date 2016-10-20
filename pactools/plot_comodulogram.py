@@ -183,3 +183,5 @@ def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
         # plot the colorbar once
         ax = axs[0] if len(axs) == 1 else None
         add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
+
+    return fig
