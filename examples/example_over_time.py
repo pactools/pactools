@@ -6,7 +6,7 @@ import mne
 
 from pactools.comodulogram import comodulogram, get_maximum_pac
 from pactools.utils.spliter import Spliter, blend_and_ravel
-from pactools.plot_comodulogram import plot_comodulograms
+from pactools.plot_comodulogram import plot_comodulogram
 from pactools.utils.progress_bar import ProgressBar
 from pactools.dar_model import DAR
 
@@ -87,8 +87,8 @@ def example_channel_by_channel():
                                 figsize=(1.4 * len(comodulograms), 5.))
         titles = ['cs- %s' % (parts[i]) for i in range(len(parts))]
         titles += ['cs+ %s' % (parts[i]) for i in range(len(parts))]
-        plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
-                           titles, fig, axs)
+        plot_comodulogram(comodulograms, fs, low_fq_range, high_fq_range,
+                          titles, fig, axs)
 
         # add suptitle
         fig.subplots_adjust(top=0.85)
@@ -165,8 +165,8 @@ def example_all_channels():
                                 figsize=(1.4 * len(comodulograms), 5.))
         titles = ['cs- %s' % (parts[i]) for i in range(len(parts))]
         titles += ['cs+ %s' % (parts[i]) for i in range(len(parts))]
-        plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
-                           titles, fig, axs)
+        plot_comodulogram(comodulograms, fs, low_fq_range, high_fq_range,
+                          titles, fig, axs)
 
         # add suptitle
         fig.subplots_adjust(top=0.85)

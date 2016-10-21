@@ -77,10 +77,10 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     return fig
 
 
-def plot_comodulograms(comodulograms, fs, low_fq_range, high_fq_range,
-                       titles=None, fig=None, axs=None,
-                       cmap=None, vmin=None, vmax=None, unit='',
-                       cbar=True, label=True, contours=None):
+def plot_comodulogram(comodulograms, fs, low_fq_range, high_fq_range,
+                      titles=None, fig=None, axs=None,
+                      cmap=None, vmin=None, vmax=None, unit='',
+                      cbar=True, label=True, contours=None):
     """
     Plot one or more comodulograms.
 

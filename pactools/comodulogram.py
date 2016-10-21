@@ -11,7 +11,7 @@ from .utils.progress_bar import ProgressBar
 from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d, check_random_state
-from .plot_comodulogram import plot_comodulograms
+from .plot_comodulogram import plot_comodulogram
 from .preprocess import extract
 
 
@@ -536,8 +536,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
     if draw:
         contours = 4.0 if n_surrogates > 1 else None
-        plot_comodulograms(comod_list, fs, low_fq_range, high_fq_range,
-                           contours=contours)
+        plot_comodulogram(comod_list, fs, low_fq_range, high_fq_range,
+                          contours=contours)
 
     if not mask_is_list:
         return comod_list[0]

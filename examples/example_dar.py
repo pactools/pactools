@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pactools.comodulogram import comodulogram
-from pactools.plot_comodulogram import plot_comodulograms
+from pactools.plot_comodulogram import plot_comodulogram
 from pactools.io.load_data_example import load_data_example
 from pactools.dar_model import DAR, plot_dar_lines
 from pactools.preprocess import extract
@@ -78,9 +78,9 @@ def example_compare_comodulogram():
             high_fq_width=high_fq_width,
             n_surrogates=n_surrogates)
 
-        plot_comodulograms(comod, fs, low_fq_range, high_fq_range,
-                           ['%s' % method], fig, [axs.ravel()[i]],
-                           contours=contours)
+        plot_comodulogram(comod, fs, low_fq_range, high_fq_range,
+                          ['%s' % method], fig, [axs.ravel()[i]],
+                          contours=contours)
 
     fig.savefig('compare_comodulogram_%ds.png' % n_surrogates)
     plt.show()
