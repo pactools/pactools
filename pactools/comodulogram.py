@@ -187,6 +187,7 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
                 amplitude_dist[b] = np.mean(selection)
             if np.any(amplitude_dist == 0):
                 continue
+            break
 
         if np.any(amplitude_dist == 0):
             raise RuntimeError("Not enough data to fill %d bins !" % n_bins)
