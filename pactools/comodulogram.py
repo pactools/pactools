@@ -268,6 +268,7 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
 
     # as in [Jiang & al 2015]
     fftlen = 2 ** int(np.ceil(np.log2(fs / low_fq_width)))
+    delta_freq = fs / fftlen
     blklen = fftlen // 2  # zero-padding
 
     estimator = Coherence(blklen=blklen, fftlen=fftlen, fs=fs)
@@ -289,7 +290,7 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
         # we use a kernel of k * 2 with respect to product, i.e. a kernel of
         # k * 2 + 1 with respect to coherence
         k = 2
-        kernel = np.ones(2 * k)
+        kernel = np.ones(2 * k) / (2 * k)
         phase_slope_index = np.zeros((n_high, n_freq - (2 * k)),
                                      dtype=np.complex128)
         for i in range(n_high):
@@ -297,7 +298,10 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
         phase_slope_index = np.imag(phase_slope_index)
         frequencies = frequencies[k:-k]
 
-        comod = _interpolate(np.arange(n_high), frequencies, phase_slope_index,
+        # transform the phase slope index into a delay
+        delay = phase_slope_index / (2. * np.pi * delta_freq)
+
+        comod = _interpolate(np.arange(n_high), frequencies, delay,
                              np.arange(n_high), low_fq_range)
 
     else:
