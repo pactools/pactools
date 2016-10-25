@@ -12,23 +12,37 @@ import matplotlib.pyplot as plt
 
 
 class Spectrum(object):
-    def __init__(self, blklen=1024, fftlen=None, step=None, wfunc=np.hamming,
-                 fs=1, donorm=True):
+    def __init__(self, block_length=1024, fft_length=None, step=None,
+                 wfunc=np.hamming, fs=1., donorm=True):
         """
-        initalizes an estimator
+        Spectral estimator
 
-        blklen : length of each signal block
-        fftlen : length of FFT (it is expected that fftlen >= blklen)
-                 set to blklen if None
-        step   : step between successive blocks
-                 set to blklen // 2 if None
-        wfunc  : function used to compute weitghting function
-        fs     : sampling frequency
-        donorm : normalize amplitude if True
+        Parameters
+        ----------
+        block_length : int
+            Length of each signal block, on which we estimate the spectrum
+
+        fft_length : int or None
+            Length of FFT, should be greater or equal to block_length.
+            If None, it is set to block_length
+
+        step : int or None
+            Step between successive blocks
+            If None, it is set to half the block length (i.e. 0.5 overlap)
+
+        wfunc : function
+            Function used to compute the weitghting window on each block.
+            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+        fs : float
+            Sampling frequency
+
+        donorm : boolean
+            If True, the amplitude is normalized
 
         """
-        self.blklen = blklen
-        self.fftlen = fftlen
+        self.block_length = block_length
+        self.fft_length = fft_length
         self.step = step
         self.wfunc = wfunc
         self.fs = fs
@@ -36,58 +50,69 @@ class Spectrum(object):
         self.psd = []
 
     def check_params(self):
-        # blklen
-        if self.blklen < 0:
+        # block_length
+        if self.block_length < 0:
             raise ValueError('Block length is negative')
-        self.blklen = int(self.blklen)
+        self.block_length = int(self.block_length)
 
-        # fftlen
-        if self.fftlen is None:
-            fftlen = int(self.blklen)
+        # fft_length
+        if self.fft_length is None:
+            fft_length = int(self.block_length)
         else:
-            fftlen = int(self.fftlen)
-        if not is_power2(fftlen):
+            fft_length = int(self.fft_length)
+        if not is_power2(fft_length):
             raise ValueError('FFT length should be a power of 2')
-        if fftlen < self.blklen:
+        if fft_length < self.block_length:
             raise ValueError('Block length is greater than FFT length')
 
         # step
         if self.step is None:
-            step = int(self.blklen // 2)
+            step = int(self.block_length // 2)
         else:
             step = int(self.step)
-        if step <= 0 or step > self.blklen:
+        if step <= 0 or step > self.block_length:
             raise ValueError('Invalid step between blocks: %s' % (step, ))
 
-        return fftlen, step
+        return fft_length, step
 
     def periodogram(self, signals, hold=False):
         """
-        computes the estimation (in dB) for one signal
+        Computes the estimation (in dB) for each epoch in a signal
 
-        signals : signals from which one computes the power spectrum
-                  (if self.donorm = True) or impulse response used
-                  to compute a transfer function (set donorm to False)
-        hold    : if True, the estimation is appended to the list of
-                  previous estimations,
-                  if False, the list is emptied and only the current
-                  estimation is stored
+        Parameters
+        ----------
+        signals : array, shape (n_epochs, n_points)
+            Signals from which one computes the power spectrum
+
+        hold : boolean, default = False
+            If True, the estimation is appended to the list of previous
+            estimations, else, the list is emptied and only the current
+            estimation is stored.
+
+        Returns
+        -------
+        psd : array, shape (n_epochs, n_freq)
+            Power spectrum estimated with a Welsh method on each epoch
+            n_freq = fft_length // 2 + 1
         """
-        fftlen, step = self.check_params()
-        if len(signals.shape) < 2:
-            signals = signals[None, :]
+        fft_length, step = self.check_params()
 
-        window = self.wfunc(self.blklen)
-        n_signals, tmax = signals.shape
-        psd = np.zeros((n_signals, fftlen))
+        signals = np.atleast_2d(signals)
+
+        window = self.wfunc(self.block_length)
+        n_epochs, tmax = signals.shape
+        psd = np.zeros((n_epochs, fft_length))
+
+        n_freq = fft_length // 2 + 1
 
         for i, sig in enumerate(signals):
-            block = np.arange(self.blklen)
+            block = np.arange(self.block_length)
 
             # iterate on blocks
             count = 0
             while block[-1] < sig.size:
-                psd[i] += np.abs(sp.fft(window * sig[block], fftlen, 0)) ** 2
+                psd[i] += np.abs(sp.fft(window * sig[block],
+                                 fft_length, 0))[:n_freq] ** 2
                 count = count + 1
                 block = block + step
             if count == 0:
@@ -120,7 +145,7 @@ class Spectrum(object):
         labels : list of label of the plots
         replicate: number of replication of the spectrum across frequencies
         """
-        fftlen, _ = self.check_params()
+        fft_length, _ = self.check_params()
         if labels is None:
             plot_legend = False
             labels = [''] * len(self.psd)
@@ -149,7 +174,7 @@ class Spectrum(object):
             fig.set_xscale('linear')
 
         fmax = self.fs / 2
-        freq = np.linspace(0, fmax, fftlen // 2 + 1)
+        freq = np.linspace(0, fmax, fft_length // 2 + 1)
 
         if len(self.psd) > 1:
             plt.hold(True)
@@ -157,8 +182,7 @@ class Spectrum(object):
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
-                fig.plot(freq + i * fmax,
-                         psd[:, 0:fftlen // 2 + 1].T[::(-1) ** i],
+                fig.plot(freq + i * fmax, psd.T[::(-1) ** i],
                          label=label, color=color)
 
         fig.grid(True)
@@ -170,29 +194,45 @@ class Spectrum(object):
         return fig
 
     def main_frequency(self):
-        fftlen, _ = self.check_params()
-        freq = np.linspace(0, self.fs / 2, fftlen // 2 + 1)
-        psd = self.psd[-1][0, 0:fftlen // 2 + 1]
+        """Extract the frequency of the maximum in the spectrum"""
+        fft_length, _ = self.check_params()
+        n_freq = fft_length // 2 + 1
+        freq = np.linspace(0, self.fs / 2, n_freq)
+        psd = self.psd[-1][0, :]
         return freq[np.argmax(psd)]
 
 
 class Coherence(Spectrum):
-    def __init__(self, blklen=1024, fftlen=None, step=None, wfunc=np.hamming,
-                 fs=1):
+    def __init__(self, block_length=1024, fft_length=None, step=None,
+                 wfunc=np.hamming, fs=1.):
         """
-        initalizes an estimator
+        Coherence estimator
 
-        blklen : length of each signal block
-        fftlen : length of FFT (it is expected that fftlen >= blklen)
-                 set to blklen if None
-        step   : step between successive blocks
-                 set to blklen // 2 if None
-        wfunc  : function used to compute weitghting function
-        fs     : sampling frequency
+        Parameters
+        ----------
+        block_length : int
+            Length of each signal block, on which we estimate the spectrum
 
+        fft_length : int or None
+            Length of FFT, should be greater or equal to block_length.
+            If None, it is set to block_length
+
+        step : int or None
+            Step between successive blocks
+            If None, it is set to half the block length (i.e. 0.5 overlap)
+
+        wfunc : function
+            Function used to compute the weitghting window on each block.
+            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+        fs : float
+            Sampling frequency
+
+        donorm : boolean
+            If True, the amplitude is normalized
         """
         super(Coherence, self).__init__(
-            blklen=blklen, fftlen=fftlen, step=step,
+            block_length=block_length, fft_length=fft_length, step=step,
             wfunc=wfunc, fs=fs)
 
         self.coherence = None
@@ -202,17 +242,22 @@ class Coherence(Spectrum):
         Computes the coherence for two signals.
         It is symmetrical, and slightly faster if n_signals_a < n_signals_b.
 
+
         Parameters
         ----------
-        sigs_a    : signal of shape (n_signals_a, n_epochs, n_points)
-        sigs_b    : signal of shape (n_signals_b, n_epochs, n_points)
+        sigs_a : array, shape (n_signals_a, n_epochs, n_points)
+            Signal from which one computes the coherence
+
+        sigs_b : array, shape (n_signals_b, n_epochs, n_points)
+            Signal from which one computes the coherence
 
         Returns
         -------
-        coherence : complex coherence of sigs_a and sigs_b over all epochs
-            shape (n_signals_a, n_signals_b, n_freqs)
+        coherence : array, shape (n_signals_a, n_signals_b, n_freqs)
+            Complex coherence of sigs_a and sigs_b over all epochs.
+            n_freqs = fft_length // 2 + 1
         """
-        fftlen, step = self.check_params()
+        fft_length, step = self.check_params()
 
         n_signals_a, n_epochs, n_points = sigs_a.shape
         n_signals_b, n_epochs, n_points = sigs_b.shape
@@ -220,8 +265,8 @@ class Coherence(Spectrum):
             raise ValueError('Incompatible shapes: %s and %s' %
                              (sigs_a.shape[1:], sigs_b.shape[1:]))
 
-        window = self.wfunc(self.blklen)
-        n_freq = fftlen // 2 + 1
+        window = self.wfunc(self.block_length)
+        n_freq = fft_length // 2 + 1
         coherence = np.zeros((n_signals_a, n_signals_b, n_freq),
                              dtype=np.complex128)
         norm_a = np.zeros((n_signals_a, n_freq), dtype=np.float64)
@@ -230,17 +275,17 @@ class Coherence(Spectrum):
         # iterate on blocks
         count = 0
         for i_epoch in range(n_epochs):
-            block = np.arange(self.blklen)
+            block = np.arange(self.block_length)
             while block[-1] < n_points:
 
                 for i_a in range(n_signals_a):
                     F_a = sp.fft(window * sigs_a[i_a, i_epoch, block],
-                                 fftlen, 0)[:n_freq]
+                                 fft_length, 0)[:n_freq]
                     norm_a[i_a] += square(F_a)
 
                     for i_b in range(n_signals_b):
                         F_b = sp.fft(window * sigs_b[i_b, i_epoch, block],
-                                     fftlen, 0)[:n_freq]
+                                     fft_length, 0)[:n_freq]
                         # compute only once
                         if i_a == 0:
                             norm_b[i_b] += square(F_b)
@@ -256,7 +301,7 @@ class Coherence(Spectrum):
         if count == 0:
             raise IndexError(
                 'bicoherence: first block needs %d samples but sigs has shape '
-                '%s' % (self.blklen, sigs_a.shape))
+                '%s' % (self.block_length, sigs_a.shape))
 
         self.coherence = coherence
         return self.coherence
@@ -270,47 +315,74 @@ class Coherence(Spectrum):
 
 
 class Bicoherence(Spectrum):
-    def __init__(self, blklen=1024, fftlen=None, step=None, wfunc=np.hamming,
-                 fs=1):
+    def __init__(self, block_length=1024, fft_length=None, step=None,
+                 wfunc=np.hamming, fs=1.):
         """
-        initalizes an estimator
+        Bicoherence estimator
 
-        blklen : length of each signal block
-        fftlen : length of FFT (it is expected that fftlen >= blklen)
-                 set to blklen if None
-        step   : step between successive blocks
-                 set to blklen // 2 if None
-        wfunc  : function used to compute weitghting function
-        fs     : sampling frequency
+        Parameters
+        ----------
+        block_length : int
+            Length of each signal block, on which we estimate the spectrum
 
+        fft_length : int or None
+            Length of FFT, should be greater or equal to block_length.
+            If None, it is set to block_length
+
+        step : int or None
+            Step between successive blocks
+            If None, it is set to half the block length (i.e. 0.5 overlap)
+
+        wfunc : function
+            Function used to compute the weitghting window on each block.
+            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+        fs : float
+            Sampling frequency
+
+        donorm : boolean
+            If True, the amplitude is normalized
         """
         super(Bicoherence, self).__init__(
-            blklen=blklen, fftlen=fftlen, step=step,
+            block_length=block_length, fft_length=fft_length, step=step,
             wfunc=wfunc, fs=fs)
 
     def fit(self, sigs, method='hagihira'):
         """
-        computes the bicoherence for one signal
+        Computes the bicoherence for one signal
 
-        sigs     : signal from which one computes the bicoherence
+        Parameters
+        ----------
+        sigs : array, shape (n_epochs, n_points)
+            Signal from which one computes the bicoherence
+
+        method : string in ('hagihira', 'sigl', 'nagashima', 'bispectrum')
+            Normalization used for the bicoherence
+
+        Returns
+        -------
+        bicoherence : array, shape (n_freq, n_freq)
+            Complex bicoherence computed on the input signal.
+            n_freq = fft_length // 2 + 1
         """
-        fftlen, step = self.check_params()
+        fft_length, step = self.check_params()
         self.method = method
 
         sigs = np.atleast_2d(sigs)
         n_epochs, n_points = sigs.shape
 
-        window = self.wfunc(self.blklen)
-        n_freq = fftlen // 2 + 1
+        window = self.wfunc(self.block_length)
+        n_freq = fft_length // 2 + 1
         bicoherence = np.zeros((n_freq, n_freq), dtype=np.complex128)
         normalization = np.zeros((n_freq, n_freq), dtype=np.float64)
 
         # iterate on blocks
         count = 0
         for i_epoch in range(n_epochs):
-            block = np.arange(self.blklen)
+            block = np.arange(self.block_length)
             while block[-1] < n_points:
-                F = sp.fft(window * sigs[i_epoch, block], fftlen, 0)[:n_freq]
+                F = sp.fft(window * sigs[i_epoch, block],
+                           fft_length, 0)[:n_freq]
                 F1 = F[None, :]
                 F2 = F1.T
                 mask = hankel(np.arange(n_freq))
@@ -345,7 +417,7 @@ class Bicoherence(Spectrum):
         if count == 0:
             raise IndexError(
                 'bicoherence: first block needs %d samples but sigs has shape '
-                '%s' % (self.blklen, sigs.shape))
+                '%s' % (self.block_length, sigs.shape))
 
         self.bicoherence = bicoherence
         return bicoherence
@@ -388,7 +460,7 @@ def phase_amplitude(signals, phase=True, amplitude=True):
     elif signals.ndim == 2:
         one_dim = False
     else:
-        raise ValueError('Impoosible to compute phase_amplitude with ndim ='
+        raise ValueError('Impossible to compute phase_amplitude with ndim ='
                          ' %s.' % (signals.ndim, ))
 
     n_epochs, n_points = signals.shape
@@ -419,7 +491,7 @@ def phase_amplitude(signals, phase=True, amplitude=True):
 
 
 def square(c):
-    """square a complex"""
+    """square a complex array"""
     return np.real(c * np.conjugate(c))
 
 
@@ -450,23 +522,33 @@ def compute_n_fft(signals):
     return n_fft
 
 
-def prime_factors(n):
+def prime_factors(num):
     """
     Decomposition in prime factor.
     Used to find signal length that speed up Hilbert transform.
+
+    Parameters
+    ----------
+    num : int
+        Number.
+
+    Returns
+    -------
+    decomposition : list of int
+        List of prime factors sorted by ascending order
     """
-    assert n > 0
-    assert isinstance(n, int)
+    assert num > 0
+    assert isinstance(num, int)
 
     decomposition = []
-    for i in chain([2], range(3, int(np.sqrt(n)) + 1, 2)):
-        while n % i == 0:
-            n = n // i
+    for i in chain([2], range(3, int(np.sqrt(num)) + 1, 2)):
+        while num % i == 0:
+            num = num // i
             decomposition.append(i)
-        if n == 1:
+        if num == 1:
             break
-    if n != 1:
-        decomposition.append(n)
+    if num != 1:
+        decomposition.append(num)
     return decomposition
 
 

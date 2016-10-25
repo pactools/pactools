@@ -35,12 +35,12 @@ class Arma(Spectrum):
         self.ordma = ordma
 
     def estimate(self, nbcorr=np.nan, numpsd=-1):
-        fftlen, _ = self.check_params()
+        fft_length, _ = self.check_params()
         if np.isnan((nbcorr)):
             nbcorr = self.ordar
 
         # -------- estimate correlation from psd
-        correl = fftpack.ifft(self.psd[numpsd][0], fftlen, 0).real
+        correl = fftpack.ifft(self.psd[numpsd][0], fft_length, 0).real
 
         # -------- estimate AR part
         col1 = correl[self.ordma:self.ordma + nbcorr]
@@ -66,9 +66,10 @@ class Arma(Spectrum):
         """Compute the power spectral density of the ARMA model
 
         """
+        fft_length, _ = self.check_params()
         arpart = np.concatenate((np.ones(1), self.AR_))
-        psdar = np.abs(fftpack.fft(arpart, fftlen, 0)) ** 2
-        psdma = np.abs(fftpack.fft(self.MA, fftlen, 0)) ** 2
+        psdar = np.abs(fftpack.fft(arpart, fft_length, 0)) ** 2
+        psdma = np.abs(fftpack.fft(self.MA, fft_length, 0)) ** 2
         psd = psdma / psdar
         if not hold:
             self.psd = []

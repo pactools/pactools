@@ -260,20 +260,20 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
     filtered_high = np.real(np.abs(filtered_high))
 
     # the FFT length is chosen to have a frequency resolution of low_fq_width
-    fftlen = fs / low_fq_width
+    fft_length = fs / low_fq_width
     # but it is faster if it is a power of 2
-    fftlen = 2 ** int(np.ceil(np.log2(fftlen)))
+    fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
     # so the actual frequency resolution is computed here
-    delta_freq = fs / fftlen
+    delta_freq = fs / fft_length
     # the block length is chosen to limit the zero-padding
-    blklen = fftlen // 2
+    block_length = fft_length // 2
 
     n_epochs, n_points = low_sig.shape
 
     def comod_function(shift):
         return _one_coherence_modulation_index(
-            fs, low_sig, filtered_high, method, low_fq_range, blklen, fftlen,
-            delta_freq, shift)
+            fs, low_sig, filtered_high, method, low_fq_range, block_length,
+            fft_length, delta_freq, shift)
 
     comod = _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
                                 random_state, n_surrogates)
@@ -282,12 +282,12 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
 
 
 def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
-                                    low_fq_range, blklen, fftlen, delta_freq,
-                                    shift):
+                                    low_fq_range, block_length, fft_length,
+                                    delta_freq, shift):
     if shift != 0:
         low_sig = np.roll(low_sig, shift)
 
-    estimator = Coherence(blklen=blklen, fftlen=fftlen, fs=fs)
+    estimator = Coherence(blklen=block_length, fftlen=fft_length, fs=fs)
     coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
     n_high, n_freq = coherence.shape
     frequencies = np.linspace(0, fs / 2., n_freq)
