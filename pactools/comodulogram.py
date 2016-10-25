@@ -61,7 +61,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
     return filtered
 
 
-def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
+def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
                   progress_bar, draw_phase, minimum_shift, random_state,
                   filtered_low_2):
     """
@@ -222,8 +222,8 @@ def _same_mask_on_all_epochs(sig, mask, method):
     return sig
 
 
-def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
-                 low_fq_range, high_fq_range):
+def _bicoherence(fs, sig, mask, method, low_fq_range,
+                 low_fq_width, high_fq_range, coherence_params):
     """Compute the PAC with the bicoherence."""
     # The modulation index is only computed where mask is True
     if mask is not None:
@@ -231,8 +231,10 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
 
     n_epochs, n_points = sig.shape
 
-    estimator = Bicoherence(blklen=block_length, fftlen=fft_length,
-                            step=step, fs=fs)
+    coherence_params = _define_default_params(fs, low_fq_width, True,
+                                              **coherence_params)
+
+    estimator = Bicoherence(**coherence_params)
     bicoh = estimator.fit(sigs=sig, method=method)
 
     # remove the redundant part
@@ -247,9 +249,41 @@ def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
     return comod
 
 
-def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
-               progress_bar, minimum_shift, random_state, low_fq_range,
-               low_fq_width):
+def _define_default_params(fs, low_fq_width, is_bicoherence, **user_params):
+    """Define default values for Coherence and Bicoherence classes,
+    if not defined in user_params dictionary."""
+
+    # the FFT length is chosen to have a frequency resolution of low_fq_width
+    fft_length = fs / low_fq_width
+    # but it is faster if it is a power of 2
+    fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
+
+    # smoothing for bicoherence methods
+    if is_bicoherence:
+        fft_length /= 4
+
+    # the block length is chosen to avoid zero-padding
+    block_length = fft_length
+
+    if 'block_length' not in user_params and 'fft_length' not in user_params:
+        user_params['block_length'] = block_length
+        user_params['fft_length'] = fft_length
+    elif 'block_length' in user_params and 'fft_length' not in user_params:
+        user_params['fft_length'] = user_params['block_length']
+    elif 'block_length' not in user_params and 'fft_length' in user_params:
+        user_params['block_length'] = user_params['fft_length']
+
+    if 'fs' not in user_params:
+        user_params['fs'] = fs
+    if 'step' not in user_params:
+        user_params['step'] = None
+
+    return user_params
+
+
+def _coherence(fs, low_sig, filtered_high, mask, method, low_fq_range,
+               low_fq_width, n_surrogates, minimum_shift, random_state,
+               progress_bar, coherence_params):
     """Compute the PAC with the coherence."""
     if mask is not None:
         low_sig = _same_mask_on_all_epochs(low_sig, mask, method)
@@ -259,21 +293,15 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
     # amplitude of the high frequency signals
     filtered_high = np.real(np.abs(filtered_high))
 
-    # the FFT length is chosen to have a frequency resolution of low_fq_width
-    fft_length = fs / low_fq_width
-    # but it is faster if it is a power of 2
-    fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
-    # so the actual frequency resolution is computed here
-    delta_freq = fs / fft_length
-    # the block length is chosen to limit the zero-padding
-    block_length = fft_length // 2
+    coherence_params = _define_default_params(fs, low_fq_width, False,
+                                              **coherence_params)
 
     n_epochs, n_points = low_sig.shape
 
     def comod_function(shift):
         return _one_coherence_modulation_index(
-            fs, low_sig, filtered_high, method, low_fq_range, block_length,
-            fft_length, delta_freq, shift)
+            fs, low_sig, filtered_high, method, low_fq_range, coherence_params,
+            shift)
 
     comod = _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
                                 random_state, n_surrogates)
@@ -282,12 +310,14 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
 
 
 def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
-                                    low_fq_range, block_length, fft_length,
-                                    delta_freq, shift):
+                                    low_fq_range, coherence_params, shift):
     if shift != 0:
         low_sig = np.roll(low_sig, shift)
 
-    estimator = Coherence(blklen=block_length, fftlen=fft_length, fs=fs)
+    # the actual frequency resolution is computed here
+    delta_freq = fs / coherence_params['fft_length']
+
+    estimator = Coherence(**coherence_params)
     coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
     n_high, n_freq = coherence.shape
     frequencies = np.linspace(0, fs / 2., n_freq)
@@ -361,9 +391,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                  draw_phase=False,
                  minimum_shift=1.0,
                  random_state=None,
-                 bicoherence_block_length=512,
-                 bicoherence_fft_length=None,
-                 bicoherence_step=None,
+                 coherence_params=dict(),
                  low_fq_width_2=4.0):
     """
     Compute the comodulogram for Phase Amplitude Coupling (PAC).
@@ -435,17 +463,17 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     random_state : None, int or np.random.RandomState instance
         Seed or random number generator for the surrogate analysis
 
-    bicoherence_block_length : int
-        Block length for bicoherence analysis
-
-    bicoherence_fft_length: int or None
-        Length of the FFT in bicoherence analysis. Must be greater or equal to
-        bicoherence_block_length. If greater, zero-padding will be applied. If
-        None, it is eqaul to bicoherence_block_length.
-
-    bicoherence_step : int or None
-        Step between two blocks for bicoherence analysis. If None, it is equal
-        to bicoherence_block_length (i.e. no overlap)
+    coherence_params : dict
+        Parameters for methods base on coherence or bicoherence.
+        May contain:
+            block_length : int
+                Block length
+            fft_length : int or None
+                Length of the FFT
+            step : int or None
+                Step between two blocks
+        If the dictionary is empty, default values will be applied based on
+        fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
 
     low_fq_width_2 : float
         Bandwidth of the band-pass filters centered on low_fq_range, for
@@ -491,8 +519,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
         comod_list = []
         for this_mask in mask:
-            comod = _comodulogram(filtered_low, filtered_high, this_mask,
-                                  method, fs, n_surrogates, progress_bar,
+            comod = _comodulogram(fs, filtered_low, filtered_high, this_mask,
+                                  method, n_surrogates, progress_bar,
                                   draw_phase, minimum_shift, random_state,
                                   filtered_low_2)
             comod_list.append(comod)
@@ -511,10 +539,10 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
         comod_list = []
         for this_mask in mask:
-            comod = _coherence(low_sig, filtered_high, this_mask,
-                               method, fs, n_surrogates, progress_bar,
-                               minimum_shift, random_state,
-                               low_fq_range, low_fq_width)
+            comod = _coherence(fs, low_sig, filtered_high, this_mask, method,
+                               low_fq_range, low_fq_width, n_surrogates,
+                               minimum_shift, random_state, progress_bar,
+                               coherence_params)
             comod_list.append(comod)
             if progress_bar:
                 progress_bar.update_with_increment_value(1)
@@ -538,11 +566,10 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         for this_mask in mask:
             comod = _bicoherence(fs=fs, sig=low_sig,
                                  mask=this_mask, method=method,
-                                 block_length=bicoherence_block_length,
-                                 fft_length=bicoherence_fft_length,
-                                 step=bicoherence_step,
                                  low_fq_range=low_fq_range,
-                                 high_fq_range=high_fq_range)
+                                 low_fq_width=low_fq_width,
+                                 high_fq_range=high_fq_range,
+                                 coherence_params=coherence_params)
             comod_list.append(comod)
             if progress_bar:
                 progress_bar.update_with_increment_value(1)

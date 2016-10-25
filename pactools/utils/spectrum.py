@@ -101,9 +101,9 @@ class Spectrum(object):
 
         window = self.wfunc(self.block_length)
         n_epochs, tmax = signals.shape
-        psd = np.zeros((n_epochs, fft_length))
-
         n_freq = fft_length // 2 + 1
+
+        psd = np.zeros((n_epochs, n_freq))
 
         for i, sig in enumerate(signals):
             block = np.arange(self.block_length)
