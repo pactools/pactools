@@ -16,7 +16,7 @@ from .preprocess import extract
 
 
 def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
-                       n_cycles=None, method=1):
+                       n_cycles=None, filter_method='carrier'):
     """
     Band-pass filter the signal at multiple frequencies
     """
@@ -29,7 +29,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
     frequency_range = np.atleast_1d(frequency_range)
     n_frequencies = frequency_range.shape[0]
 
-    if method == 1:
+    if filter_method == 'carrier':
         fir = Carrier()
 
     filtered = np.zeros((n_frequencies, n_epochs, n_points),
@@ -40,8 +40,8 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
             if fixed_n_cycles is None:
                 n_cycles = 1.65 * frequency / bandwidth
 
-            # 0--------- with mne.filter.band_pass_filter
-            if method == 0:
+            # --------- with mne.filter.band_pass_filter
+            if filter_method == 'mne':
                 low_sig = band_pass_filter(
                     sigs[ii, :], Fs=fs,
                     Fp1=frequency - bandwidth / 2.0,
@@ -50,8 +50,8 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
                     h_trans_bandwidth=bandwidth / 4.0,
                     n_jobs=1, method='iir')
 
-            # 1--------- with pactools.Carrier
-            if method == 1:
+            # --------- with pactools.Carrier
+            if filter_method == 'carrier':
                 fir.design(fs, frequency, n_cycles, None, zero_mean=True)
                 low_sig = fir.direct(sigs[ii, :])
 
@@ -102,7 +102,7 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
         filtered_low_2 = np.real(filtered_low_2)
 
     # Calculate the modulation index for each couple
-    MI = np.zeros((n_low, n_high))
+    comod = np.zeros((n_low, n_high))
     for i in range(n_low):
         # preproces the phase array
         if method == 'tort':
@@ -123,29 +123,22 @@ def _comodulogram(filtered_low, filtered_high, mask, method, fs, n_surrogates,
             phase_preprocessed = np.exp(1j * filtered_low[i])
 
         for j in range(n_high):
-            # number of  surrogates MIs
-            n_iterations = max(1, 1 + n_surrogates)
-            MI_surr = np.empty(n_iterations)
 
-            shifts = get_shifts(random_state, n_points, minimum_shift, fs,
-                                n_iterations)
-
-            for s, shift in enumerate(shifts):
-                MI_surr[s] = _one_modulation_index(
+            def comod_function(shift):
+                return _one_modulation_index(
                     amplitude=filtered_high[j],
                     phase_preprocessed=phase_preprocessed,
                     norm_a=norm_a[j], method=method,
                     shift=shift, draw_phase=draw_phase)
 
-            MI[i, j] = MI_surr[0]
-            if n_iterations > 2:
-                MI[i, j] -= np.mean(MI_surr[1:])
-                MI[i, j] /= np.std(MI_surr[1:])
+            comod[i, j] = _surrogate_analysis(comod_function, fs, n_points,
+                                              minimum_shift, random_state,
+                                              n_surrogates)
 
         if progress_bar:
             progress_bar.update_with_increment_value(1)
 
-    return MI
+    return comod
 
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
@@ -159,7 +152,7 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
         MI = np.abs(np.mean(amplitude * phase_preprocessed))
         MI *= np.sqrt(amplitude.size) / norm_a
 
-    # Modulation index as in [Penny & al 2008]
+    # Modulation index as in [Penny & al 2008] or [van Wijk & al 2015]
     elif method in ('penny', 'vanwijk', ):
         # solve a linear regression problem:
         # amplitude = np.dot(phase_preprocessed) * beta
@@ -167,9 +160,9 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
         PtA = np.dot(phase_preprocessed.T, amplitude[:, None])
         beta = np.linalg.solve(PtP, PtA)
         residual = amplitude - np.dot(phase_preprocessed, beta).ravel()
-        ss_amplitude = amplitude.std() ** 2
-        ss_residual = residual.std() ** 2
-        MI = (ss_amplitude - ss_residual) / ss_amplitude
+        variance_amplitude = np.var(amplitude)
+        variance_residual = np.var(residual)
+        MI = (variance_amplitude - variance_residual) / variance_amplitude
 
     # Modulation index as in [Canolty & al 2006]
     elif method == 'canolty':
@@ -216,7 +209,7 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     return MI
 
 
-def same_mask_on_all_epoch_warning(sig, mask, method):
+def _same_mask_on_all_epochs(sig, mask, method):
     mask = np.squeeze(mask)
     if mask.ndim > 1:
         warnings.warn("For coherence methods (e.g. %s) the mask has "
@@ -231,10 +224,10 @@ def same_mask_on_all_epoch_warning(sig, mask, method):
 
 def _bicoherence(fs, sig, mask, method, block_length, fft_length, step,
                  low_fq_range, high_fq_range):
-    """Helper for the bicoherence methods"""
+    """Compute the PAC with the bicoherence."""
     # The modulation index is only computed where mask is True
     if mask is not None:
-        sig = same_mask_on_all_epoch_warning(sig, mask, method)
+        sig = _same_mask_on_all_epochs(sig, mask, method)
 
     n_epochs, n_points = sig.shape
 
@@ -259,17 +252,40 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
                low_fq_width):
     """Compute the PAC with the coherence."""
     if mask is not None:
-        low_sig = same_mask_on_all_epoch_warning(low_sig, mask, method)
-        filtered_high = same_mask_on_all_epoch_warning(
+        low_sig = _same_mask_on_all_epochs(low_sig, mask, method)
+        filtered_high = _same_mask_on_all_epochs(
             filtered_high, mask, method)
 
     # amplitude of the high frequency signals
     filtered_high = np.real(np.abs(filtered_high))
 
-    # as in [Jiang & al 2015]
-    fftlen = 2 ** int(np.ceil(np.log2(fs / low_fq_width)))
+    # the FFT length is chosen to have a frequency resolution of low_fq_width
+    fftlen = fs / low_fq_width
+    # but it is faster if it is a power of 2
+    fftlen = 2 ** int(np.ceil(np.log2(fftlen)))
+    # so the actual frequency resolution is computed here
     delta_freq = fs / fftlen
-    blklen = fftlen // 2  # zero-padding
+    # the block length is chosen to limit the zero-padding
+    blklen = fftlen // 2
+
+    n_epochs, n_points = low_sig.shape
+
+    def comod_function(shift):
+        return _one_coherence_modulation_index(
+            fs, low_sig, filtered_high, method, low_fq_range, blklen, fftlen,
+            delta_freq, shift)
+
+    comod = _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
+                                random_state, n_surrogates)
+
+    return comod
+
+
+def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
+                                    low_fq_range, blklen, fftlen, delta_freq,
+                                    shift):
+    if shift != 0:
+        low_sig = np.roll(low_sig, shift)
 
     estimator = Coherence(blklen=blklen, fftlen=fftlen, fs=fs)
     coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
@@ -287,18 +303,18 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
     elif method == 'jiang':
         product = coherence[:, 1:] * np.conjugate(coherence[:, :-1])
 
-        # we use a kernel of k * 2 with respect to product, i.e. a kernel of
-        # k * 2 + 1 with respect to coherence
-        k = 2
-        kernel = np.ones(2 * k) / (2 * k)
-        phase_slope_index = np.zeros((n_high, n_freq - (2 * k)),
+        # we use a kernel of (ker * 2) with respect to the product,
+        # i.e. a kernel of (ker * 2 + 1) with respect to the coherence.
+        ker = 2
+        kernel = np.ones(2 * ker) / (2 * ker)
+        phase_slope_index = np.zeros((n_high, n_freq - (2 * ker)),
                                      dtype=np.complex128)
         for i in range(n_high):
             phase_slope_index[i] = np.convolve(product[i], kernel, 'valid')
         phase_slope_index = np.imag(phase_slope_index)
-        frequencies = frequencies[k:-k]
+        frequencies = frequencies[ker:-ker]
 
-        # transform the phase slope index into a delay
+        # transform the phase slope index into an approximated delay
         delay = phase_slope_index / (2. * np.pi * delta_freq)
 
         comod = _interpolate(np.arange(n_high), frequencies, delay,
@@ -311,8 +327,10 @@ def _coherence(low_sig, filtered_high, mask, method, fs, n_surrogates,
 
 
 def _interpolate(x1, y1, z1, x2, y2):
-    """helper to interpolate in 1d or 2d"""
-    # interpolate to get the same shape than with other methods
+    """Helper to interpolate in 1d or 2d
+
+    We interpolate to get the same shape than with other methods.
+    """
     if x1.size > 1 and y1.size > 1:
         func = interp2d(x1, y1, z1.T, kind='linear', bounds_error=False)
         z2 = func(x2, y2)
@@ -504,8 +522,13 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     # compute PAC with the bispectrum/bicoherence
     elif method in ('sigl', 'nagashima', 'hagihira', 'bispectrum'):
         if high_sig is not None:
-            raise ValueError("Impossible to use a bicoherence on two signals, "
-                             "please try another method.")
+            raise ValueError(
+                "Impossible to use a bicoherence method (%s) on two signals, "
+                "please try another method." % method)
+        if n_surrogates > 1:
+            raise NotImplementedError(
+                "Surrogate analysis with a bicoherence method (%s) "
+                "is not implemented." % method)
 
         if progress_bar:
             progress_bar = ProgressBar('bicoherence: %s' % method,
@@ -668,36 +691,22 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         n_epochs, n_points = sigdriv.shape
 
         for i_mask, this_mask in enumerate(mask):
-            # number of  surrogates MIs
-            n_iterations = max(1, 1 + n_surrogates)
-            MI_surr = None
+            def comod_function(shift):
+                return _one_driven_modulation_index(model, sigin, sigdriv,
+                                                    fs, this_mask, method,
+                                                    high_fq_range, shift)
 
-            shifts = get_shifts(random_state, n_points, minimum_shift, fs,
-                                n_iterations)
-
-            for s, shift in enumerate(shifts):
-                spec_diff = _one_driven_modulation_index(model, sigin, sigdriv,
-                                                         fs, this_mask, method,
-                                                         high_fq_range, shift)
-
-                if MI_surr is None:
-                    MI_surr = np.zeros((n_iterations, spec_diff.size))
-
-                MI_surr[s, :] = spec_diff
-
-            # save the results
-            MI = MI_surr[0, :]
-            if n_iterations > 2:
-                MI -= np.mean(MI_surr[1:, :], axis=0)
-                MI /= np.std(MI_surr[1:, :], axis=0)
+            comod = _surrogate_analysis(comod_function, fs, n_points,
+                                        minimum_shift, random_state,
+                                        n_surrogates)
 
             # initialize the comodulogram arrays
             if comod_list is None:
                 comod_list = []
                 for _ in mask:
                     comod_list.append(np.zeros((low_fq_range.size,
-                                                spec_diff.size)))
-            comod_list[i_mask][j, :] = MI
+                                                comod.size)))
+            comod_list[i_mask][j, :] = comod
 
             if progress_bar:
                 bar.update_with_increment_value(1)
@@ -732,9 +741,9 @@ def _one_driven_modulation_index(model, sigin, sigdriv, fs, mask, method,
     return spec_diff
 
 
-def get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
+def _get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
     """ Compute the shifts for the surrogate analysis"""
-    n_minimum_shift = int(fs * minimum_shift)
+    n_minimum_shift = max(1, int(fs * minimum_shift))
     # shift at least minimum_shift seconds, i.e. n_minimum_shift points
     if n_iterations > 1:
         if n_points - n_minimum_shift < n_minimum_shift:
@@ -745,10 +754,38 @@ def get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
             n_minimum_shift, n_points - n_minimum_shift, size=n_iterations)
     else:
         shifts = np.array([0])
+
     # the first has no shift since this is for the initial computation
     shifts[0] = 0
 
     return shifts
+
+
+def _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
+                        random_state, n_surrogates):
+    """Call the comod function for several random time shifts,
+    then compute the z-score of the result distribution."""
+    # number of  surrogates MIs
+    n_iterations = max(1, 1 + n_surrogates)
+
+    # pre compute all the random time shifts
+    shifts = _get_shifts(random_state, n_points, minimum_shift, fs,
+                         n_iterations)
+
+    comod_list = []
+    for s, shift in enumerate(shifts):
+        comod_list.append(comod_function(shift))
+    comod_list = np.array(comod_list)
+
+    # the first has no shift
+    comod = comod_list[0, ...]
+
+    # here we compute the z-score
+    if n_iterations > 2:
+        comod -= np.mean(comod_list[1:, ...], axis=0)
+        comod /= np.std(comod_list[1:, ...], axis=0)
+
+    return comod
 
 
 def get_maximum_pac(comodulograms, low_fq_range, high_fq_range):

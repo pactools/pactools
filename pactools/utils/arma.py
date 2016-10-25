@@ -35,11 +35,12 @@ class Arma(Spectrum):
         self.ordma = ordma
 
     def estimate(self, nbcorr=np.nan, numpsd=-1):
+        fftlen, _ = self.check_params()
         if np.isnan((nbcorr)):
             nbcorr = self.ordar
 
         # -------- estimate correlation from psd
-        correl = fftpack.ifft(self.psd[numpsd][0], self.fftlen, 0).real
+        correl = fftpack.ifft(self.psd[numpsd][0], fftlen, 0).real
 
         # -------- estimate AR part
         col1 = correl[self.ordma:self.ordma + nbcorr]
@@ -66,8 +67,8 @@ class Arma(Spectrum):
 
         """
         arpart = np.concatenate((np.ones(1), self.AR_))
-        psdar = np.abs(fftpack.fft(arpart, self.fftlen, 0)) ** 2
-        psdma = np.abs(fftpack.fft(self.MA, self.fftlen, 0)) ** 2
+        psdar = np.abs(fftpack.fft(arpart, fftlen, 0)) ** 2
+        psdma = np.abs(fftpack.fft(self.MA, fftlen, 0)) ** 2
         psd = psdma / psdar
         if not hold:
             self.psd = []

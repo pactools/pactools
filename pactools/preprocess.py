@@ -201,6 +201,7 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
     ar.periodogram(sig)
     # duplicate to see the removal of the electric network frequency
     ar.periodogram(sig, hold=True)
+    fftlen, _ = ar.check_params()
 
     # -------- remove the influence of the electric network frequency
     k = 1
@@ -208,8 +209,8 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
     while k * (enf - d_enf) < fs / 2.0:
         fmin = k * (enf - d_enf)
         fmax = k * (enf + d_enf)
-        kmin = max((0, int(ar.fftlen * fmin / fs)))
-        kmax = min(ar.fftlen // 2, int(ar.fftlen * fmax / fs) + 1)
+        kmin = max((0, int(fftlen * fmin / fs)))
+        kmax = min(fftlen // 2, int(fftlen * fmax / fs) + 1)
         Amin = ar.psd[-1][0, kmin]
         Amax = ar.psd[-1][0, kmax]
         # linear interpolation between (kmin, Amin) and (kmax, Amax)
