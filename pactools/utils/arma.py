@@ -40,7 +40,9 @@ class Arma(Spectrum):
             nbcorr = self.ordar
 
         # -------- estimate correlation from psd
-        correl = fftpack.ifft(self.psd[numpsd][0], fft_length, 0).real
+        full_psd = self.psd[numpsd]
+        full_psd = np.c_[full_psd, np.conjugate(full_psd[:, :0:-1])]
+        correl = fftpack.ifft(full_psd[0], fft_length, 0).real
 
         # -------- estimate AR part
         col1 = correl[self.ordma:self.ordma + nbcorr]
@@ -73,7 +75,7 @@ class Arma(Spectrum):
         psd = psdma / psdar
         if not hold:
             self.psd = []
-        self.psd.append(psd[None, :])
+        self.psd.append(psd[None, :fft_length // 2 + 1])
 
     def inverse(self, sigin):
         """Apply the inverse ARMA filter to a signal

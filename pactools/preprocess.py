@@ -163,13 +163,13 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum(
-                [white_sig, low_sig, white_sig - low_sig,
-                 wide_low_sig, white_sig - wide_low_sig, high_sig],
+                [sig, low_sig, sig - low_sig,
+                 white_sig, wide_low_sig, white_sig - wide_low_sig, high_sig],
                 labels=None, fs=fs,
-                colors='bggrrk')
+                colors='bggcrrk')
             plt.legend(['signal', 'driver', 'signal-driver',
-                        'wide_driver', 'signal-wide_driver',
-                        'high_frequencies'], loc=0)
+                        'white_signal', 'wide_driver',
+                        'white_signal-wide_driver', 'high_frequencies'], loc=0)
     else:
         raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
 
@@ -183,7 +183,7 @@ def plot_multiple_spectrum(signals, fs, labels, colors):
     """
     plot the signals spectrum
     """
-    s = Spectrum(blklen=2048, fs=fs, wfunc=np.blackman)
+    s = Spectrum(block_length=2048, fs=fs, wfunc=np.blackman)
     for sig in signals:
         s.periodogram(sig, hold=True)
     s.plot(labels=labels, colors=colors, fscale='lin')
@@ -211,25 +211,23 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
     ar.periodogram(sig)
     # duplicate to see the removal of the electric network frequency
     ar.periodogram(sig, hold=True)
-    fftlen, _ = ar.check_params()
+    fft_length, _ = ar.check_params()
 
     # -------- remove the influence of the electric network frequency
     k = 1
     # while the harmonic k is included in the spectrum
-    while k * (enf - d_enf) < fs / 2.0:
-        fmin = k * (enf - d_enf)
-        fmax = k * (enf + d_enf)
-        kmin = max((0, int(fftlen * fmin / fs)))
-        kmax = min(fftlen // 2, int(fftlen * fmax / fs) + 1)
+    while k * enf - d_enf < fs / 2.0:
+        fmin = k * enf - d_enf
+        fmax = k * enf + d_enf
+        kmin = max((0, int(fft_length * fmin / fs)))
+        kmax = min(fft_length // 2, int(fft_length * fmax / fs) + 1)
         Amin = ar.psd[-1][0, kmin]
         Amax = ar.psd[-1][0, kmax]
         # linear interpolation between (kmin, Amin) and (kmax, Amax)
-        interpol = (Amin * np.linspace(1.0, 0.0, kmax - kmin, endpoint=False) +
-                    Amax * np.linspace(0.0, 1.0, kmax - kmin, endpoint=False))
+        interpol = np.linspace(Amin, Amax, kmax - kmin, endpoint=False)
 
-        # remove in positive and negative frequencies
+        # remove positive frequencies
         ar.psd[-1][0, kmin:kmax] = interpol
-        ar.psd[-1][0, -kmax:-kmin] = interpol[::-1]
 
         k += 1
 
@@ -269,12 +267,12 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw=''):
     """Fill a gap with white noise.
     """
     # -------- get the amplitude of the gap
-    sp = Spectrum(blklen=2048, fs=fs, wfunc=np.blackman)
+    sp = Spectrum(block_length=2048, fs=fs, wfunc=np.blackman)
     sp.periodogram(sig)
     fmin = fa - dfa
     fmax = fa + dfa
-    kmin = max((0, int(sp.fftlen * fmin / fs)))
-    kmax = min(sp.fftlen // 2, int(sp.fftlen * fmax / fs) + 1)
+    kmin = max((0, int(sp.fft_length * fmin / fs)))
+    kmax = min(sp.fft_length // 2, int(sp.fft_length * fmax / fs) + 1)
     Amin = sp.psd[-1][0, kmin]
     Amax = sp.psd[-1][0, kmax]
     A_fa = (Amin + Amax) * 0.5
@@ -287,7 +285,7 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw=''):
 
     # -------- compute the scale parameter
     sp.periodogram(fill_sig, hold=True)
-    kfa = int(sp.fftlen * fa / fs)
+    kfa = int(sp.fft_length * fa / fs)
     scale = np.sqrt(A_fa / sp.psd[-1][0, kfa])
     fill_sig *= scale
 
@@ -306,7 +304,7 @@ def show_plot(draw):
 
 
 def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
-               stop=None, enf=50.0, blklen=2048, draw='',
+               stop=None, enf=50.0, block_length=2048, draw='',
                custom_func=None):
     """Chains the successive steps of the process """
     # ------ read raw signal
@@ -338,8 +336,8 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
     # -------- reduce noise at 50 or 60 Hz
     if enf is not None:
         hmax = int(0.5 * fs / enf)
-        sigs = [dehummer(sig, fs, enf=enf, hmax=hmax, blklen=blklen,
-                         draw=draw) for sig in sigs]
+        sigs = [dehummer(sig, fs, enf=enf, hmax=hmax,
+                         block_length=block_length, draw=draw) for sig in sigs]
         show_plot(draw)
 
     if custom_func is not None:

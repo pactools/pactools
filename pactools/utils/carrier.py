@@ -74,10 +74,10 @@ class Carrier:
         plots the impulse response and the transfer function of the filter
         """
         # compute periodogram
-        nfft = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
-        s = Spectrum(fftlen=nfft,
-                     blklen=self.fir.size,
-                     step=np.nan,
+        fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
+        s = Spectrum(fft_length=fft_length,
+                     block_length=self.fir.size,
+                     step=None,
                      fs=self.fs,
                      wfunc=np.ones,
                      donorm=False)
@@ -86,9 +86,9 @@ class Carrier:
 
         # print the frequency and the bandwidth
         if print_width:
-            freq = np.linspace(0, s.fs / 2, s.fftlen // 2 + 1)
+            freq = np.linspace(0, s.fs / 2, s.fft_length // 2 + 1)
 
-            psd = s.psd[0][0, 0:s.fftlen // 2 + 1]
+            psd = s.psd[0][0, :]
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-12))
             i0 = np.argmax(psd)
             over_3db = np.nonzero(psd > psd[i0] - 3)[0]

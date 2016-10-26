@@ -64,7 +64,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
 
     # plot simple periodogram
     if True:
-        spect = Spectrum(blklen=128, fs=model.fs, wfunc=np.blackman)
+        spect = Spectrum(block_length=128, fs=model.fs, wfunc=np.blackman)
         spect.periodogram(model.sigin)
         n_frequency = spect.fftlen // 2 + 1
         psd = spect.psd[0][0, 0:n_frequency]

@@ -34,7 +34,7 @@ def params_rat():
 
         # dehumming
         'enf': 50.0,  # electrical network frequency
-        'blklen': 2048,  # block length for dehumming
+        'block_length': 2048,  # block length for dehumming
 
         # custom function
         'custom_func': fill_gap,  # fill the wide gap at 50 Hz

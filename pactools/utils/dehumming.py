@@ -15,25 +15,26 @@ from .spectrum import Spectrum
 from .progress_bar import ProgressBar
 
 
-def dehummer(sig, fs, enf=50.0, hmax=5, blklen=2048, draw=''):
+def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
     """Removes the ENF signal and its harmonics
 
     sig    : input signal
     fs     : sampling frequency
     enf    : electrical network frequency
     hmax   : maximum number of harmonics
-    blklen : length of FFTs
+    block_length : length of FFTs
     draw   : list of plots
 
     returns the denoised signal
     """
     hmax = min(hmax, int(0.5 * fs / enf))
 
-    blklen_o2 = blklen // 2
-    # -------- the window and its shift by blklen/2 must sum to 1.0
-    window = np.hamming(blklen)
-    window[0:blklen_o2] /= window[0:blklen_o2] + window[blklen_o2:blklen]
-    window[blklen_o2:blklen] = np.flipud(window[0:blklen_o2])
+    block_length_o2 = block_length // 2
+    # -------- the window and its shift by block_length/2 must sum to 1.0
+    window = np.hamming(block_length)
+    window[0:block_length_o2] /= (window[0:block_length_o2] +
+                                  window[block_length_o2:block_length])
+    window[block_length_o2:block_length] = np.flipud(window[0:block_length_o2])
 
     if hmax == 0:
         return sig
@@ -41,25 +42,25 @@ def dehummer(sig, fs, enf=50.0, hmax=5, blklen=2048, draw=''):
 
     # -------- prepare an array with estimated frequencies
     tmax = len(sig)
-    freq = np.zeros(2 + 2 * tmax // blklen)
+    freq = np.zeros(2 + 2 * tmax // block_length)
     kf = 0
     bar = ProgressBar(max_value=len(freq), title='dehumming %.0f Hz' % enf)
 
     # -------- process successive blocks
-    for tmid in range(0, tmax + blklen_o2, blklen_o2):
+    for tmid in range(0, tmax + block_length_o2, block_length_o2):
         # -------- initial and final blocks are truncated
-        tstart = tmid - blklen_o2
+        tstart = tmid - block_length_o2
         if tstart < 0:
             wstart = -tstart
             tstart = 0
         else:
             wstart = 0
-        tstop = tmid + blklen_o2
+        tstop = tmid + block_length_o2
         if tstop > tmax:
-            wstop = blklen + tmax - tstop
+            wstop = block_length + tmax - tstop
             tstop = tmax
         else:
-            wstop = blklen
+            wstop = block_length
 
         # -------- search for the frequency
         f0 = enf
@@ -110,7 +111,7 @@ def dehummer(sig, fs, enf=50.0, hmax=5, blklen=2048, draw=''):
 
     # -------- plot long term spectum of noisy and denoised signals
     if 'd' in draw or 'z' in draw:
-        sp = Spectrum(blklen=2048, fs=fs, donorm=True, wfunc=np.blackman)
+        sp = Spectrum(block_length=2048, fs=fs, donorm=True, wfunc=np.blackman)
         sp.periodogram(sig)
         sp.periodogram(result, hold=True)
         sp.plot('Power spectral density before/after dehumming',
@@ -153,4 +154,4 @@ def example():
     sig = np.random.randn(50000)
 
     # remove electric network frequency
-    dehummer(sig, fs=400.0, enf=50.0, blklen=2048, draw='z')
+    dehummer(sig, fs=400.0, enf=50.0, block_length=2048, draw='z')
