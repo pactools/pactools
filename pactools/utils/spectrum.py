@@ -199,7 +199,7 @@ class Spectrum(object):
         n_freq = fft_length // 2 + 1
         freq = np.linspace(0, self.fs / 2, n_freq)
         psd = self.psd[-1][0, :]
-        return freq[np.argmax(psd)]
+        return freq[np.argmax(psd[1:]) + 1]
 
 
 class Coherence(Spectrum):

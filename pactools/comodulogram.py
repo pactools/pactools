@@ -6,7 +6,7 @@ from scipy.signal import hilbert
 from scipy.interpolate import interp1d, interp2d
 from mne.filter import band_pass_filter
 
-from .dar_model.dar import DAR
+from .dar_model import DAR, SimpleDAR
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
@@ -493,8 +493,9 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     low_fq_range = np.asarray(low_fq_range)
     high_fq_range = np.asarray(high_fq_range)
 
-    mask_is_list = isinstance(mask, list)
-    if not mask_is_list:
+    multiple_masks = (isinstance(mask, list) or
+                      (isinstance(mask, np.ndarray) and mask.ndim == 3))
+    if not multiple_masks:
         mask = [mask]
     n_masks = len(mask)
 
@@ -574,7 +575,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
             if progress_bar:
                 progress_bar.update_with_increment_value(1)
 
-    elif isinstance(method, DAR):
+    elif isinstance(method, (SimpleDAR, DAR)):
         comod_list = driven_comodulogram(fs=fs, low_sig=low_sig,
                                          high_sig=high_sig,
                                          mask=mask, model=method,
@@ -593,7 +594,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         plot_comodulogram(comod_list, fs, low_fq_range, high_fq_range,
                           contours=contours)
 
-    if not mask_is_list:
+    if not multiple_masks:
         return comod_list[0]
     else:
         return comod_list
@@ -679,49 +680,63 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     comod : array, shape (len(low_fq_range), len(high_fq_range))
         Comodulogram for each couple of frequencies
     """
+    sigdriv_imag = None
     low_sig = np.atleast_2d(low_sig)
     if high_sig is None:
         sigs = low_sig
     else:
+        # hack to call only once extract
         high_sig = np.atleast_2d(high_sig)
         sigs = np.r_[low_sig, high_sig]
         n_epochs = low_sig.shape[0]
 
     sigs = np.atleast_2d(sigs)
 
-    mask_is_list = isinstance(mask, list)
-    if not mask_is_list:
+    multiple_masks = (isinstance(mask, list) or
+                      (isinstance(mask, np.ndarray) and mask.ndim == 3))
+    if not multiple_masks:
         mask = [mask]
+
+    extract_complex = model.ordriv_d > 0
 
     comod_list = None
     if progress_bar:
         bar = ProgressBar(
             max_value=len(low_fq_range) * len(mask),
             title='comodulogram: %s' % model.get_title(name=True))
-    for j, (filtered_low, filtered_high) in enumerate(extract(
+    for j, filtered_signals in enumerate(extract(
             sigs=sigs, fs=fs, low_fq_range=low_fq_range,
             bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
             random_noise=random_noise, normalize=normalize,
-            whitening=whitening, draw='')):
+            whitening=whitening, draw='', extract_complex=extract_complex)):
+
+        fc = low_fq_range[j]
+
+        if extract_complex:
+            filtered_low, filtered_high, filtered_low_imag = filtered_signals
+        else:
+            filtered_low, filtered_high = filtered_signals
 
         if high_sig is None:
-            filtered_high = np.array(filtered_high)
-            filtered_low = np.array(filtered_low)
+            sigin = np.array(filtered_high)
+            sigdriv = np.array(filtered_low)
+            if extract_complex:
+                sigdriv_imag = np.array(filtered_low_imag)
         else:
-            filtered_high = np.array(filtered_high[n_epochs:])
-            filtered_low = np.array(filtered_low[:n_epochs])
+            sigin = np.array(filtered_high[n_epochs:])
+            sigdriv = np.array(filtered_low[:n_epochs])
+            if extract_complex:
+                sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
 
-        sigdriv = filtered_low
-        sigin = filtered_high
         sigin /= np.std(sigin)
-
         n_epochs, n_points = sigdriv.shape
 
         for i_mask, this_mask in enumerate(mask):
             def comod_function(shift):
-                return _one_driven_modulation_index(model, sigin, sigdriv,
-                                                    fs, this_mask, method,
-                                                    high_fq_range, shift)
+                return _one_driven_modulation_index(fs, sigin, sigdriv,
+                                                    sigdriv_imag, model,
+                                                    this_mask, method,
+                                                    high_fq_range, fc, shift)
 
             comod = _surrogate_analysis(comod_function, fs, n_points,
                                         minimum_shift, random_state,
@@ -738,24 +753,25 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             if progress_bar:
                 bar.update_with_increment_value(1)
 
-    if not mask_is_list:
+    if not multiple_masks:
         return comod_list[0]
     else:
         return comod_list
 
 
-def _one_driven_modulation_index(model, sigin, sigdriv, fs, mask, method,
-                                 high_fq_range, shift):
+def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
+                                 method, high_fq_range, fc, shift):
 
     # shift for the surrogate analysis
     if shift != 0:
         sigdriv = np.roll(sigdriv, shift)
 
     # fit the model DAR on the data
-    model.fit(sigin=sigin, sigdriv=sigdriv, fs=fs, mask=mask)
+    model.fit(fs=fs, sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
+              mask=mask)
 
     # get PSD difference
-    spec, _ = model.amplitude_frequency()
+    spec, _ = model.amplitude_frequency(fc=fc)
     if method == 'minmax':
         spec_diff = spec.max(axis=1) - spec.min(axis=1)
     elif method == 'firstlast':

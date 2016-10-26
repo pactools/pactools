@@ -12,12 +12,13 @@ from .spectrum import Spectrum
 
 
 class Carrier:
-    def __init__(self, fir=np.ones(1), fs=1.):
+    def __init__(self, fir=np.ones(1), fs=1., extract_complex=False):
         """
         initializes a filter with coefficient in a (ndarray)
         """
         self.fir = fir
         self.fs = fs
+        self.extract_complex = extract_complex
 
     def design(self, fs, fc, n_cycles=7.0, bandwidth=None, zero_mean=True):
         """
@@ -43,7 +44,9 @@ class Carrier:
 
         w = np.blackman(order)
         t = np.linspace(-half_order, half_order, order)
-        car = np.cos((2.0 * np.pi * fc / fs) * t)
+        phase = (2.0 * np.pi * fc / fs) * t
+
+        car = np.cos(phase)
         fir = w * car
 
         # the filter must be odd and symmetric, in order to be zero-phase
@@ -57,6 +60,13 @@ class Carrier:
         gain = np.sum(fir * car)
         self.fir = fir * (1.0 / gain)
         self.fs = fs
+
+        # add the imaginary part to have a complex wavelet
+        if self.extract_complex:
+            car_imag = np.sin(phase)
+            fir_imag = w * car_imag
+            self.fir_imag = fir_imag * (1.0 / gain)
+
         return self
 
     def plot(self, fig=None, fscale='log', print_width=False):
@@ -87,14 +97,16 @@ class Carrier:
             f_high = freq[over_3db[-1]]
             df = f_high - f_low
             f0 = freq[i0]
-            print('f0 = %.3f Hz, df_3db = %.3f Hz, df/f = %.3f'
-                  % (f0, df, df / f0))
+            print('f0 = %.3f Hz, df_3db = %.3f Hz [%.3f, %.3f], df/f = %.3f'
+                  % (f0, df, f_low, f_high, df / f0))
 
         # plots
         if fig is None:
             fig = plt.figure('Impulse response of FIR filter "Carrier"')
         ax = fig.gca()
         ax.plot(self.fir)
+        if self.extract_complex:
+            ax.plot(self.fir_imag)
         ax.set_title('Impulse response of FIR filter "Carrier"')
         plt.xlabel('Samples')
         plt.ylabel('Amplitude')
@@ -106,10 +118,21 @@ class Carrier:
         sigin : input signal (ndarray)
         returns the filtered signal (ndarray)
         """
+        fftconvolve = signal.fftconvolve
+
+        filtered = fftconvolve(sigin.ravel(), self.fir, 'same')
+        if self.extract_complex:
+            filtered_imag = fftconvolve(sigin.ravel(), self.fir_imag, 'same')
+
         if sigin.ndim == 2:
-            return signal.fftconvolve(sigin[0], self.fir, 'same')[None, :]
+            filtered = filtered[None, :]
+            if self.extract_complex:
+                filtered_imag = filtered_imag[None, :]
+
+        if self.extract_complex:
+            return filtered, filtered_imag
         else:
-            return signal.fftconvolve(sigin, self.fir, 'same')
+            return filtered
 
 
 def test1():

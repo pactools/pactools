@@ -298,7 +298,6 @@ class BaseLattice(BaseAR):
 
         # -------- select signal, basis and regression signals
         n_basis, n_epochs, n_points = basis.shape
-        ordriv_p1 = self.ordriv + 1
         ordar_ = self.ordar
         scale = 1.0 / n_points
 
@@ -312,7 +311,7 @@ class BaseLattice(BaseAR):
         self.backward_residual[0] = backward_res
 
         # -------- model at order 0
-        AR_ = np.empty((0, ordriv_p1))
+        AR_ = np.empty((0, self.n_basis))
         yield AR_
 
         # -------- loop on successive orders
@@ -381,7 +380,7 @@ class BaseLattice(BaseAR):
                 gradient = 2.0 * np.dot(
                     basis[:, :, 1:n_points].reshape(n_basis, -1),
                     g.reshape(-1, 1))
-                gradient.shape = (ordriv_p1, 1)
+                gradient.shape = (n_basis, 1)
 
                 h = self.common_hessian(k + 1, parcor_list)
                 hessian = 2.0 * np.dot(
@@ -389,7 +388,7 @@ class BaseLattice(BaseAR):
                     basis[:, :, 1:n_points].reshape(n_basis, -1).T)
 
                 dLAR = np.reshape(linalg.solve(hessian, gradient),
-                                  (1, ordriv_p1))
+                                  (1, n_basis))
                 LAR -= dLAR
 
             # -------- save current cell and residuals
@@ -403,7 +402,7 @@ class BaseLattice(BaseAR):
             self.forward_residual[k + 1] = forward_res
             self.backward_residual[k + 1] = backward_res
 
-            AR_ = np.vstack((AR_, np.reshape(LAR, (1, ordriv_p1))))
+            AR_ = np.vstack((AR_, np.reshape(LAR, (1, n_basis))))
             yield AR_
 
     def estimate_error(self, recompute=False):
@@ -432,32 +431,26 @@ class BaseLattice(BaseAR):
         if recompute:
             self.residual_, _ = self.whiten()
 
-    def develop(self, newcols, newbasis=None):
+    def develop(self, basis, sigdriv):
         """Compute the AR models and gains at instants fixed by newcols
 
-        newcols : array giving the indexes of the columns
-        newbasis : if None, we use the basis used for fitting (self.basis_)
-                   else, we use the given basis.
         returns:
         ARcols : array containing the AR parts
         Gcols  : array containing the gains
 
-        The size of ARcols is (1 + ordar, n_epochs, len(newcols))
-        The size of Gcols is (1, n_epochs, len(newcols))
+        The size of ARcols is (1 + ordar, n_epochs, n_columns)
+        The size of Gcols is (1, n_epochs, n_columns)
 
         """
-        if newbasis is None:
-            basisplot = self.basis_[..., newcols]
-        else:
-            basisplot = newbasis[..., newcols]
-        n_basis, n_epochs, n_points = basisplot.shape
+        n_basis, n_epochs, n_points = basis.shape
         ordar = self.get_ordar()
 
         # -------- expand on the basis
         AR_cols = np.ones((1, n_epochs, n_points))
         if ordar > 0:
-            parcor_list = self.develop_parcor(self.AR_, basisplot)
+            parcor_list = self.develop_parcor(self.AR_, basis)
             parcor_list = self.decode(parcor_list)
             AR_cols = np.vstack((AR_cols, ki2ai(parcor_list)))
-        G_cols = self.develop_gain(basisplot, squared=False, log=False)
-        return (AR_cols, G_cols)
+        G_cols = self.develop_gain(basis, squared=False, log=False)
+
+        return AR_cols, G_cols

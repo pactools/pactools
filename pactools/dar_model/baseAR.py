@@ -9,7 +9,7 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
-from ..utils.spectrum import phase_amplitude
+from ..utils.spectrum import phase_amplitude, Spectrum
 
 
 class BaseAR(object):
@@ -28,7 +28,8 @@ class BaseAR(object):
                  eps_newton=0.001,
                  ordriv_d=0,
                  progress_bar=False,
-                 fit_size=1):
+                 fit_size=1,
+                 cross_term_driver=True):
         """Creates a filtered STAR model with Taylor expansion
 
         ordar       : order of the autoregressive model
@@ -43,6 +44,7 @@ class BaseAR(object):
         eps_newton  : threshold to stop Newton-Raphson iterations
         ordriv_d    : ordriv for driver's derivative
         fit_size    : ratio of the signal used in the fit
+        cross_term_driver: use or not the cross term when using two drivers
 
         """
         # -------- save parameters
@@ -56,25 +58,26 @@ class BaseAR(object):
         self.progress_bar = progress_bar
 
         # power of the Taylor expansion
-        self.ordriv = ordriv + ordriv_d
+        self.ordriv = ordriv
         self.ordriv_d = ordriv_d
+        self.cross_term_driver = cross_term_driver
+        self.compute_cross_orders(ordriv, ordriv_d, cross_term_driver)
 
         # -------- prepare other arrays
+        self.sigdriv_imag = None
         self.basis_ = None
         self.fit_size = fit_size
 
-    def fit(self, sigin, sigdriv, fs, mask=None, use_driver_phase=False):
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None,
+            use_driver_phase=False):
         """Estimates a filtered STAR model with Taylor expansion
 
         sigin     : signal that is to be modeled
         sigdriv   : signal that drives the model
         fs        : sampling frequency
+        sigdriv_imag : imaginary part of the driver (sigdriv)
         mask      : mask to select where signals are used to fit the model
-
         use_driver_phase : if True, we divide the driver by its amplitude
-
-        start, filein and filedriv are only given for information
-        and may be omitted
         """
         self.reset_logl_aic_bic()
         self.use_driver_phase = use_driver_phase
@@ -85,15 +88,19 @@ class BaseAR(object):
             sigin = np.atleast_2d(sigin)[:, :sigdriv.size]
 
         # -------- save signals as attributes of the model
-        self.sigin = np.atleast_2d(np.array(sigin, dtype='float64',
-                                            order='C'))
-        self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64',
-                                              order='C'))
+        self.sigin = np.atleast_2d(np.array(sigin, dtype='float64'))
+        self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64'))
 
+        # -------- also store the sigdriv imaginary part is present
+        self.sigdriv_imag = sigdriv_imag
+        if sigdriv_imag is not None:
+            self.sigdriv_imag = np.atleast_2d(np.array(sigdriv_imag,
+                                                       dtype='float64'))
+
+        # -------- also save the mask and remove far masked data
         self.mask = mask
         if mask is not None:
             self.mask = np.atleast_2d(np.array(mask, dtype='float64'))
-
         self.remove_far_masked_data()
 
         if self.center:
@@ -127,7 +134,35 @@ class BaseAR(object):
             self.estimate_gain()
         return self
 
-    def make_basis(self, sigdriv=None):
+    def compute_cross_orders(self, ordriv, ordriv_d, cross_term_driver):
+        max_order_cross_term = max(ordriv, ordriv_d)
+
+        power_list, power_list_d = [], []
+
+        # power of the driver
+        for j in np.arange(1, ordriv + 1):
+            power_list.append(j)
+            power_list_d.append(0)
+
+        # power of the derivative of the driver
+        for k in np.arange(1, ordriv_d + 1):
+            power_list.append(0)
+            power_list_d.append(k)
+
+        if cross_term_driver:
+            # cross terms
+            for j in range(1, ordriv):
+                for k in range(1, ordriv_d):
+                    if j + k >= max_order_cross_term:
+                        power_list.append(j)
+                        power_list_d.append(k)
+
+        self.n_basis = len(power_list) + 1
+        self.ordriv = ordriv
+        self.ordriv_d = ordriv_d
+        return power_list, power_list_d, self.n_basis
+
+    def make_basis(self, sigdriv=None, sigdriv_imag=None):
         """Creates a basis from the driving signal
 
         sigdriv : if None, we use self.sigdriv instead
@@ -142,10 +177,11 @@ class BaseAR(object):
         the basis is stored in self.basis_
         """
         ordriv, ordriv_d = self.get_ordriv(), self.get_ordriv_d()
-        ordriv -= ordriv_d
+
         # -------- check default arguments
         if sigdriv is None:
             sigdriv = self.sigdriv
+            sigdriv_imag = self.sigdriv_imag
             save_basis = True
             ortho = self.ortho
             normalize = self.normalize
@@ -155,32 +191,41 @@ class BaseAR(object):
             ortho = False
             normalize = False
 
+        power_list, power_list_d, n_basis = self.compute_cross_orders(
+            ordriv, ordriv_d, self.cross_term_driver)
+
         sigdriv = np.atleast_2d(sigdriv)
         n_epochs, n_points = sigdriv.shape
 
         # -------- memorize in alpha the various transforms
-        alpha = np.eye(ordriv + ordriv_d + 1)
+        alpha = np.eye(n_basis)
 
         # -------- create the basis
-        basis = np.empty((ordriv + ordriv_d + 1, n_epochs * n_points))
+        basis = np.zeros((n_basis, n_epochs * n_points))
         basis[0] = 1.0
 
-        # -------- create derivative
+        # -------- create derivative if sigdriv_imag is not given
         if ordriv_d > 0:
-            sigdriv_d = np.copy(sigdriv)
-            sigdriv_d -= np.roll(sigdriv, shift=1, axis=1)
-            sigdriv_d[:, 0] = sigdriv_d[:, 1]
-            sigdriv_d *= sigdriv.std() / sigdriv_d.std()
-
-        orders = np.r_[np.arange(1, ordriv + 1), np.arange(1, ordriv_d + 1)]
-        derivative = [False] * ordriv + [True] * ordriv_d
-        # -------- create successive components
-        for k, (order, deriv) in enumerate(zip(orders, derivative)):
-            k += 1
-            if deriv:
-                basis[k] = sigdriv_d.ravel() ** order
+            if sigdriv_imag is None:
+                sigdriv_d = np.copy(sigdriv)
+                sigdriv_d -= np.roll(sigdriv, shift=1, axis=1)
+                sigdriv_d[:, 0] = sigdriv_d[:, 1]
+                sigdriv_d *= sigdriv.std() / sigdriv_d.std()
             else:
-                basis[k] = sigdriv.ravel() ** order
+                sigdriv_d = np.atleast_2d(sigdriv_imag)
+
+        # -------- create successive components
+        for k, (power, power_d) in enumerate(zip(power_list, power_list_d)):
+            k += 1
+            if power_d > 0 and power == 0:
+                basis[k] = sigdriv_d.ravel() ** power_d
+            elif power_d == 0 and power > 0:
+                basis[k] = sigdriv.ravel() ** power
+            elif power_d > 0 and power > 0:
+                basis[k] = sigdriv_d.ravel() ** power_d
+                basis[k] *= sigdriv.ravel() ** power
+            else:
+                raise ValueError('impossible !')
 
             if ortho:
                 # correct current component with corrected components
@@ -239,6 +284,7 @@ class BaseAR(object):
                 bar.update(float(self.ordar_) / self.ordar,
                            title=self.get_title(name=True))
         self.ordriv_ = self.ordriv
+        self.ordriv_d_ = self.ordriv_d
 
     def remove_far_masked_data(self):
         """Remove unnecessary data which is masked
@@ -264,9 +310,14 @@ class BaseAR(object):
         self.mask = self.mask[epoch_selection, :]
         self.sigin = self.sigin[epoch_selection, :]
         self.sigdriv = self.sigdriv[epoch_selection, :]
-        self.mask = (self.mask[:, time_selection])
+        if self.sigdriv_imag is not None:
+            self.sigdriv_imag = self.sigdriv_imag[epoch_selection, :]
+
+        self.mask = self.mask[:, time_selection]
         self.sigin = np.ascontiguousarray(self.sigin[:, time_selection])
-        self.sigdriv = (self.sigdriv[:, time_selection])
+        self.sigdriv = self.sigdriv[:, time_selection]
+        if self.sigdriv_imag is not None:
+            self.sigdriv_imag = self.sigdriv_imag[:, time_selection]
 
     def crop_end(self, sig):
         fit_size = min(1, self.fit_size)
@@ -295,7 +346,7 @@ class BaseAR(object):
             title += self.__class__.__name__
 
         ordar = self.get_ordar()
-        ordriv = self.get_ordriv() - self.get_ordriv_d()
+        ordriv = self.get_ordriv()
         ordriv_d = self.get_ordriv_d()
         if ordriv_d > 0:
             title += '(%d, %d+%d)' % (ordar, ordriv, ordriv_d)
@@ -369,8 +420,7 @@ class BaseAR(object):
             self.BIC = BIC
 
         if isinstance(BIC, np.ndarray):
-            BIC = BIC[self.ordar_, self.ordriv_ - self.ordriv_d_,
-                      self.ordriv_d_]
+            BIC = BIC[self.ordar_, self.ordriv_, self.ordriv_d_]
 
         return BIC
 
@@ -399,8 +449,7 @@ class BaseAR(object):
             self.tmax = tmax
 
         if isinstance(logL, np.ndarray):
-            logL = logL[self.ordar_, self.ordriv_ - self.ordriv_d_,
-                        self.ordriv_d_]
+            logL = logL[self.ordar_, self.ordriv_, self.ordriv_d_]
 
         return logL
 
@@ -423,7 +472,7 @@ class BaseAR(object):
         self.AR_ = np.ndarray(0)
         self.G_ = np.ndarray(0)
         ordar = self.ordar
-        ordriv = self.ordriv - self.ordriv_d
+        ordriv = self.ordriv
         ordriv_d = self.ordriv_d
 
         best_criterion = np.inf
@@ -445,8 +494,8 @@ class BaseAR(object):
         for ordriv_d_ in range(ordriv_d + 1):
             for ordriv_ in range(ordriv + 1):
                 A = self.copy()
-                A.ordriv = ordriv_ + ordriv_d_
-                A.ordriv_ = ordriv_ + ordriv_d_
+                A.ordriv = ordriv_
+                A.ordriv_ = ordriv_
                 A.ordriv_d = ordriv_d_
                 A.ordriv_d_ = ordriv_d_
                 A.make_basis()
@@ -473,7 +522,7 @@ class BaseAR(object):
                     if this_criterion < best_criterion:
                         best_criterion = this_criterion
                         self.ordar_ = ordar_
-                        self.ordriv_ = ordriv_ + ordriv_d_
+                        self.ordriv_ = ordriv_
                         self.ordriv_d_ = ordriv_d_
                         self.AR_ = np.copy(AR_)
                         self.G_ = np.copy(A.G_)
@@ -532,7 +581,7 @@ class BaseAR(object):
         residual2 = residual ** 2
         n_points = residual.size
         resreg = basis * residual
-        self.G_ = np.zeros((1, self.ordriv_ + 1))
+        self.G_ = np.zeros((1, self.n_basis))
 
         # -------- prepare an initial estimation
         # chose N = 3 * ordriv classes, estimate a standard deviation
@@ -542,12 +591,12 @@ class BaseAR(object):
         # successive slices of the signal, but for signal driven
         # models, this would be wrong! Use levels of the driving
         # function instead.
-        if self.ordriv_ > 0:
+        if self.n_basis > 1:
             index = np.argsort(basis[1, :])  # indexes to sort the basis
         else:
             index = np.arange(n_points, dtype=int)
 
-        nbslices = 3 * (self.ordriv_ + 1)  # number of slices
+        nbslices = 3 * self.n_basis        # number of slices
         lenslice = n_points // nbslices    # length of a slice
         e = np.zeros(nbslices)             # log energies
 
@@ -570,7 +619,7 @@ class BaseAR(object):
         r = np.dot(e, masked_basis[:, index[kmid]].T)
 
         # -------- regularize matrix R
-        v = np.resize(linalg.eigvalsh(R), (1, self.ordriv + 1))
+        v = np.resize(linalg.eigvalsh(R), (1, self.n_basis))
         correction = regul * np.max(v)
 
         # add tiny correction on diagonal without a copy
@@ -578,7 +627,7 @@ class BaseAR(object):
 
         # -------- compute regularized solution
         self.G_ = linalg.solve(R, r)
-        self.G_.shape = (1, self.ordriv_ + 1)
+        self.G_.shape = (1, self.n_basis)
 
         # -------- prepare the likelihood (and its initial value)
         loglike = np.zeros(iter_gain + 1)
@@ -699,10 +748,8 @@ class BaseAR(object):
         pass
 
     @abstractmethod
-    def develop(self, newcols, newbasis):
+    def develop(self, basis, sigdriv):
         """Compute the AR models and gains at instants fixed by newcols
-
-        newcols : array giving the indexes of the columns
 
         returns:
         ARcols : array containing the AR parts
@@ -717,33 +764,28 @@ class BaseAR(object):
         """overload if it's faster to get only last model"""
         return self.next_model()
 
-    def develop_all(self, sigdriv=None, instantaneous=False):
+    def develop_all(self, sigdriv=None):
         """
         Compute the AR models and gains for every instant of sigdriv
         """
-
         if sigdriv is None:
             sigdriv = self.sigdriv
-            basis = self.make_basis()
+            try:
+                basis = self.basis_
+            except:
+                basis = self.make_basis()
         else:
             basis = self.make_basis(sigdriv=sigdriv)
 
-        newcols = np.arange(sigdriv.size)
-        try:
-            AR_cols, G_cols = self.develop(newcols=newcols, newbasis=basis,
-                                           instantaneous=instantaneous)
-        except:
-            AR_cols, G_cols = self.develop(newcols=newcols, newbasis=basis)
+        AR_cols, G_cols = self.develop(basis=basis, sigdriv=sigdriv)
 
-        return AR_cols, G_cols, newcols, sigdriv
+        return AR_cols, G_cols, np.arange(sigdriv.size), sigdriv
 
     # ------------------------------------------------ #
     # Functions to plot the models                     #
     # ------------------------------------------------ #
     def _basis2spec(self, sigdriv, frange=None):
         """Compute the power spectral density for a given basis
-
-        newcols : array giving the indexes of the columns
         frange  : frequency range
 
         this method is not intended for general use, except as a
@@ -758,7 +800,7 @@ class BaseAR(object):
 
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]
-        G_cols = G_cols[0, :][None, :]
+        G_cols = G_cols[0, :]
 
         # -------- estimate AR spectrum
         nfft = 256
@@ -784,7 +826,7 @@ class BaseAR(object):
         return spec
 
     def amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                            xlim=None, fmax=None):
+                            xlim=None, fc=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -801,9 +843,21 @@ class BaseAR(object):
         if xlim is None:
             xlim = self.get_sigdriv_bounds()
 
-        # simple ramp
-        eps = 0.0
-        amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
+        if self.ordriv_d > 0 or False:
+            if fc is None:
+                # compute the main driver frequency
+                sp = Spectrum(block_length=min(2048, self.sigdriv.shape[1]),
+                              fs=self.fs)
+                sp.periodogram(self.sigdriv[0, :])
+                fc = sp.main_frequency()
+
+            # full oscillation for derivative
+            amplitudes = xlim[1] * np.cos(2.0 * np.pi * fc / self.fs *
+                                          np.arange(int(self.fs / fc)))
+        else:
+            # simple ramp
+            eps = 0.0
+            amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
 
         # -------- compute spectra
         spec = self._basis2spec(amplitudes[None, :], frange)

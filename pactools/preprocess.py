@@ -81,7 +81,7 @@ def decimate(sig, fs, decimation_factor):
 
 def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                      draw='', ordar=8, enf=50.0, whiten_fill4=True,
-                     random_noise=None):
+                     random_noise=None, extract_complex=False):
     """Creates a FIR filter that extracts a carrier,
     applies this filter to signal
 
@@ -99,6 +99,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                     4 : removing a wide-band around carrier and then use fill=2
     draw       : list of plots
     ordar      : for the whitening with option fill=4
+    extract_complex : use a complex wavelet
 
     returns carrier signal and processed full band signal
 
@@ -106,11 +107,14 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
     if random_noise is None:
         random_noise = np.random.randn(len(sig))
 
-    fir = Carrier()
-    fir.design(fs, fc, n_cycles, bandwidth, zero_mean=False)
+    filt = Carrier(extract_complex=extract_complex)
+    filt.design(fs, fc, n_cycles, bandwidth, zero_mean=False)
     if 'c' in draw or 'z' in draw:
-        fir.plot(fscale='lin', print_width=False)
-    low_sig = fir.direct(sig)
+        filt.plot(fscale='lin', print_width=False)
+    if extract_complex:
+        low_sig, low_sig_imag = filt.direct(sig)
+    else:
+        low_sig = filt.direct(sig)
 
     if fill == 0:
         # keeping driver in high_sig
@@ -122,7 +126,10 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
     elif fill == 2:
         # replacing driver by a white noise
-        fill_sig = fir.direct(random_noise)
+        if extract_complex:
+            fill_sig, _ = filt.direct(random_noise)
+        else:
+            fill_sig = filt.direct(random_noise)
         fill_sig.shape = sig.shape
         fill_sig *= np.std(low_sig) / np.std(fill_sig)
 
@@ -152,7 +159,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         wide_low_sig, high_sig = extract_and_fill(
             sig=white_sig, fs=fs, fc=fc, n_cycles=n_cycles,
             bandwidth=bandwidth, fill=2, draw=draw, enf=enf,
-            random_noise=random_noise)
+            random_noise=random_noise, extract_complex=False)
 
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum(
@@ -166,7 +173,10 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
     else:
         raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
 
-    return low_sig, high_sig
+    if extract_complex:
+        return low_sig, high_sig, low_sig_imag
+    else:
+        return low_sig, high_sig
 
 
 def plot_multiple_spectrum(signals, fs, labels, colors):
@@ -341,7 +351,7 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
 
 def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
             draw='', ordar=8, enf=50.0, random_noise=None, normalize=False,
-            whitening='after'):
+            whitening='after', extract_complex=False):
     """
     Do fast preprocessing for several values of fc (the driver frequency).
 
@@ -371,9 +381,12 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
         low_and_high = [extract_and_fill(
             sig, fs=fs, fc=fc, n_cycles=n_cycles, bandwidth=bandwidth,
             fill=fill, ordar=ordar, enf=enf, whiten_fill4=whitening == 'after',
-            random_noise=random_noise, draw=draw) for sig in sigs]
+            random_noise=random_noise, draw=draw,
+            extract_complex=extract_complex) for sig in sigs]
         low_sigs = [both[0] for both in low_and_high]
         high_sigs = [both[1] for both in low_and_high]
+        if extract_complex:
+            low_sigs_imag = [both[2] for both in low_and_high]
 
         if whitening == 'after' and fill != 4:
             high_sigs = [whiten(high_sig, fs=fs, ordar=ordar, draw=draw)
@@ -384,7 +397,13 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
             scales = [1.0 / np.std(high_sig) for high_sig in high_sigs]
             high_sigs = [high * s for (high, s) in zip(high_sigs, scales)]
             low_sigs = [low * s for (low, s) in zip(low_sigs, scales)]
+            if extract_complex:
+                low_sigs_imag = [low * s for (low, s) in zip(low_sigs_imag,
+                                                             scales)]
 
         show_plot(draw)
 
-        yield low_sigs, high_sigs
+        if extract_complex:
+            yield low_sigs, high_sigs, low_sigs_imag
+        else:
+            yield low_sigs, high_sigs
