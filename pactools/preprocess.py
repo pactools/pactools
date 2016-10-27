@@ -120,9 +120,22 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         # keeping driver in high_sig
         high_sig = sig
 
+        if 'z' in draw or 'c' in draw:
+            plot_multiple_spectrum(
+                [sig, low_sig, high_sig],
+                labels=None, fs=fs, colors='bggck')
+            plt.legend(['signal', 'driver', 'high_frequencies'], loc=0)
+
     elif fill == 1:
         # subtracting driver
         high_sig = sig - low_sig
+
+        if 'z' in draw or 'c' in draw:
+            plot_multiple_spectrum(
+                [sig, low_sig, sig - low_sig, high_sig],
+                labels=None, fs=fs, colors='bggck')
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'high_frequencies'], loc=0)
 
     elif fill == 2:
         # replacing driver by a white noise
@@ -135,11 +148,25 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         high_sig = sig - low_sig + fill_sig
 
+        if 'z' in draw or 'c' in draw:
+            plot_multiple_spectrum(
+                [sig, low_sig, sig - low_sig, fill_sig, high_sig],
+                labels=None, fs=fs, colors='bggck')
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'noise', 'high_frequencies'], loc=0)
+
     elif fill == 3:
         # 'replacing with driver[::-1]
         fill_sig = low_sig.ravel()[::-1]
         fill_sig.shape = sig.shape
         high_sig = sig - low_sig + fill_sig
+
+        if 'z' in draw or 'c' in draw:
+            plot_multiple_spectrum(
+                [sig, low_sig, sig - low_sig, fill_sig, high_sig],
+                labels=None, fs=fs, colors='bggck')
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'driver[::-1]', 'high_frequencies'], loc=0)
 
     elif fill == 4:
         # replacing driver by a wide-band white noise
@@ -165,8 +192,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
             plot_multiple_spectrum(
                 [sig, low_sig, sig - low_sig,
                  white_sig, wide_low_sig, white_sig - wide_low_sig, high_sig],
-                labels=None, fs=fs,
-                colors='bggcrrk')
+                labels=None, fs=fs, colors='bggcrrk')
             plt.legend(['signal', 'driver', 'signal-driver',
                         'white_signal', 'wide_driver',
                         'white_signal-wide_driver', 'high_frequencies'], loc=0)
@@ -263,29 +289,42 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
     return sigout
 
 
-def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw=''):
+def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None):
     """Fill a gap with white noise.
     """
     # -------- get the amplitude of the gap
     sp = Spectrum(block_length=2048, fs=fs, wfunc=np.blackman)
+    fft_length, _ = sp.check_params()
     sp.periodogram(sig)
     fmin = fa - dfa
     fmax = fa + dfa
-    kmin = max((0, int(sp.fft_length * fmin / fs)))
-    kmax = min(sp.fft_length // 2, int(sp.fft_length * fmax / fs) + 1)
+    kmin = max((0, int(fft_length * fmin / fs)))
+    kmax = min(fft_length // 2, int(fft_length * fmax / fs) + 1)
     Amin = sp.psd[-1][0, kmin]
     Amax = sp.psd[-1][0, kmax]
+
+    if kmin == 0 and kmax == (fft_length // 2):
+        # we can't fill the entire spectrum
+        return sig
+    if kmin == 0:
+        # if the gap reach zero, we only consider the right bound
+        Amin = Amax
+    if kmax == (fft_length // 2):
+        # if the gap reach fft_length / 2, we only consider the left bound
+        Amax = Amin
+
     A_fa = (Amin + Amax) * 0.5
 
     # -------- bandpass filtering of white noise
-    n_cycles = 1.65 * fa / dfa
-    fir = Carrier()
-    fir.design(fs, fa, n_cycles, None, zero_mean=False)
-    fill_sig = fir.direct(np.random.randn(*sig.shape))
+    if fill_sig is None:
+        n_cycles = 1.65 * fa / dfa
+        fir = Carrier()
+        fir.design(fs, fa, n_cycles, None, zero_mean=False)
+        fill_sig = fir.direct(np.random.randn(*sig.shape))
 
     # -------- compute the scale parameter
     sp.periodogram(fill_sig, hold=True)
-    kfa = int(sp.fft_length * fa / fs)
+    kfa = int(fft_length * fa / fs)
     scale = np.sqrt(A_fa / sp.psd[-1][0, kfa])
     fill_sig *= scale
 

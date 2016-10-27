@@ -112,5 +112,7 @@ class SimpleDAR(BaseAR):
         if ordar > 0:
             AR_cols = np.tensordot(self.AR_, basis, axes=([1], [0]))
             AR_cols = np.vstack((AR_cols_ones, AR_cols))
+        else:
+            AR_cols = AR_cols_ones
         G_cols = self.develop_gain(basis, squared=False, log=False)
         return (AR_cols, G_cols)

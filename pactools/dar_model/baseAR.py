@@ -638,8 +638,7 @@ class BaseAR(object):
             logsigma = np.dot(self.G_, basis)
             sigma2 = np.exp(2 * logsigma)
 
-            # TODO: add weighting if mask is not None
-            loglike[itnum] = wgn_log_likelihood(residual, sigma2)
+            loglike[itnum] = wgn_log_likelihood(residual, sigma2, mask)
 
             gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
             hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
@@ -669,12 +668,14 @@ class BaseAR(object):
         """
         # -------- crop the beginning of the signal
         basis = self.crop_begin(self.basis_)
+        mask = self.crop_begin(self.mask) if self.mask is not None else None
 
         # -------- estimate the gain
         gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(self.residual_[:, skip:], gain2)
+        logL = wgn_log_likelihood(self.residual_[:, skip:], gain2,
+                                  mask[:, skip:])
 
         tmax = gain2.size
 
@@ -764,7 +765,7 @@ class BaseAR(object):
         """overload if it's faster to get only last model"""
         return self.next_model()
 
-    def develop_all(self, sigdriv=None):
+    def develop_all(self, sigdriv=None, sigdriv_imag=None):
         """
         Compute the AR models and gains for every instant of sigdriv
         """
@@ -775,7 +776,7 @@ class BaseAR(object):
             except:
                 basis = self.make_basis()
         else:
-            basis = self.make_basis(sigdriv=sigdriv)
+            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
 
         AR_cols, G_cols = self.develop(basis=basis, sigdriv=sigdriv)
 
@@ -784,7 +785,7 @@ class BaseAR(object):
     # ------------------------------------------------ #
     # Functions to plot the models                     #
     # ------------------------------------------------ #
-    def _basis2spec(self, sigdriv, frange=None):
+    def _basis2spec(self, sigdriv, sigdriv_imag=None, frange=None):
         """Compute the power spectral density for a given basis
         frange  : frequency range
 
@@ -796,11 +797,12 @@ class BaseAR(object):
         ordar = self.get_ordar()
 
         # -------- estimate AR and Gain columns
-        AR_cols, G_cols, _, _ = self.develop_all(sigdriv=sigdriv)
+        AR_cols, G_cols, _, _ = self.develop_all(sigdriv=sigdriv,
+                                                 sigdriv_imag=sigdriv_imag)
 
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]
-        G_cols = G_cols[0, :]
+        G_cols = G_cols[:1, :]
 
         # -------- estimate AR spectrum
         nfft = 256
@@ -852,15 +854,18 @@ class BaseAR(object):
                 fc = sp.main_frequency()
 
             # full oscillation for derivative
-            amplitudes = xlim[1] * np.cos(2.0 * np.pi * fc / self.fs *
-                                          np.arange(int(self.fs / fc)))
+            phase = 2.0 * np.pi * fc / self.fs * np.arange(int(self.fs / fc))
+            sigdriv = xlim[1] * np.cos(phase)
+            sigdriv_imag = xlim[1] * np.sin(phase)
         else:
             # simple ramp
             eps = 0.0
-            amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
+            sigdriv = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
+            sigdriv_imag = None
 
         # -------- compute spectra
-        spec = self._basis2spec(amplitudes[None, :], frange)
+        spec = self._basis2spec(sigdriv[None, :], sigdriv_imag=sigdriv_imag,
+                                frange=frange)
 
         # -------- normalize
         if 'c' in mode:
@@ -1060,13 +1065,17 @@ class BaseAR(object):
         return self.get_title(name=True, logl=False)
 
 
-def wgn_log_likelihood(eps, sigma2):
+def wgn_log_likelihood(eps, sigma2, mask=None):
     """Returns the likelihood of a gaussian uncorrelated signal
     given a model of its variance
 
     eps    : gaussian signal (residual or innovation)
     sigma2 : variance of this signal
     """
+    if mask is not None:
+        eps = eps[mask != 0]
+        sigma2 = sigma2[mask != 0]
+
     tmax = eps.size
     logL = tmax * np.log(2.0 * np.pi)  # = tmax * 1.8378770664093453
     logL += np.sum(eps * eps / sigma2)  # = tmax * 1.0 if fitted correctly
