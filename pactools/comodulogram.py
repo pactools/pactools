@@ -602,7 +602,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
 def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                         high_fq_range, low_fq_width, method='firstlast',
-                        fill=2, ordar=12, enf=50., random_noise=None,
+                        fill=0, ordar=12, enf=50., random_noise=None,
                         normalize=True, whitening='after',
                         progress_bar=True, n_surrogates=0, random_state=None,
                         minimum_shift=1.0):
@@ -643,7 +643,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         Bandwidth of the band-pass filter (phase signal)
 
     method : string in ('firstlast', 'minmax')
-        Modulation index method,
+        Method for extracting a PAC metric from a DAR model
 
     fill : int in (0, 1, 2, 3, 4)
         Method to fill the spectral gap when removing the low frequencies
@@ -777,12 +777,12 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     elif method == 'firstlast':
         if model.ordriv_d == 0:
             # min and max of driver's values
-            spec_diff = spec[:, -1] - spec[:, 0]
+            spec_diff = np.abs(spec[:, -1] - spec[:, 0])
         else:
             # largest PSD difference with a phase difference of np.pi
             n_freq, n_phases = spec.shape
             spec_diff = np.abs(spec - np.roll(spec, n_phases // 2, axis=1))
-            i, j = argmax_2d(spec_diff)
+            _, j = argmax_2d(spec_diff)
             spec_diff = spec_diff[:, j]
 
     # crop the spectrum to high_fq_range

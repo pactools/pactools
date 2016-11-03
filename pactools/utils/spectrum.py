@@ -469,16 +469,12 @@ def phase_amplitude(signals, phase=True, amplitude=True):
     sig_phase = np.empty(signals.shape) if phase else None
     sig_amplitude = np.empty(signals.shape) if amplitude else None
     for i, sig in enumerate(signals):
-        sig_complex = hilbert(sig, n_fft)
+        sig_complex = hilbert(sig, n_fft)[:n_points]
 
         if phase:
             sig_phase[i] = np.angle(sig_complex)
         if amplitude:
             sig_amplitude[i] = np.abs(sig_complex)
-
-    # go back to the initial numebr of time points
-    sig_phase = sig_phase[:, :n_points]
-    sig_amplitude = sig_amplitude[:, :n_points]
 
     # one dimension array
     if one_dim:

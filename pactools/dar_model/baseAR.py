@@ -1040,26 +1040,7 @@ class BaseAR(object):
         return A
 
     def __repr__(self):
-        """Represent a model"""
-
-        s = '%s(ordar=%d, ordriv=%d, bic=%s)' % (self.__class__.__name__,
-                                                 self.ordar,
-                                                 self.ordriv,
-                                                 self.bic)
-        try:
-            s += '.fit(sigin=ndarray%s' % self.sigin.shape
-        except AttributeError:
-            s += '.fit(sigin=None'
-        try:
-            s += ', sigdriv=ndarray%s' % self.sigdriv.shape
-        except AttributeError:
-            s += ', sigdriv=None'
-        try:
-            s += ', fs=%.f' % self.fs
-        except AttributeError:
-            s += ', fs=None'
-        s += ') '
-        return s
+        return self.get_title(name=True, logl=False)
 
     def __str__(self):
         return self.get_title(name=True, logl=False)
