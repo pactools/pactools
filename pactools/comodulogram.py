@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.interpolate import interp1d, interp2d
-from mne.filter import band_pass_filter
 
 from .dar_model import DAR, SimpleDAR
 from .utils.progress_bar import ProgressBar
@@ -42,6 +41,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
 
             # --------- with mne.filter.band_pass_filter
             if filter_method == 'mne':
+                from mne.filter import band_pass_filter
                 low_sig = band_pass_filter(
                     sigs[ii, :], Fs=fs,
                     Fp1=frequency - bandwidth / 2.0,

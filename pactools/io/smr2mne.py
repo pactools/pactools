@@ -3,13 +3,12 @@ import warnings
 import sys
 
 import numpy as np
-import neo.io
-from mne.io.array import RawArray
-from mne import create_info
 
 
 def _smr(filename):
     """helper function to read signal from .smr file (Spike2)"""
+    import neo.io
+
     with warnings.catch_warnings():  # avoid warning in Spike2IO
         warnings.simplefilter("ignore")
         reader = neo.io.Spike2IO(filename=filename)
@@ -117,6 +116,9 @@ def sig2mne(sigs, fs, events, ch_names=None):
     mne_raw    : mne.Raw instance
     mne_events : mne compatible events
     """
+    from mne.io.array import RawArray
+    from mne import create_info
+
     if ch_names is None:
         ch_names = len(sigs)
 

@@ -1,10 +1,10 @@
 import os
-import mne
 
 from pactools.utils.spliter import blend_and_ravel
 
 
 def load_data_example(ravel=True):
+    import mne
     directory = '/data/tdupre/rat_data/LTM1_L1-L2/'
     if not os.path.exists(directory):
         directory = '/home/tom/data/LTM1-2/'

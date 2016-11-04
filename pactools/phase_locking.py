@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from mne.preprocessing.peak_finder import peak_finder
-
 from .utils.spectrum import crop_for_fast_hilbert
 from .plot_comodulogram import add_colorbar
 from .comodulogram import multiple_band_pass
@@ -159,6 +157,7 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None,
     Also remove the peaks that are too close to the start or the end
     of each epoch, and the peaks that are masked by the mask.
     """
+    from mne.preprocessing.peak_finder import peak_finder
     n_epochs, n_points = x0.shape
 
     peak_inds_list = []
