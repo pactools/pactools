@@ -4,11 +4,11 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 from scipy import linalg
 
-from .baseAR import BaseAR
+from .base_dar import BaseDAR
 from ..utils.arma import ki2ai
 
 
-class BaseLattice(BaseAR):
+class BaseLattice(BaseDAR):
     __metaclass__ = ABCMeta
 
     def __init__(self, iter_newton=0, eps_newton=0.001, **kwargs):

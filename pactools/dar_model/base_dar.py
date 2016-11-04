@@ -11,7 +11,7 @@ from ..utils.maths import squared_norm
 from ..utils.spectrum import phase_amplitude, Spectrum
 
 
-class BaseAR(object):
+class BaseDAR(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, ordar=1, ordriv=0, ordriv_d=0, criterion=None,

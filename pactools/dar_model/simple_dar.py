@@ -2,10 +2,10 @@ from __future__ import print_function
 
 import numpy as np
 
-from .baseAR import BaseAR
+from .base_dar import BaseDAR
 
 
-class SimpleDAR(BaseAR):
+class SimpleDAR(BaseDAR):
 
     def last_model(self):
         return self._next_model(only_last=True)
