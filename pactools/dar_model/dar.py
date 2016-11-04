@@ -51,7 +51,7 @@ class DAR(BaseLattice):
         """
         e_forward = self.forward_residual
         e_backward = self.backward_residual
-        n_epochs, n_points = self.crop_end(self.sigin).shape
+        _, n_epochs, n_points = e_forward.shape
 
         g = e_forward[p, :, 1:n_points] * e_backward[p - 1, :, 0:n_points - 1]
         g += e_backward[p, :, 1:n_points] * e_forward[p - 1, :, 1:n_points]
@@ -78,7 +78,7 @@ class DAR(BaseLattice):
         """
         e_forward = self.forward_residual
         e_backward = self.backward_residual
-        n_epochs, n_points = self.crop_end(self.sigin).shape
+        _, n_epochs, n_points = e_forward.shape
 
         h1 = e_forward[p - 1, :, 1:n_points] ** 2
         h1 += e_backward[p - 1, :, 0:n_points - 1] ** 2

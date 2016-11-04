@@ -2,7 +2,6 @@ from __future__ import print_function
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy import linalg
 from scipy.signal import fftconvolve
 from scipy import stats
@@ -15,23 +14,14 @@ from ..utils.spectrum import phase_amplitude, Spectrum
 class BaseAR(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self,
-                 ordar=1,
-                 ordriv=0,
-                 bic=False,
-                 normalize=True,
-                 ortho=True,
-                 center=True,
-                 iter_gain=10,
-                 epsilon=1.0e-4,
-                 iter_newton=0,
-                 eps_newton=0.001,
-                 ordriv_d=0,
-                 progress_bar=False,
-                 fit_size=1,
-                 cross_term_driver=True):
-        """Creates a filtered STAR model with Taylor expansion
-
+    def __init__(self, ordar=1, ordriv=0, bic=False, normalize=True,
+                 ortho=True, center=True, iter_gain=10, epsilon=1.0e-4,
+                 iter_newton=0, eps_newton=0.001, ordriv_d=0,
+                 progress_bar=False, cross_term_driver=True,
+                 use_driver_phase=False):
+        """
+        Parameters
+        ----------
         ordar       : order of the autoregressive model
         ordriv      : order of the taylor expansion
         bic         : select order through BIC [boolean]
@@ -43,8 +33,8 @@ class BaseAR(object):
         iter_newton : maximum number of Newton-Raphson iterations
         eps_newton  : threshold to stop Newton-Raphson iterations
         ordriv_d    : ordriv for driver's derivative
-        fit_size    : ratio of the signal used in the fit
         cross_term_driver: use or not the cross term when using two drivers
+        use_driver_phase : if True, we divide the driver by its amplitude
 
         """
         # -------- save parameters
@@ -56,6 +46,7 @@ class BaseAR(object):
         self.iter_gain = iter_gain
         self.epsilon = epsilon
         self.progress_bar = progress_bar
+        self.use_driver_phase = use_driver_phase
 
         # power of the Taylor expansion
         self.ordriv = ordriv
@@ -63,55 +54,60 @@ class BaseAR(object):
         self.cross_term_driver = cross_term_driver
         self.compute_cross_orders(ordriv, ordriv_d, cross_term_driver)
 
+        # left-out system
+        self.train_mask = None
+        self.test_mask = None
+
         # -------- prepare other arrays
         self.sigdriv_imag = None
         self.basis_ = None
-        self.fit_size = fit_size
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None,
-            use_driver_phase=False):
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
         """Estimates a filtered STAR model with Taylor expansion
 
         sigin     : signal that is to be modeled
         sigdriv   : signal that drives the model
         fs        : sampling frequency
         sigdriv_imag : imaginary part of the driver (sigdriv)
-        mask      : mask to select where signals are used to fit the model
-        use_driver_phase : if True, we divide the driver by its amplitude
+        mask      : The model is fitted only where mask is True
         """
         self.reset_logl_aic_bic()
-        self.use_driver_phase = use_driver_phase
-        if use_driver_phase:
+        if self.use_driver_phase:
             phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
             sigdriv = np.cos(phase)
-            # phase_amplitude may crop to speed up the Hilbert transform
-            sigin = np.atleast_2d(sigin)[:, :sigdriv.size]
+            if self.ordriv_d > 0:
+                sigdriv_imag = np.sin(phase)
+            sigin = np.atleast_2d(sigin)
 
-        # -------- save signals as attributes of the model
-        self.sigin = np.atleast_2d(np.array(sigin, dtype='float64'))
-        self.sigdriv = np.atleast_2d(np.array(sigdriv, dtype='float64'))
+        # -------- transform the signals to 2d array of float64
+        sigin = check_array(sigin)
+        sigdriv = check_array(sigdriv)
+        check_consistent_shape(sigin, sigdriv)
 
-        # -------- also store the sigdriv imaginary part is present
-        self.sigdriv_imag = sigdriv_imag
+        # -------- also store the sigdriv imaginary part if present
         if sigdriv_imag is not None:
-            self.sigdriv_imag = np.atleast_2d(np.array(sigdriv_imag,
-                                                       dtype='float64'))
+            sigdriv_imag = check_array(sigdriv_imag)
+            check_consistent_shape(sigdriv, sigdriv_imag)
 
         # -------- also save the mask and remove far masked data
-        self.mask = mask
         if mask is not None:
-            self.mask = np.atleast_2d(np.array(mask, dtype='float64'))
-        self.remove_far_masked_data()
+            mask = check_array(mask, dtype='bool')
+            check_consistent_shape(sigdriv, mask)
+
+            mask, sigin, sigdriv, sigdriv_imag = \
+                self.remove_far_masked_data(
+                    mask, [mask, sigin, sigdriv, sigdriv_imag])
+
+            check_consistent_shape(sigdriv, mask)
 
         if self.center:
-            self.sigin -= np.mean(self.sigin)
+            sigin -= np.mean(sigin)
 
-        if self.sigin.shape != self.sigdriv.shape:
-            raise ValueError(
-                'sigin and sigdriv have incompatible shapes. Got '
-                '(%s != %s)' % (self.sigin.shape, self.sigdriv.shape))
-
-        # -------- informations on the signals
+        # -------- save signals as attributes of the model
+        self.sigin = sigin
+        self.sigdriv = sigdriv
+        self.sigdriv_imag = sigdriv_imag
+        self.mask = mask
         self.fs = fs
 
         # -------- prepare the estimates
@@ -121,8 +117,8 @@ class BaseAR(object):
         # -------- estimation of the model
         if self.bic:
             # -------- select the best order
-            self.AIC, self.BIC, self.logL, self.tmax = self.order_selection(
-                self.bic)
+            self.AIC, self.BIC, self.logL, self.tmax = \
+                self.order_selection(self.bic)
             self.estimate_error()
             self.estimate_gain()
 
@@ -259,20 +255,15 @@ class BaseAR(object):
         self.ordar defines the order
         self.ordar_ receives this value after estimation
         """
-
-        # -------- create the observation and regression signals
-        # sigin        : input signal (copy of self.sigin)
-        # sigdriv      : driving signal (copy of self.sigdriv)
-        # basis_       : basis of functions (build from sigdriv)
-        # sigreg       : regression signals (sigin * basis)
-
         # -------- verify all parameters for the estimator
         if self.ordar < 1:
-            raise ValueError('baseAR: self.ordar is zero or negative')
+            raise ValueError('self.ordar is zero or negative')
         if self.ordriv < 0:
-            raise ValueError('baseAR: self.ordriv is negative')
+            raise ValueError('self.ordriv is negative')
+        if self.ordriv_d < 0:
+            raise ValueError('self.ordriv_d is negative')
         if self.basis_ is None:
-            raise ValueError('baseAR: basis does not yet exist')
+            raise ValueError('basis does not yet exist')
 
         # -------- compute the final estimate
         if self.progress_bar:
@@ -286,18 +277,18 @@ class BaseAR(object):
         self.ordriv_ = self.ordriv
         self.ordriv_d_ = self.ordriv_d
 
-    def remove_far_masked_data(self):
+    def remove_far_masked_data(self, mask, list_signals):
         """Remove unnecessary data which is masked
         and far (> self.ordar) from the unmasked data.
         """
-        if self.mask is None:
-            return
+        if mask is None:
+            return list_signals
 
         # convolution with a delay kernel,
         # so we keep the close points before the mask
         kernel = np.ones(self.ordar * 2 + 1)
         kernel[-self.ordar:] = 0.
-        delayed_mask = fftconvolve(self.mask, kernel[None, :], mode='same')
+        delayed_mask = fftconvolve(mask, kernel[None, :], mode='same')
         # remove numerical error from fftconvolve
         delayed_mask[np.abs(delayed_mask) < 1e-13] = 0.
 
@@ -307,35 +298,47 @@ class BaseAR(object):
         if not np.any(time_selection) or not np.any(epoch_selection):
             raise ValueError("The mask seems to be empty.")
 
-        self.mask = self.mask[epoch_selection, :]
-        self.sigin = self.sigin[epoch_selection, :]
-        self.sigdriv = self.sigdriv[epoch_selection, :]
-        if self.sigdriv_imag is not None:
-            self.sigdriv_imag = self.sigdriv_imag[epoch_selection, :]
+        output_signals = []
+        for sig in list_signals:
+            if sig is not None:
+                sig = sig[epoch_selection, :]
+                sig = sig[:, time_selection]
+            output_signals.append(sig)
 
-        self.mask = self.mask[:, time_selection]
-        self.sigin = np.ascontiguousarray(self.sigin[:, time_selection])
-        self.sigdriv = self.sigdriv[:, time_selection]
-        if self.sigdriv_imag is not None:
-            self.sigdriv_imag = self.sigdriv_imag[:, time_selection]
+        return output_signals
 
-    def crop_end(self, sig):
-        fit_size = min(1, self.fit_size)
-        if fit_size == 1:
-            return sig
+    def get_train_data(self, sig):
+        mask = self.mask
+        train_mask = self.train_mask
+
+        if train_mask is None:
+            return mask, sig
         else:
-            n_points = sig.shape[-1]
-            n_points = int(n_points * fit_size)
-            return sig[..., :n_points]
+            if mask is not None:
+                train_mask = np.logical_and(train_mask, mask)
 
-    def crop_begin(self, sig):
-        fit_size = min(1, self.fit_size)
-        if fit_size == 1:
-            return sig
+            train_mask, sig = self.remove_far_masked_data(
+                train_mask, [train_mask, sig])
+
+            return train_mask, sig
+
+    def get_test_data(self, sig):
+        mask = self.mask
+        test_mask = self.test_mask
+        train_mask = self.train_mask
+        if test_mask is None and train_mask is not None:
+            test_mask = ~train_mask
+
+        if test_mask is None:
+            return mask, sig
         else:
-            n_points = sig.shape[-1]
-            n_points = int(n_points * fit_size)
-            return sig[..., n_points:]
+            if mask is not None:
+                test_mask = np.logical_and(test_mask, mask)
+
+            test_mask, sig = self.remove_far_masked_data(
+                test_mask, [test_mask, sig])
+
+            return test_mask, sig
 
     def degrees_of_freedom(self):
         return ((self.get_ordar() + 1) * (self.get_ordriv() + 1))
@@ -557,9 +560,8 @@ class BaseAR(object):
         epsilon = self.epsilon
         ordar = self.get_ordar()
 
-        # -------- crop the beginning of the signal (for left out data)
-        basis = self.crop_begin(self.basis_)
-        mask = self.crop_begin(self.mask) if self.mask is not None else None
+        # -------- get the left-out data
+        mask, basis = self.get_test_data(self.basis_)
 
         residual = self.residual_
 
@@ -666,9 +668,8 @@ class BaseAR(object):
 
         skip : how many initial samples to skip
         """
-        # -------- crop the beginning of the signal
-        basis = self.crop_begin(self.basis_)
-        mask = self.crop_begin(self.mask) if self.mask is not None else None
+        # -------- get the left-out data
+        mask, basis = self.get_test_data(self.basis_)
 
         # -------- estimate the gain
         gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
@@ -693,22 +694,14 @@ class BaseAR(object):
         returns:
         pvalue : the p-value for the test (1-F(chi2(ratio)))
         """
-        # -------- crop the beginning of the signal
-        sigdriv = self.sigdriv
-        sigin = self.sigin
-
-        # -------- verify that the current model has been fitted
+        # -------- verify that the models have been fitted
         if not hasattr(self, 'ordar_'):
-            raise ValueError('model was not fit before LR test')
-
-        # -------- verify that the H0 model has been fitted, or fit it
+            raise ValueError('model was not fit before LR test.')
         if not hasattr(ar0, 'ordar_'):
-            ar0.fit(sigin, sigdriv, fs=self.fs)
+            raise ValueError('ar0 was not fit before LR test.')
 
-        # -------- compute the log likelihood for the current model
+        # -------- compute the log likelihood for the models
         logL1, _ = self.log_likelihood(skip=self.ordar_)
-
-        # -------- compute the log likelihood for the H0 model
         logL0, _ = ar0.log_likelihood(skip=ar0.ordar_)
 
         # -------- compute the log likelihood ratio
@@ -796,9 +789,14 @@ class BaseAR(object):
         # -------- distinguish estimated or target model
         ordar = self.get_ordar()
 
-        # -------- estimate AR and Gain columns
-        AR_cols, G_cols, _, _ = self.develop_all(sigdriv=sigdriv,
-                                                 sigdriv_imag=sigdriv_imag)
+        # -------- Compute the AR models and gains for every instant of sigdriv
+        if sigdriv is None:
+            sigdriv = self.sigdriv
+            basis = self.basis_
+        else:
+            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
+
+        AR_cols, G_cols = self.develop(basis=basis, sigdriv=sigdriv)
 
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]
@@ -875,31 +873,6 @@ class BaseAR(object):
 
         return spec, xlim
 
-    def develop_coefficients(self, nbcols=256, xlim=None):
-        """Computes the coefficients on the basis
-
-        nbcols : number of expected columns (amplitude)
-        xlim : minimum and maximum amplitude
-
-        returns:
-        spec : ndarray containing the time-frequency psd
-        xlim : minimum and maximum amplitude
-
-        """
-        # -------- define the horizontal axis
-        if xlim is None:
-            xlim = self.get_sigdriv_bounds()
-
-        # simple ramp
-        eps = 0.0
-        amplitudes = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
-
-        # -------- estimate AR and Gain columns
-        AR_cols, _, _, _ = self.develop_all(
-            sigdriv=amplitudes[None, :], instantaneous=True)
-
-        return AR_cols, xlim
-
     def get_sigdriv_bounds(self, sigdriv=None):
         if self.use_driver_phase:
             bounds = [-1, 1]
@@ -913,103 +886,6 @@ class BaseAR(object):
         bound_min = min(-bounds[0], bounds[1])
         bounds = (-bound_min, bound_min)
         return bounds
-
-    def driven_gain(self, draw='rg', fig=None, ylim=None, n_bins=100,
-                    bin_residual=True, sigdriv=None, scale='dB',
-                    residual=None, title=None):
-        """
-        Compute the driven gain for n_bins values of the driver amplitude.
-        Draw 'r' the residual and/or 'g' the estimated gain.
-        """
-        if sigdriv is None:
-            sigdriv = self.sigdriv
-        sigdriv = self.crop_begin(np.atleast_2d(sigdriv))
-
-        if self.mask is not None:
-            mask = self.crop_begin(self.mask)
-            sigdriv = sigdriv[mask != 0]
-
-        sigdriv = sigdriv.ravel()
-
-        if not bin_residual or 'r' not in draw:
-            # uniform binning
-            bounds = self.get_sigdriv_bounds(sigdriv)
-            sigdriv_bins = np.linspace(bounds[0], bounds[1], n_bins + 1)
-
-        else:
-            # non-uniform binning
-            sigdriv_bins = np.percentile(sigdriv,
-                                         np.linspace(5, 95, n_bins + 1))
-
-        # compute the G_ coefficients for each instant
-        newbasis = self.make_basis(sigdriv=sigdriv_bins[None, :])
-        if scale == 'dB':
-            G_cols_dB = self.develop_gain(newbasis, sigdriv_bins,
-                                          squared=True, log=True)
-            G_cols_dB *= 20.0 / np.log(10)
-        else:
-            G_cols_dB = self.develop_gain(newbasis, sigdriv_bins,
-                                          squared=True, log=False)
-
-        # bin the raw residual with respect to sigdriv values (sigdriv_bins)
-        if 'r' in draw:
-            if residual is None:
-                residual = self.crop_begin(self.residual_)
-
-            if self.mask is not None:
-                residual = residual[mask != 0]
-
-            residual = residual.ravel() ** 2  # with copy
-
-            if not bin_residual:
-                # do not bin the residual
-                binned_res_mean = residual
-            else:
-                # bin the residual
-                bin_indices = np.digitize(sigdriv, sigdriv_bins) - 1
-                binned_res_mean = np.zeros(n_bins)
-                for b in range(n_bins):
-                    if np.any(bin_indices == b):
-                        this_res = residual[bin_indices == b]
-                        binned_res_mean[b] = np.mean(this_res)
-
-            if scale == 'dB':
-                binned_res_mean = 20.0 * np.log10(binned_res_mean)
-
-        if draw:
-            if fig is None:
-                fig = plt.figure('driven gain')
-            try:
-                ax = fig.gca()
-            except:
-                ax = fig
-
-            if 'g' in draw:
-                ax.plot(sigdriv_bins, G_cols_dB[0])
-            if 'r' in draw:
-                if bin_residual:
-                    ax.plot(0.5 * (sigdriv_bins[:-1] + sigdriv_bins[1:]),
-                            binned_res_mean,
-                            'o', alpha=0.5)
-                    # color=ax.lines[-1].get_color())
-                else:
-                    ax.plot(sigdriv,
-                            binned_res_mean,
-                            ',', alpha=0.1)
-
-            ax.set_ylabel('Gain (%s)' % scale)
-            ax.set_xlabel('Driver amplitude')
-            if title is None:
-                title = self.get_title(name=True)
-            ax.set_title(title)
-            ax.grid('on')
-            if ylim is not None:
-                ax.set_ylim(ylim)
-
-        if 'r' in draw:
-            return G_cols_dB, binned_res_mean
-        else:
-            return G_cols_dB
 
     # ------------------------------------------------ #
     def to_dict(self):
@@ -1058,9 +934,25 @@ def wgn_log_likelihood(eps, sigma2, mask=None):
         sigma2 = sigma2[mask != 0]
 
     tmax = eps.size
-    logL = tmax * np.log(2.0 * np.pi)  # = tmax * 1.8378770664093453
-    logL += np.sum(eps * eps / sigma2)  # = tmax * 1.0 if fitted correctly
+    logL = tmax * np.log(2.0 * np.pi)
+    logL += np.sum(eps * eps / sigma2)
     logL += np.sum(np.log(sigma2))
     logL *= -0.5
 
     return logL
+
+
+def check_array(sig, dtype='float64', accept_none=False):
+    if accept_none and sig is None:
+        return None
+    elif not accept_none and sig is None:
+        raise ValueError("This array should not be None.")
+
+    return np.atleast_2d(np.array(sig, dtype=dtype))
+
+
+def check_consistent_shape(*args):
+    for array in args:
+        if array.shape != args[0].shape:
+            raise ValueError('Incompatible shapes. Got '
+                             '(%s != %s)' % (array.shape, args[0].shape))

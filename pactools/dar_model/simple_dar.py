@@ -28,13 +28,12 @@ class SimpleDAR(BaseAR):
         if self.basis_ is None:
             raise ValueError('drivenAR: basis does not yet exist')
 
-        # -------- crop the end of the signal, to fit only on the beginning
-        sigin = self.crop_end(self.sigin)
-        basis = self.crop_end(self.basis_)
+        # -------- get the training data
+        mask, sigin = self.get_train_data(self.sigin)
+        _, basis = self.get_train_data(self.basis_)
 
         # mask the signal (same behavior as sample weights)
         if self.mask is not None:
-            mask = np.sqrt(self.crop_end(self.mask))
             masked_basis = mask * basis
             masked_sigin = mask * sigin
         else:
@@ -79,9 +78,9 @@ class SimpleDAR(BaseAR):
 
         uses self.sigin, self.basis_ and self.AR_
         """
-        # -------- crop the beginning of the signal
-        sigin = self.crop_begin(self.sigin)
-        basis = self.crop_begin(self.basis_)
+        # -------- get the left-out data
+        _, sigin = self.get_test_data(self.sigin)
+        _, basis = self.get_test_data(self.basis_)
         n_epochs, n_points = sigin.shape
 
         prediction = np.zeros((self.n_basis, n_epochs, n_points))

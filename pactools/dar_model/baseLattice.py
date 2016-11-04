@@ -160,7 +160,7 @@ class BaseLattice(BaseAR):
         f_residual[:, 1:] += parcor_list[:, 1:] * delayed
         return f_residual, b_residual
 
-    def whiten(self):
+    def transform(self):
         """Apply the direct lattice filter to whiten the original signal
 
         returns:
@@ -168,9 +168,9 @@ class BaseLattice(BaseAR):
         backward : array containing the backward residual (whitened) signal
 
         """
-        # -------- crop the beginning of the signal
-        sigin = self.crop_begin(self.sigin)
-        basis = self.crop_begin(self.basis_)
+        # -------- get left-out data
+        _, sigin = self.get_test_data(self.sigin)
+        _, basis = self.get_test_data(self.basis_)
 
         # -------- select ordar (prefered: ordar_)
         ordar = self.get_ordar()
@@ -284,14 +284,12 @@ class BaseLattice(BaseAR):
             raise ValueError('%s: basis_ does not yet exist' %
                              self.__class__.__name__)
 
-        # -------- crop the end of the signal, to fit only on the beginning
-        sigin = self.crop_end(self.sigin)
-        basis = self.crop_end(self.basis_)
+        # --------  get the training data
+        mask, sigin = self.get_train_data(self.sigin)
+        _, basis = self.get_train_data(self.basis_)
 
         mask = self.mask
         if mask is not None:
-            mask = self.crop_end(self.mask)
-            mask = np.sqrt(mask)  # cf. weighted least-square
             masked_basis = basis * mask
         else:
             masked_basis = basis
@@ -412,24 +410,23 @@ class BaseLattice(BaseAR):
 
         """
         # if we fit only on the beginning, we need to recompute the residual
-        if self.fit_size < 1:
+        if self.train_mask is not None:
             recompute = True
-
-        # -------- crop the beginning of the signal
-        sigin = self.crop_begin(self.sigin)
-        n_epochs, n_points = sigin.shape
 
         if not recompute:
             # -------- if residual are stored, simply return the right one
             try:
-                self.residual_ = np.reshape(self.forward_residual[self.ordar_],
-                                            (n_epochs, n_points))
+                self.residual_ = self.forward_residual[self.ordar_]
             # -------- otherwise, compute the prediction error
             except AttributeError:
                 recompute = True
 
         if recompute:
-            self.residual_, _ = self.whiten()
+            self.residual_, _ = self.transform()
+
+        # -------- get left-out data
+        _, sigin = self.get_test_data(self.sigin)
+        assert sigin.shape == self.residual_.shape
 
     def develop(self, basis, sigdriv):
         """Compute the AR models and gains at instants fixed by newcols
