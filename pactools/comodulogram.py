@@ -775,7 +775,7 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     if method == 'minmax':
         spec_diff = spec.max(axis=1) - spec.min(axis=1)
     elif method == 'firstlast':
-        if model.ordriv_d == 0:
+        if model.ordriv_d_ == 0:
             # min and max of driver's values
             spec_diff = np.abs(spec[:, -1] - spec[:, 0])
         else:

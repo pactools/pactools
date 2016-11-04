@@ -14,37 +14,55 @@ from ..utils.spectrum import phase_amplitude, Spectrum
 class BaseAR(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, ordar=1, ordriv=0, bic=False, normalize=True,
-                 ortho=True, center=True, iter_gain=10, epsilon=1.0e-4,
-                 iter_newton=0, eps_newton=0.001, ordriv_d=0,
-                 progress_bar=False, cross_term_driver=True,
-                 use_driver_phase=False):
+    def __init__(self, ordar=1, ordriv=0, ordriv_d=0, criterion=None,
+                 normalize=True, ortho=True, center=True, iter_gain=10,
+                 eps_gain=1.0e-4, progress_bar=False,
+                 cross_term_driver=True, use_driver_phase=False):
         """
         Parameters
         ----------
-        ordar       : order of the autoregressive model
-        ordriv      : order of the taylor expansion
-        bic         : select order through BIC [boolean]
-        normalize   : normalize basis (to unit energy) [boolean]
-        ortho       : orthogonalize basis [boolean]
-        center      : subtract mean from signal [boolean]
-        iter_gain   : maximum number of iteration in gain estimation
-        epsilon     : threshold to stop iterations in gain estimation
-        iter_newton : maximum number of Newton-Raphson iterations
-        eps_newton  : threshold to stop Newton-Raphson iterations
-        ordriv_d    : ordriv for driver's derivative
-        cross_term_driver: use or not the cross term when using two drivers
-        use_driver_phase : if True, we divide the driver by its amplitude
+        ordar : int > 0
+            Order of the autoregressive model
+
+        ordriv : int >= 0
+            Order of the taylor expansion for sigdriv
+
+        ordriv_d : int >= 0
+            Order of the taylor expansion for sigdriv_imag
+
+        criterion : None or string in ('bic', 'aic', 'logl')
+            If not None, select the criterion used for model selection.
+
+        normalize : boolean
+            If True, the basis vectors are normalized to unit energy.
+
+        ortho : boolean
+            If True, the basis vectors are orthogonalized.
+
+        center : boolean
+            If True, we subtract the mean in sigin
+
+        iter_gain : int >=0
+            Maximum number of iteration in gain estimation
+
+        eps_gain : float >= 0
+            Threshold to stop iterations in gain estimation
+
+        cross_term_driver: boolean
+            If True, the cross terms are used when using two drivers.
+
+        use_driver_phase : boolean
+            If True, we divide the driver by its instantaneous amplitude.
 
         """
         # -------- save parameters
-        self.ordar = ordar          # autoregressive order
-        self.bic = bic              # find orders through BIC
-        self.normalize = normalize  # normalize the amplitude of driving signal
-        self.ortho = ortho          # Gram-Schmidt orthogonalization of basis
-        self.center = center        # subtract mean from sigin
+        self.ordar = ordar
+        self.criterion = criterion
+        self.normalize = normalize
+        self.ortho = ortho
+        self.center = center
         self.iter_gain = iter_gain
-        self.epsilon = epsilon
+        self.eps_gain = eps_gain
         self.progress_bar = progress_bar
         self.use_driver_phase = use_driver_phase
 
@@ -58,27 +76,13 @@ class BaseAR(object):
         self.train_mask = None
         self.test_mask = None
 
-        # -------- prepare other arrays
-        self.sigdriv_imag = None
+        # prepare other arrays
         self.basis_ = None
+        self.ordar_ = ordar
+        self.ordriv_ = ordriv
+        self.ordriv_d_ = ordriv_d
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
-        """Estimates a filtered STAR model with Taylor expansion
-
-        sigin     : signal that is to be modeled
-        sigdriv   : signal that drives the model
-        fs        : sampling frequency
-        sigdriv_imag : imaginary part of the driver (sigdriv)
-        mask      : The model is fitted only where mask is True
-        """
-        self.reset_logl_aic_bic()
-        if self.use_driver_phase:
-            phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
-            sigdriv = np.cos(phase)
-            if self.ordriv_d > 0:
-                sigdriv_imag = np.sin(phase)
-            sigin = np.atleast_2d(sigin)
-
+    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag, mask):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -88,6 +92,12 @@ class BaseAR(object):
         if sigdriv_imag is not None:
             sigdriv_imag = check_array(sigdriv_imag)
             check_consistent_shape(sigdriv, sigdriv_imag)
+
+        if self.use_driver_phase:
+            phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
+            sigdriv = np.cos(phase)
+            if self.ordriv_d_ > 0:
+                sigdriv_imag = np.sin(phase)
 
         # -------- also save the mask and remove far masked data
         if mask is not None:
@@ -108,6 +118,33 @@ class BaseAR(object):
         self.sigdriv = sigdriv
         self.sigdriv_imag = sigdriv_imag
         self.mask = mask
+
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+        """ Estimate a DAR model from input signals.
+
+        Parameters
+        ----------
+        sigin : array, shape (n_epochs, n_points)
+            Signal that is to be modeled
+
+        sigdriv : array, shape (n_epochs, n_points)
+            Signal that drives the model
+
+        fs : float > 0
+            Sampling frequency
+
+        sigdriv_imag : None or array, shape (n_epochs, n_points)
+            Second driver, containing the imaginary part of the driver
+
+        mask : None or array, shape (n_epochs, n_points)
+            If not None, the model is fitted only where the mask is True
+
+        Returns
+        -------
+        self
+        """
+        self.reset_criterions()
+        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, mask)
         self.fs = fs
 
         # -------- prepare the estimates
@@ -115,10 +152,9 @@ class BaseAR(object):
         self.G_ = np.ndarray(0)
 
         # -------- estimation of the model
-        if self.bic:
+        if self.criterion:
             # -------- select the best order
-            self.AIC, self.BIC, self.logL, self.tmax = \
-                self.order_selection(self.bic)
+            self.order_selection(self.criterion)
             self.estimate_error()
             self.estimate_gain()
 
@@ -154,44 +190,58 @@ class BaseAR(object):
                         power_list_d.append(k)
 
         self.n_basis = len(power_list) + 1
-        self.ordriv = ordriv
-        self.ordriv_d = ordriv_d
         return power_list, power_list_d, self.n_basis
 
     def make_basis(self, sigdriv=None, sigdriv_imag=None):
-        """Creates a basis from the driving signal
+        """Creates a basis from the driving signal, with the successive
+        powers of sigdriv and sigdriv_imag.
 
-        sigdriv : if None, we use self.sigdriv instead
+        If self.normalize is True, each component of the basis will be
+        normalized by its standard deviation.
+        If self.ortho is True, a Gram-Schmidt orthogonalisation of the
+        basis will be performed.
 
-        the basis is build with the successive powers of self.sigdriv
+        During the fit, sigdriv and sigdriv_imag are not specified,
+        it uses self.sigdriv and self.sigdriv_imag, and the basis is stored
+        in self.basis_, along with the orthonormalization transform
+        (self.alpha_). The method returns None.
 
-        if self.normalize is True, each component of the basis will be
-        normalized by its standard deviation
-        if self.ortho is True, a Gram-Schmidt orthogonalisation of the
-        basis will be performed
+        During the transform, sigdriv and sigdriv_imag are specified,
+        the stored transform (self.alpha_) is applied on the new basis,
+        and the method returns the new basis but does not store it.
 
-        the basis is stored in self.basis_
+        Parameters
+        ----------
+        sigdriv : None or array, shape (n_epochs, n_points)
+            Signal that drives the model
+            If None, we use self.sigdriv instead
+
+        sigdriv_imag : None or array, shape (n_epochs, n_points)
+            Second driver, containing the imaginary part of the driver
+
+        Returns
+        -------
+        None or basis: array, shape (n_basis, n_epochs, n_points)
+            Basis formed of the successive power of sigdriv and sigdriv_imag
+
         """
-        ordriv, ordriv_d = self.get_ordriv(), self.get_ordriv_d()
-
         # -------- check default arguments
         if sigdriv is None:
             sigdriv = self.sigdriv
             sigdriv_imag = self.sigdriv_imag
             save_basis = True
-            ortho = self.ortho
-            normalize = self.normalize
+            ortho, normalize = self.ortho, self.normalize
         else:
             # reuse previous transformation
+            sigdriv = check_array(sigdriv)
+            sigdriv_imag = check_array(sigdriv_imag, accept_none=True)
             save_basis = False
-            ortho = False
-            normalize = False
+            ortho, normalize = False, False
 
-        power_list, power_list_d, n_basis = self.compute_cross_orders(
-            ordriv, ordriv_d, self.cross_term_driver)
-
-        sigdriv = np.atleast_2d(sigdriv)
         n_epochs, n_points = sigdriv.shape
+        ordriv_, ordriv_d_ = self.ordriv_, self.ordriv_d_
+        power_list, power_list_d, n_basis = self.compute_cross_orders(
+            ordriv_, ordriv_d_, self.cross_term_driver)
 
         # -------- memorize in alpha the various transforms
         alpha = np.eye(n_basis)
@@ -201,7 +251,7 @@ class BaseAR(object):
         basis[0] = 1.0
 
         # -------- create derivative if sigdriv_imag is not given
-        if ordriv_d > 0:
+        if ordriv_d_ > 0:
             if sigdriv_imag is None:
                 sigdriv_d = np.copy(sigdriv)
                 sigdriv_d -= np.roll(sigdriv, shift=1, axis=1)
@@ -238,13 +288,13 @@ class BaseAR(object):
                 alpha[k, :k + 1] *= scale
 
         # -------- save basis and transformation matrix
-        # (basis_ = transform_ * rawbasis)
+        # (basis = np.dot(alpha, rawbasis))
         if save_basis:
             self.basis_ = basis.reshape(-1, n_epochs, n_points)
-            self.transform_ = alpha
+            self.alpha_ = alpha
         else:
             if self.normalize or self.ortho:
-                basis = np.dot(self.transform_, basis)
+                basis = np.dot(self.alpha_, basis)
             return basis.reshape(-1, n_epochs, n_points)
 
     def estimate_ar(self):
@@ -258,9 +308,9 @@ class BaseAR(object):
         # -------- verify all parameters for the estimator
         if self.ordar < 1:
             raise ValueError('self.ordar is zero or negative')
-        if self.ordriv < 0:
+        if self.ordriv_ < 0:
             raise ValueError('self.ordriv is negative')
-        if self.ordriv_d < 0:
+        if self.ordriv_d_ < 0:
             raise ValueError('self.ordriv_d is negative')
         if self.basis_ is None:
             raise ValueError('basis does not yet exist')
@@ -274,8 +324,6 @@ class BaseAR(object):
             if self.progress_bar:
                 bar.update(float(self.ordar_) / self.ordar,
                            title=self.get_title(name=True))
-        self.ordriv_ = self.ordriv
-        self.ordriv_d_ = self.ordriv_d
 
     def remove_far_masked_data(self, mask, list_signals):
         """Remove unnecessary data which is masked
@@ -341,132 +389,78 @@ class BaseAR(object):
             return test_mask, sig
 
     def degrees_of_freedom(self):
-        return ((self.get_ordar() + 1) * (self.get_ordriv() + 1))
+        assert self.n_basis == self.ordriv_ + self.ordriv_d_ + 1
+        return ((self.ordar_ + 1) * self.n_basis)
 
     def get_title(self, name=False, logl=False, bic=False):
         title = ''
         if name:
             title += self.__class__.__name__
 
-        ordar = self.get_ordar()
-        ordriv = self.get_ordriv()
-        ordriv_d = self.get_ordriv_d()
-        if ordriv_d > 0:
-            title += '(%d, %d+%d)' % (ordar, ordriv, ordriv_d)
+        ordar_ = self.ordar_
+        ordriv_ = self.ordriv_
+        ordriv_d_ = self.ordriv_d_
+        if ordriv_d_ > 0:
+            title += '(%d, %d+%d)' % (ordar_, ordriv_, ordriv_d_)
         else:
-            title += '(%d, %d)' % (ordar, ordriv)
+            title += '(%d, %d)' % (ordar_, ordriv_)
 
         if logl:
-            logL = self.get_logl()
-            title += 'logL=%.4f' % logL
+            title += '_logL=%.4f' % self.logl
         if bic:
-            bic = self.get_bic()
-            title += '_BIC=%.4f' % bic
+            title += '_BIC=%.4f' % self.bic
         return title
 
-    def get_ordar(self):
-        # -------- distinguish estimated or target model
-        try:
-            return self.ordar_
-        except AttributeError:
-            return self.ordar
-
-    def get_ordriv(self):
-        # -------- distinguish estimated or target model
-        try:
-            return self.ordriv_
-        except AttributeError:
-            return self.ordriv
-
-    def get_ordriv_d(self):
-        # -------- distinguish estimated or target model
-        try:
-            return self.ordriv_d_
-        except AttributeError:
-            return self.ordriv_d
-
-    def get_full_criterion(model, criterion):
-        if criterion == 'AIC':
-            array = model.AIC
-        elif criterion == 'BIC':
-            array = model.BIC
-        elif criterion == 'logL':
-            array = model.LogL
-
-        if not isinstance(array, np.ndarray):
-            raise ValueError('get_full_criterion gives the full '
-                             'array of model selection, yet no model selection'
-                             ' has been done.')
-        return array
-
     def get_criterion(self, criterion):
-        if criterion == 'AIC':
-            value = self.get_aic()
-        elif criterion == 'BIC':
-            value = self.get_bic()
-        elif criterion == 'logL':
-            value = self.get_logl()
-        elif criterion == '-logL':
-            value = -self.get_logl()
-        else:
-            raise ValueError('Wrong criterion: %s' % criterion)
+        criterion = criterion.lower()
+        try:
+            value = self.compute_criterions()[criterion]
+        except:
+            raise KeyError('Wrong criterion: %s' % criterion)
         return value
 
-    def get_bic(self):
-        BIC = getattr(self, 'BIC', None)
-        if BIC is None:
-            logL = self.get_logl()
-            tmax = getattr(self, 'tmax', None)
+    def compute_criterions(self):
+        criterions = getattr(self, 'criterions_', None)
+        if criterions is not None:
+            return criterions
 
-            eta_bic = np.log(tmax)
-            BIC = -2.0 * logL + eta_bic * self.degrees_of_freedom() / tmax
-            self.BIC = BIC
+        # else compute the criterions base on the log likelihood
+        logl, tmax = self.log_likelihood(skip=self.ordar_)
+        degrees = self.degrees_of_freedom()
 
-        if isinstance(BIC, np.ndarray):
-            BIC = BIC[self.ordar_, self.ordriv_, self.ordriv_d_]
+        # Akaike Information Criterion
+        eta_aic = 2.0
+        aic = -2.0 * logl + eta_aic * degrees
 
-        return BIC
+        # Bayesian Information Criterion
+        eta_bic = np.log(tmax)
+        bic = -2.0 * logl + eta_bic * degrees
 
-    def get_aic(self):
-        AIC = getattr(self, 'AIC', None)
-        if AIC is None:
-            logL = self.get_logl()
-            tmax = getattr(self, 'tmax', None)
+        self.criterions_ = {'aic': aic / tmax, 'bic': bic / tmax,
+                            'logl': logl / tmax, '-logl': -logl / tmax,
+                            'tmax': tmax}
 
-            eta_aic = 2.0
-            AIC = -2.0 * logL + eta_aic * self.degrees_of_freedom() / tmax
-            self.AIC = AIC
+        return self.criterions_
 
-        if isinstance(AIC, np.ndarray):
-            AIC = AIC[self.ordar_, self.ordriv_ - self.ordriv_d_,
-                      self.ordriv_d_]
+    @property
+    def logl(self):
+        return self.compute_criterions()['logl']
 
-        return AIC
+    @property
+    def aic(self):
+        return self.compute_criterions()['aic']
 
-    def get_logl(self):
-        logL = getattr(self, 'logL', None)
-        if logL is None:
-            logL, tmax = self.log_likelihood(skip=self.ordar_)
-            logL /= tmax
-            self.logL = logL
-            self.tmax = tmax
+    @property
+    def bic(self):
+        return self.compute_criterions()['bic']
 
-        if isinstance(logL, np.ndarray):
-            logL = logL[self.ordar_, self.ordriv_, self.ordriv_d_]
-
-        return logL
-
-    def reset_logl_aic_bic(self):
-        self.logL = None
-        self.BIC = None
-        self.AIC = None
-        self.tmax = None
+    def reset_criterions(self):
+        self.model_selection_criterions_ = None
+        self.criterions_ = None
 
     def order_selection(self, criterion):
-        """Select the order of the model
-
-        Returns the values of the criterion (a tuple containing the
-        AIC and BIC criterions, and the log likelihood)
+        """Select the order of the model with a criterion based on the
+        log likelihood.
 
         Attributes ordar and ordriv define the maximum values.
         This function saves the optimal values as ordar_ and ordriv_
@@ -478,28 +472,29 @@ class BaseAR(object):
         ordriv = self.ordriv
         ordriv_d = self.ordriv_d
 
-        best_criterion = np.inf
-        logL = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
-        AIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
-        BIC = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
+        best_criterion = {'aic': np.inf, 'bic': np.inf, '-logl': np.inf}
+
+        logl = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
+        aic = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
+        bic = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
 
         # backward compatibility
         if not isinstance(criterion, str) and criterion:
-            criterion = 'BIC'
+            criterion = 'bic'
         if criterion.lower() == 'logl':
             criterion = '-logl'
 
         # -------- loop on ordriv with a copy of the estimator
         if self.progress_bar:
             bar = ProgressBar(title='%s' % self.__class__.__name__,
-                              max_value=logL.size)
+                              max_value=logl.size)
             bar_k = 0
         for ordriv_d_ in range(ordriv_d + 1):
             for ordriv_ in range(ordriv + 1):
                 A = self.copy()
-                A.ordriv = ordriv_
+                # A.ordriv = ordriv_
                 A.ordriv_ = ordriv_
-                A.ordriv_d = ordriv_d_
+                # A.ordriv_d = ordriv_d_
                 A.ordriv_d_ = ordriv_d_
                 A.make_basis()
 
@@ -515,14 +510,14 @@ class BaseAR(object):
                     A.estimate_error()
                     A.estimate_gain()
 
-                    A.reset_logl_aic_bic()
-                    this_criterion = A.get_criterion(criterion)
-                    logL[ordar_, ordriv_, ordriv_d_] = A.get_logl()
-                    AIC[ordar_, ordriv_, ordriv_d_] = A.get_aic()
-                    BIC[ordar_, ordriv_, ordriv_d_] = A.get_bic()
+                    A.reset_criterions()
+                    this_criterion = A.compute_criterions()
+                    logl[ordar_, ordriv_, ordriv_d_] = this_criterion['logl']
+                    aic[ordar_, ordriv_, ordriv_d_] = this_criterion['aic']
+                    bic[ordar_, ordriv_, ordriv_d_] = this_criterion['bic']
 
                     # -------- actualize the best model
-                    if this_criterion < best_criterion:
+                    if this_criterion[criterion] < best_criterion[criterion]:
                         best_criterion = this_criterion
                         self.ordar_ = ordar_
                         self.ordriv_ = ordriv_
@@ -530,10 +525,16 @@ class BaseAR(object):
                         self.AR_ = np.copy(AR_)
                         self.G_ = np.copy(A.G_)
 
-        # -------- return criteria
+        # store all criterions
+        self.model_selection_criterions_ = \
+            {'logl': logl, 'aic': aic, 'bic': bic, '-logl': -logl,
+             'tmax': best_criterion['tmax']}
+        self.criterions_ = best_criterion
+
+        # print('Best model: %s' % self.get_title(name=True, bic=True))
+
+        # recompute the basis with ordriv_ and ordriv_d_
         self.make_basis()
-        tmax = A.tmax + ordar - self.ordar_
-        return (AIC, BIC, logL, tmax)
 
     def estimate_gain(self, regul=0.01):
         """Estimate the gain expressed over the basis by maximizing
@@ -543,11 +544,11 @@ class BaseAR(object):
         deviation: std(e(t)) = exp(b(0) + b(1)u(t) + ... + b(m)u(t)^M)
 
         iter_gain : maximum number of iterations
-        epsilon   : stop iteration when corrections get smaller than epsilon
+        eps_gain   : stop iteration when corrections get smaller than eps_gain
         regul     : regularization factor (for inversion of the Hessian)
         """
         # -------- estimate the gain (self.G_) given the following data
-        # self.ordriv    : order of the regression of the parameters
+        # self.ordriv_   : order of the regression of the parameters
         # self.residual_ : residual signal (from ordar to n_points)
         # self.basis_    : basis of functions (build from sigdriv)
 
@@ -557,8 +558,8 @@ class BaseAR(object):
         # residual2 : squared residual
 
         iter_gain = self.iter_gain
-        epsilon = self.epsilon
-        ordar = self.get_ordar()
+        eps_gain = self.eps_gain
+        ordar = self.ordar_
 
         # -------- get the left-out data
         mask, basis = self.get_test_data(self.basis_)
@@ -586,7 +587,7 @@ class BaseAR(object):
         self.G_ = np.zeros((1, self.n_basis))
 
         # -------- prepare an initial estimation
-        # chose N = 3 * ordriv classes, estimate a standard deviation
+        # chose N = 3 * ordriv_ classes, estimate a standard deviation
         # on each class, and make a regression on the values of
         # the indexes for their centroid.
         # For a time-dependent signal, a good idea was to take
@@ -646,10 +647,28 @@ class BaseAR(object):
             hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
             dG = linalg.solve(hessian, gradient)
             self.G_ -= dG.T
-            if np.amax(np.absolute(dG)) < epsilon:
+            if np.amax(np.absolute(dG)) < eps_gain:
                 iter_gain = itnum + 1
                 break
         self.residual_bis_ = residual / np.sqrt(sigma2)
+
+    def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+        """Same as fit, but return the residual instead of the model object
+        """
+        self.fit(sigin=sigin, sigdriv=sigdriv, fs=fs,
+                 sigdriv_imag=sigdriv_imag, mask=mask)
+        return self.residual_
+
+    def transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+        """Whiten a signal with the already fitted model
+        """
+        self.reset_criterions()
+        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, mask)
+        self.basis_ = self.make_basis(sigdriv=sigdriv,
+                                      sigdriv_imag=sigdriv_imag)
+
+        self.estimate_error(recompute=True)
+        return self.residual_
 
     def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
         # n_basis, n_epochs, n_points = basis.shape
@@ -671,12 +690,16 @@ class BaseAR(object):
         # -------- get the left-out data
         mask, basis = self.get_test_data(self.basis_)
 
+        # skip first samples
+        if mask is not None:
+            mask = mask[:, skip:]
+        residual = self.residual_[:, skip:]
+
         # -------- estimate the gain
         gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(self.residual_[:, skip:], gain2,
-                                  mask[:, skip:])
+        logL = wgn_log_likelihood(residual, gain2, mask)
 
         tmax = gain2.size
 
@@ -787,7 +810,7 @@ class BaseAR(object):
         plot_drive_freq
         """
         # -------- distinguish estimated or target model
-        ordar = self.get_ordar()
+        ordar = self.ordar_
 
         # -------- Compute the AR models and gains for every instant of sigdriv
         if sigdriv is None:
@@ -843,7 +866,7 @@ class BaseAR(object):
         if xlim is None:
             xlim = self.get_sigdriv_bounds()
 
-        if self.ordriv_d > 0 or False:
+        if self.ordriv_d_ > 0 or False:
             if fc is None:
                 # compute the main driver frequency
                 sp = Spectrum(block_length=min(2048, self.sigdriv.shape[1]),
@@ -916,10 +939,10 @@ class BaseAR(object):
         return A
 
     def __repr__(self):
-        return self.get_title(name=True, logl=False)
+        return self.get_title(name=True)
 
     def __str__(self):
-        return self.get_title(name=True, logl=False)
+        return self.get_title(name=True)
 
 
 def wgn_log_likelihood(eps, sigma2, mask=None):

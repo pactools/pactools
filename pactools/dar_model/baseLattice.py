@@ -38,7 +38,7 @@ class BaseLattice(BaseAR):
         sigdriv_init : shape (1, self.ordar_) previous point of the past
 
         """
-        ordar_ = self.get_ordar()
+        ordar_ = self.ordar_
         if sigdriv is None:
             sigdriv = self.sigdriv
             try:
@@ -95,7 +95,7 @@ class BaseLattice(BaseAR):
         else:
             basis = newbasis
         # -------- select ordar (prefered: ordar_)
-        ordar = self.get_ordar()
+        ordar = self.ordar_
 
         # -------- prepare excitation signal and burn in phase
         if burn_in is None:
@@ -160,7 +160,7 @@ class BaseLattice(BaseAR):
         f_residual[:, 1:] += parcor_list[:, 1:] * delayed
         return f_residual, b_residual
 
-    def transform(self):
+    def whiten(self):
         """Apply the direct lattice filter to whiten the original signal
 
         returns:
@@ -173,7 +173,7 @@ class BaseLattice(BaseAR):
         _, basis = self.get_test_data(self.basis_)
 
         # -------- select ordar (prefered: ordar_)
-        ordar = self.get_ordar()
+        ordar = self.ordar_
         n_epochs, n_points = sigin.shape
 
         residual = np.copy(sigin)
@@ -422,7 +422,7 @@ class BaseLattice(BaseAR):
                 recompute = True
 
         if recompute:
-            self.residual_, _ = self.transform()
+            self.residual_, _ = self.whiten()
 
         # -------- get left-out data
         _, sigin = self.get_test_data(self.sigin)
@@ -440,7 +440,7 @@ class BaseLattice(BaseAR):
 
         """
         n_basis, n_epochs, n_points = basis.shape
-        ordar = self.get_ordar()
+        ordar = self.ordar_
 
         # -------- expand on the basis
         AR_cols = np.ones((1, n_epochs, n_points))

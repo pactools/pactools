@@ -104,7 +104,7 @@ class SimpleDAR(BaseAR):
 
         """
         n_basis, n_epochs, n_points = basis.shape
-        ordar = self.get_ordar()
+        ordar = self.ordar_
 
         # -------- expand on the basis
         AR_cols_ones = np.ones((1, n_epochs, n_points))
