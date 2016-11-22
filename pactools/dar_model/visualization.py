@@ -52,7 +52,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     # ax.cla()
 
     # -------- plot spectrum
-    colors = 'bcgyrm'
+    # colors = 'bcgyrm'
     n_frequency, n_amplitude = spec.shape
     if sigdriv_imag is None:
         max_i = (n_amplitude - 1)
@@ -71,7 +71,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         str_x_imag = ''
         label = r'$x=%.2f%s$' % (sigdriv[i_amplitude], str_x_imag)
 
-        ax.plot(frequencies, spec[:, i_amplitude], color=colors[i],
+        ax.plot(frequencies, spec[:, i_amplitude], #  color=colors[i],
                 label=label)
 
     # plot simple periodogram
@@ -90,7 +90,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         ax.plot(frequencies, psd, '--k', label='PSD')
 
     if title == '':
-        title = model.get_title(name=True, bic=True)
+        title = model.get_title(name=True, criterion=model.criterion)
     ax.set_title(title)
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power (dB)')

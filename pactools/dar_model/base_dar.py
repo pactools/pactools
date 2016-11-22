@@ -410,7 +410,7 @@ class BaseDAR(object):
     def degrees_of_freedom(self):
         return ((self.ordar_ + 1) * self.n_basis)
 
-    def get_title(self, name=False, logl=False, bic=False):
+    def get_title(self, name=False, criterion=None):
         title = ''
         if name:
             title += self.__class__.__name__
@@ -423,10 +423,9 @@ class BaseDAR(object):
         else:
             title += '(%d, %d)' % (ordar_, ordriv_)
 
-        if logl:
-            title += '_logL=%.4f' % self.logl
-        if bic:
-            title += '_BIC=%.4f' % self.bic
+        if criterion is not None:
+            title += '_%s=%.4f' % (criterion, self.get_criterion(criterion))
+
         return title
 
     def get_criterion(self, criterion):
@@ -553,8 +552,6 @@ class BaseDAR(object):
             {'logl': logl, 'aic': aic, 'bic': bic, '-logl': -logl,
              'tmax': best_criterion['tmax']}
         self.criterions_ = best_criterion
-
-        # print('Best model: %s' % self.get_title(name=True, bic=True))
 
         # recompute the basis with ordriv_ and ordriv_d_
         self.make_basis()
