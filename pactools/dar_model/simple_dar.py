@@ -73,14 +73,20 @@ class SimpleDAR(BaseDAR):
             AR_ = np.reshape(AR_, (k + 1, m))
             yield AR_
 
-    def estimate_error(self, recompute=False):
+    def estimate_error(self, train=True, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and self.AR_
         """
-        # -------- get the left-out data
-        _, sigin = self.get_test_data(self.sigin)
-        _, basis = self.get_test_data(self.basis_)
+        if train:
+            # -------- get the training data
+            _, sigin = self.get_train_data(self.sigin)
+            _, basis = self.get_train_data(self.basis_)
+        else:
+            # -------- get the left-out data
+            _, sigin = self.get_test_data(self.sigin)
+            _, basis = self.get_test_data(self.basis_)
+
         n_epochs, n_points = sigin.shape
 
         prediction = np.zeros((self.n_basis, n_epochs, n_points))

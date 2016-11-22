@@ -8,7 +8,7 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
-from ..utils.spectrum import phase_amplitude, Spectrum
+from ..utils.spectrum import phase_amplitude
 
 
 class BaseDAR(object):
@@ -119,7 +119,8 @@ class BaseDAR(object):
         self.sigdriv_imag = sigdriv_imag
         self.mask = mask
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None,
+            train_mask=None, test_mask=None):
         """ Estimate a DAR model from input signals.
 
         Parameters
@@ -137,7 +138,20 @@ class BaseDAR(object):
             Second driver, containing the imaginary part of the driver
 
         mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is fitted only where the mask is True
+            If not None, the model is fitted and tested (likelihood estimate)
+            only where 'mask' is True.
+
+        train_mask : None or array, shape (n_epochs, n_points)
+            If not None, the model is fitted only where 'train_mask' is True.
+            If 'mask' is also not None, the model is fitted where both 'mask'
+            and 'train_mask' are True.
+
+        test_mask : None or array, shape (n_epochs, n_points)
+            If not None, the model is tested only where 'test_mask' is True.
+            If 'mask' is also not None, the model is fitted where both 'mask'
+            and 'test_mask' are True.
+            If 'test_mask' is None and 'train_mask' is not None, 'test_mask'
+            is set to '~train_mask', i.e. the opposite of 'train_mask'.
 
         Returns
         -------
@@ -150,6 +164,11 @@ class BaseDAR(object):
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
         self.G_ = np.ndarray(0)
+
+        self.train_mask = check_array(train_mask, dtype='bool',
+                                      accept_none=True)
+        self.test_mask = check_array(test_mask, dtype='bool',
+                                     accept_none=True)
 
         # -------- estimation of the model
         if self.criterion:
@@ -349,8 +368,8 @@ class BaseDAR(object):
         output_signals = []
         for sig in list_signals:
             if sig is not None:
-                sig = sig[epoch_selection, :]
-                sig = sig[:, time_selection]
+                sig = sig[..., epoch_selection, :]
+                sig = sig[..., :, time_selection]
             output_signals.append(sig)
 
         return output_signals
@@ -389,7 +408,6 @@ class BaseDAR(object):
             return test_mask, sig
 
     def degrees_of_freedom(self):
-        assert self.n_basis == self.ordriv_ + self.ordriv_d_ + 1
         return ((self.ordar_ + 1) * self.n_basis)
 
     def get_title(self, name=False, logl=False, bic=False):
@@ -507,9 +525,14 @@ class BaseDAR(object):
                         title = A.get_title(name=True)
                         bar_k += 1
                         bar.update(bar_k, title=title)
-                    A.estimate_error()
+
+                    # compute the residual on training data to fit the gain
+                    A.estimate_error(train=True)
                     A.estimate_gain()
 
+                    # compute the residual on testing data to compute
+                    # the likelihood
+                    A.estimate_error(train=False)
                     A.reset_criterions()
                     this_criterion = A.compute_criterions()
                     logl[ordar_, ordriv_, ordriv_d_] = this_criterion['logl']
@@ -561,8 +584,8 @@ class BaseDAR(object):
         eps_gain = self.eps_gain
         ordar = self.ordar_
 
-        # -------- get the left-out data
-        mask, basis = self.get_test_data(self.basis_)
+        # -------- get the training data
+        mask, basis = self.get_train_data(self.basis_)
 
         residual = self.residual_
 
@@ -667,7 +690,7 @@ class BaseDAR(object):
         self.basis_ = self.make_basis(sigdriv=sigdriv,
                                       sigdriv_imag=sigdriv_imag)
 
-        self.estimate_error(recompute=True)
+        self.estimate_error(train=True, recompute=True)
         return self.residual_
 
     def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
@@ -757,7 +780,7 @@ class BaseDAR(object):
         pass
 
     @abstractmethod
-    def estimate_error(self):
+    def estimate_error(self, train=True, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_
@@ -862,27 +885,7 @@ class BaseDAR(object):
         xlim : minimum and maximum amplitude
 
         """
-        # -------- define the horizontal axis
-        if xlim is None:
-            xlim = self.get_sigdriv_bounds()
-
-        if self.ordriv_d_ > 0 or False:
-            if fc is None:
-                # compute the main driver frequency
-                sp = Spectrum(block_length=min(2048, self.sigdriv.shape[1]),
-                              fs=self.fs)
-                sp.periodogram(self.sigdriv[0, :])
-                fc = sp.main_frequency()
-
-            # full oscillation for derivative
-            phase = 2.0 * np.pi * fc / self.fs * np.arange(int(self.fs / fc))
-            sigdriv = xlim[1] * np.cos(phase)
-            sigdriv_imag = xlim[1] * np.sin(phase)
-        else:
-            # simple ramp
-            eps = 0.0
-            sigdriv = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
-            sigdriv_imag = None
+        xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim, fc)
 
         # -------- compute spectra
         spec = self._basis2spec(sigdriv[None, :], sigdriv_imag=sigdriv_imag,
@@ -894,7 +897,25 @@ class BaseDAR(object):
         if 'v' in mode:
             spec /= np.std(spec, axis=1)
 
-        return spec, xlim
+        return spec, xlim, sigdriv, sigdriv_imag
+
+    def _driver_range(self, nbcols=256, xlim=None, fc=None):
+        # -------- define the horizontal axis
+        if xlim is None:
+            xlim = self.get_sigdriv_bounds()
+
+        if self.ordriv_d > 0 or False:
+            # full oscillation for derivative
+            phase = np.linspace(0, 2 * np.pi, nbcols, endpoint=False)
+            sigdriv = xlim[1] * np.cos(phase)
+            sigdriv_imag = xlim[1] * np.sin(phase)
+        else:
+            # simple ramp
+            eps = 0.0
+            sigdriv = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
+            sigdriv_imag = None
+
+        return xlim, sigdriv, sigdriv_imag
 
     def get_sigdriv_bounds(self, sigdriv=None):
         if self.use_driver_phase:

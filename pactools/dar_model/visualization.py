@@ -40,7 +40,8 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         frange = [0, model.fs / 2.0]
 
     # -------- get amplitude-frequency spectrum from model
-    spec, xlim = model.amplitude_frequency(frange=frange, mode=mode, xlim=xlim)
+    spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(
+        mode=mode, xlim=xlim)
 
     if fig is None:
         fig = plt.figure(title)
@@ -48,44 +49,57 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         ax = fig.gca()
     except:
         ax = fig
-    ax.cla()
+    # ax.cla()
 
     # -------- plot spectrum
     colors = 'bcgyrm'
     n_frequency, n_amplitude = spec.shape
-    amplitudes = np.linspace(xlim[0], xlim[1], n_amplitude)
-    ploted_amplitudes = np.floor(np.linspace(0, n_amplitude - 1, 5))
-    ploted_amplitudes = ploted_amplitudes.astype(np.int)
+    if sigdriv_imag is None:
+        max_i = (n_amplitude - 1)
+    else:
+        max_i = (n_amplitude - 1) / 2
+    ploted_amplitudes = np.linspace(0, max_i, 5)
+    ploted_amplitudes = np.floor(ploted_amplitudes).astype(np.int)
 
     frequencies = np.linspace(frange[0], frange[1], n_frequency)
     for i, i_amplitude in enumerate(ploted_amplitudes[::-1]):
+
+        # build label
+        # if sigdriv_imag is not None:
+        #     str_x_imag = r' \bar{x}=%.2f' % sigdriv_imag[i_amplitude]
+        # else:
+        str_x_imag = ''
+        label = r'$x=%.2f%s$' % (sigdriv[i_amplitude], str_x_imag)
+
         ax.plot(frequencies, spec[:, i_amplitude], color=colors[i],
-                label=r'$x=%+.2f$' % amplitudes[i_amplitude])
+                label=label)
 
     # plot simple periodogram
     if True:
         spect = Spectrum(block_length=128, fs=model.fs, wfunc=np.blackman)
-        spect.periodogram(model.sigin)
-        n_frequency = spect.fftlen // 2 + 1
+        sigin = model.sigin
+        if model.mask is not None:
+            sigin = sigin[model.mask != 0]
+        spect.periodogram(sigin)
+        fft_length, _ = spect.check_params()
+        n_frequency = fft_length // 2 + 1
         psd = spect.psd[0][0, 0:n_frequency]
-        psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
-        psd += -psd.mean() + 20.0 * np.log10(model.sigin.std())
+        psd = 10.0 * np.log10(np.maximum(psd, 1.0e-12))
+        psd += -psd.mean() + 20.0 * np.log10(sigin.std())
         frequencies = np.linspace(0, spect.fs / 2, n_frequency)
         ax.plot(frequencies, psd, '--k', label='PSD')
 
     if title == '':
-        title = model.get_title(name=True)
+        title = model.get_title(name=True, bic=True)
     ax.set_title(title)
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power (dB)')
     ax.legend(loc=0)
-
-    ylim = ax.get_ylim()
-    if vmin is not None:
-        ylim = (vmin, ylim[1])
-    if vmax is not None:
-        ylim = (ylim[0], vmax)
-    ax.set_ylim(ylim)
+    vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, 0.1, percentile=0)
+    vmin_, vmax_ = compute_vmin_vmax(psd, None, None, 0.1, percentile=0)
+    vmin = min(vmin, vmin_)
+    vmax = max(vmax, vmax_)
+    ax.set_ylim((vmin, vmax))
     ax.grid('on')
 
     return fig
