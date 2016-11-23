@@ -429,7 +429,7 @@ class BaseLattice(BaseDAR):
         if recompute:
             self.residual_, _ = self.whiten(train=train)
 
-    def develop(self, basis, sigdriv):
+    def develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:

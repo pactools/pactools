@@ -99,7 +99,7 @@ class SimpleDAR(BaseDAR):
         residual += np.einsum('i...,i...', prediction, basis)
         self.residual_ = residual
 
-    def develop(self, basis, sigdriv):
+    def develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:

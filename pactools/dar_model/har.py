@@ -90,7 +90,7 @@ class HAR(BaseDAR):
                 self.AR_[k, 0] * sigin[:, 0:n_points - k - 1])
         self.residual_ = residual
 
-    def develop(self, basis, sigdriv):
+    def develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:

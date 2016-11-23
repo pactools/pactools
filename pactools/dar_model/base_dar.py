@@ -771,7 +771,7 @@ class BaseDAR(object):
         pass
 
     @abstractmethod
-    def develop(self, basis, sigdriv):
+    def develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:
@@ -800,7 +800,7 @@ class BaseDAR(object):
         else:
             basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
 
-        AR_cols, G_cols = self.develop(basis=basis, sigdriv=sigdriv)
+        AR_cols, G_cols = self.develop(basis=basis)
 
         return AR_cols, G_cols, np.arange(sigdriv.size), sigdriv
 
