@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .utils.spectrum import crop_for_fast_hilbert
 from .plot_comodulogram import add_colorbar
 from .comodulogram import multiple_band_pass
 
@@ -33,8 +32,8 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
         If None, we use low_sig for both signals
 
     mask : array or None, shape (n_epochs, n_points)
-        The locking is only evaluated with the unmasked element of low_sig and
-        high_sig. Masking is done after filtering and Hilbert transform.
+        The locking is only evaluated where the mask is False.
+        Masking is done after filtering and Hilbert transform.
 
     low_fq : float
         Filtering frequency (phase signal)
@@ -74,10 +73,6 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     low_fq = np.atleast_1d(low_fq)
 
     low_sig = np.atleast_2d(low_sig)
-    low_sig = crop_for_fast_hilbert(low_sig)
-    if mask is not None:
-        mask = crop_for_fast_hilbert(mask)
-
     if high_sig is None:
         high_sig = low_sig
 
@@ -176,7 +171,7 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None,
 
         # remove the masked peaks
         if mask is not None:
-            selection = mask[i_epoch, peak_inds] == 1
+            selection = mask[i_epoch, peak_inds] == 0
             peak_inds = peak_inds[selection]
             peak_mags = peak_mags[selection]
 
@@ -265,7 +260,7 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
     # normalization is done everywhere, but mean is computed
     #  only where mask == 1
     if mask is not None:
-        masked_filtered_high = filtered_high[:, mask == 1]
+        masked_filtered_high = filtered_high[:, mask == 0]
     else:
         masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
 
@@ -281,7 +276,7 @@ def plot_trough_locked_time_frequency(filtered_high, fs, high_fq_range,
 
     # subtract the mean power.
     if mask is not None:
-        masked_filtered_high = filtered_high[:, mask == 1]
+        masked_filtered_high = filtered_high[:, mask == 0]
     else:
         masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
     mean = masked_filtered_high.mean(axis=1)[:, None, None]

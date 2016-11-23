@@ -69,10 +69,10 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
     """
     # The modulation index is only computed where mask is True
     if mask is not None:
-        filtered_low = filtered_low[:, mask == 1]
-        filtered_high = filtered_high[:, mask == 1]
+        filtered_low = filtered_low[:, mask == 0]
+        filtered_high = filtered_high[:, mask == 0]
         if method == 'vanwijk':
-            filtered_low_2 = filtered_low_2[:, mask == 1]
+            filtered_low_2 = filtered_low_2[:, mask == 0]
     else:
         filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
         filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
@@ -218,7 +218,7 @@ def _same_mask_on_all_epochs(sig, mask, method):
                       "first row of the mask is used." %
                       (method, mask.shape, ), UserWarning)
         mask = mask[0, :]
-    sig = sig[..., mask == 1]
+    sig = sig[..., mask == 0]
     return sig
 
 
@@ -409,8 +409,8 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
         If None, we use low_sig for both signals
 
     mask : array or list of array or None, shape (n_epochs, n_points)
-        The PAC is only evaluated with the unmasked element of low_sig and
-        high_sig. Masking is done after filtering and Hilbert transform.
+        The PAC is only evaluated where the mask is False.
+        Masking is done after filtering and Hilbert transform.
         If the method computes the bicoherence, the mask has to be
         unidimensional (n_points, ) and the same mask is applied on all epochs.
         If a list is given, the filtering is done only once and the
@@ -622,8 +622,8 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         If None, we use low_sig for both signals
 
     mask : array or list of array or None, shape (n_epochs, n_points)
-        The PAC is only evaluated with the unmasked element of low_sig and
-        high_sig. Masking is done after filtering and Hilbert transform.
+        The PAC is only evaluated where the mask is False.
+        Masking is done after filtering and Hilbert transform.
         If a list is given, the filtering is done only once and the
         comodulogram is computed on each mask.
 
@@ -710,8 +710,6 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
             random_noise=random_noise, normalize=normalize,
             whitening=whitening, draw='', extract_complex=extract_complex)):
 
-        fc = low_fq_range[j]
-
         if extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals
         else:
@@ -736,7 +734,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                 return _one_driven_modulation_index(fs, sigin, sigdriv,
                                                     sigdriv_imag, model,
                                                     this_mask, method,
-                                                    high_fq_range, fc, shift)
+                                                    high_fq_range, shift)
 
             comod = _surrogate_analysis(comod_function, fs, n_points,
                                         minimum_shift, random_state,
@@ -760,7 +758,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
 
 
 def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
-                                 method, high_fq_range, fc, shift):
+                                 method, high_fq_range, shift):
 
     # shift for the surrogate analysis
     if shift != 0:
@@ -768,10 +766,10 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
 
     # fit the model DAR on the data
     model.fit(fs=fs, sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
-              mask=mask)
+              train_mask=mask)
 
     # get PSD difference
-    spec, _ = model.amplitude_frequency(fc=fc)
+    spec, _, _, _ = model.amplitude_frequency()
     if method == 'minmax':
         spec_diff = spec.max(axis=1) - spec.min(axis=1)
     elif method == 'firstlast':

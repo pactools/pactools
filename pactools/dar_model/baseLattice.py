@@ -290,12 +290,12 @@ class BaseLattice(BaseDAR):
                              self.__class__.__name__)
 
         # --------  get the training data
-        mask, sigin = self.get_train_data(self.sigin)
+        train_mask, sigin = self.get_train_data(self.sigin)
         _, basis = self.get_train_data(self.basis_)
 
-        mask = self.mask
-        if mask is not None:
-            masked_basis = basis * mask
+        train_select = ~train_mask if train_mask is not None else None
+        if train_select is not None:
+            masked_basis = basis * train_select
         else:
             masked_basis = basis
 
@@ -320,10 +320,10 @@ class BaseLattice(BaseDAR):
         # -------- loop on successive orders
         for k in range(0, ordar_):
             # -------- prepare initial estimation (driven parcor)
-            if mask is not None:
+            if train_select is not None:
                 # the mask and basis are not delay as backward_res /!\
-                forward_res = mask[:, k + 1:] * forward_res[:, k + 1:]
-                backward_res = mask[:, k + 1:] * backward_res[:, k:-1]
+                forward_res = train_select[:, k + 1:] * forward_res[:, k + 1:]
+                backward_res = train_select[:, k + 1:] * backward_res[:, k:-1]
             else:
                 forward_res = forward_res[:, k + 1:]
                 backward_res = backward_res[:, k:-1]
@@ -350,8 +350,8 @@ class BaseLattice(BaseDAR):
             parcor_list = self.develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
-            if mask is not None:
-                parcor_list *= mask
+            if train_select is not None:
+                parcor_list *= train_select
 
             R = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
                                masked_basis[:, :, k:].reshape(n_basis, -1).T)

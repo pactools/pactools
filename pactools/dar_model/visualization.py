@@ -78,8 +78,8 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     if True:
         spect = Spectrum(block_length=128, fs=model.fs, wfunc=np.blackman)
         sigin = model.sigin
-        if model.mask is not None:
-            sigin = sigin[model.mask != 0]
+        if model.train_mask is not None:
+            sigin = sigin[~model.train_mask]
         spect.periodogram(sigin)
         fft_length, _ = spect.check_params()
         n_frequency = fft_length // 2 + 1

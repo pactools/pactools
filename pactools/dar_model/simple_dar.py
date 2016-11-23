@@ -29,13 +29,14 @@ class SimpleDAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        mask, sigin = self.get_train_data(self.sigin)
+        train_mask, sigin = self.get_train_data(self.sigin)
         _, basis = self.get_train_data(self.basis_)
+        train_select = ~train_mask if train_mask is not None else None
 
         # mask the signal
-        if self.mask is not None:
-            masked_basis = mask * basis
-            masked_sigin = mask * sigin
+        if train_select is not None:
+            masked_basis = train_select * basis
+            masked_sigin = train_select * sigin
         else:
             masked_basis = basis
             masked_sigin = sigin

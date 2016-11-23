@@ -46,10 +46,10 @@ def example_phase_locking_with_mask():
 
     tmin = 0.0  # the loaded epoch start at tmin=0, i.e. the CS event
     for t_start, t_stop in [[1, 10], [10, 19], [19, 28]]:
-        mask = np.zeros(sig.shape)
+        mask = np.ones(sig.shape)
         start = int((t_start - tmin) * fs)
         stop = int((t_stop - tmin) * fs)
-        mask[:, start:stop] = 1
+        mask[:, start:stop] = 0
         save_name = 'example_phase_locking_[%s,%s]' % (t_start, t_stop)
 
         time_frequency_peak_locking(low_sig=sig, fs=fs,

@@ -59,10 +59,10 @@ def example_comodulogram_with_mask():
     for t_start, t_stop in [[1, 4], [4, 7], [7, 10],
                             [10, 13], [13, 16], [16, 19],
                             [19, 22], [22, 25], [25, 28]]:
-        mask = np.zeros(sig.shape)
+        mask = np.ones(sig.shape)
         start = int((t_start - tmin) * fs)
         stop = int((t_stop - tmin) * fs)
-        mask[:, start:stop] = 1
+        mask[:, start:stop] = 0
 
         mask_list.append(mask)
 

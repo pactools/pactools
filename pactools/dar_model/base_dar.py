@@ -82,7 +82,8 @@ class BaseDAR(object):
         self.ordriv_ = ordriv
         self.ordriv_d_ = ordriv_d
 
-    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag, mask):
+    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag,
+                         train_mask, test_mask):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -99,16 +100,26 @@ class BaseDAR(object):
             if self.ordriv_d_ > 0:
                 sigdriv_imag = np.sin(phase)
 
-        # -------- also save the mask and remove far masked data
-        if mask is not None:
-            mask = check_array(mask, dtype='bool')
-            check_consistent_shape(sigdriv, mask)
+        test_mask = check_array(test_mask, dtype='bool', accept_none=True)
 
-            mask, sigin, sigdriv, sigdriv_imag = \
+        if train_mask is not None:
+            train_mask = check_array(train_mask, dtype='bool')
+            check_consistent_shape(sigdriv, train_mask)
+
+            # if test_mask is None, we use train_mask
+            if test_mask is None:
+                test_mask = train_mask
+                both_masks = train_mask
+            else:
+                both_masks = np.logical_and(test_mask, train_mask)
+
+            # we remove far masked data (by both masks)
+            train_mask, test_mask, sigin, sigdriv, sigdriv_imag = \
                 self.remove_far_masked_data(
-                    mask, [mask, sigin, sigdriv, sigdriv_imag])
+                    both_masks,
+                    [train_mask, test_mask, sigin, sigdriv, sigdriv_imag])
 
-            check_consistent_shape(sigdriv, mask)
+            check_consistent_shape(sigdriv, train_mask)
 
         if self.center:
             sigin -= np.mean(sigin)
@@ -117,9 +128,10 @@ class BaseDAR(object):
         self.sigin = sigin
         self.sigdriv = sigdriv
         self.sigdriv_imag = sigdriv_imag
-        self.mask = mask
+        self.train_mask = train_mask
+        self.test_mask = test_mask
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None,
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None,
             train_mask=None, test_mask=None):
         """ Estimate a DAR model from input signals.
 
@@ -137,38 +149,25 @@ class BaseDAR(object):
         sigdriv_imag : None or array, shape (n_epochs, n_points)
             Second driver, containing the imaginary part of the driver
 
-        mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is fitted and tested (likelihood estimate)
-            only where 'mask' is True.
-
         train_mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is fitted only where 'train_mask' is True.
-            If 'mask' is also not None, the model is fitted where both 'mask'
-            and 'train_mask' are True.
+            If not None, the model is fitted only where 'train_mask' is False.
 
         test_mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is tested only where 'test_mask' is True.
-            If 'mask' is also not None, the model is fitted where both 'mask'
-            and 'test_mask' are True.
-            If 'test_mask' is None and 'train_mask' is not None, 'test_mask'
-            is set to '~train_mask', i.e. the opposite of 'train_mask'.
+            If not None, the model is tested only where 'test_mask' is False.
+            If 'test_mask' is None, it set equal to 'train_mask'.
 
         Returns
         -------
         self
         """
         self.reset_criterions()
-        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, mask)
+        self.check_all_arrays(sigin, sigdriv, sigdriv_imag,
+                              train_mask, test_mask)
         self.fs = fs
 
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
         self.G_ = np.ndarray(0)
-
-        self.train_mask = check_array(train_mask, dtype='bool',
-                                      accept_none=True)
-        self.test_mask = check_array(test_mask, dtype='bool',
-                                     accept_none=True)
 
         # -------- estimation of the model
         if self.criterion:
@@ -351,19 +350,22 @@ class BaseDAR(object):
         if mask is None:
             return list_signals
 
+        selection = ~mask
+
         # convolution with a delay kernel,
-        # so we keep the close points before the mask
+        # so we keep the close points before the selection
         kernel = np.ones(self.ordar * 2 + 1)
         kernel[-self.ordar:] = 0.
-        delayed_mask = fftconvolve(mask, kernel[None, :], mode='same')
+        delayed_selection = fftconvolve(selection, kernel[None, :],
+                                        mode='same')
         # remove numerical error from fftconvolve
-        delayed_mask[np.abs(delayed_mask) < 1e-13] = 0.
+        delayed_selection[np.abs(delayed_selection) < 1e-13] = 0.
 
-        time_selection = delayed_mask.sum(axis=0) != 0
-        epoch_selection = delayed_mask.sum(axis=1) != 0
+        time_selection = delayed_selection.sum(axis=0) != 0
+        epoch_selection = delayed_selection.sum(axis=1) != 0
 
         if not np.any(time_selection) or not np.any(epoch_selection):
-            raise ValueError("The mask seems to be empty.")
+            raise ValueError("The mask seems to hide everything.")
 
         output_signals = []
         for sig in list_signals:
@@ -375,37 +377,18 @@ class BaseDAR(object):
         return output_signals
 
     def get_train_data(self, sig):
-        mask = self.mask
         train_mask = self.train_mask
+        train_mask, sig = self.remove_far_masked_data(
+            train_mask, [train_mask, sig])
 
-        if train_mask is None:
-            return mask, sig
-        else:
-            if mask is not None:
-                train_mask = np.logical_and(train_mask, mask)
-
-            train_mask, sig = self.remove_far_masked_data(
-                train_mask, [train_mask, sig])
-
-            return train_mask, sig
+        return train_mask, sig
 
     def get_test_data(self, sig):
-        mask = self.mask
         test_mask = self.test_mask
-        train_mask = self.train_mask
-        if test_mask is None and train_mask is not None:
-            test_mask = ~train_mask
+        test_mask, sig = self.remove_far_masked_data(
+            test_mask, [test_mask, sig])
 
-        if test_mask is None:
-            return mask, sig
-        else:
-            if mask is not None:
-                test_mask = np.logical_and(test_mask, mask)
-
-            test_mask, sig = self.remove_far_masked_data(
-                test_mask, [test_mask, sig])
-
-            return test_mask, sig
+        return test_mask, sig
 
     def degrees_of_freedom(self):
         return ((self.ordar_ + 1) * self.n_basis)
@@ -582,22 +565,23 @@ class BaseDAR(object):
         ordar = self.ordar_
 
         # -------- get the training data
-        mask, basis = self.get_train_data(self.basis_)
+        train_mask, basis = self.get_train_data(self.basis_)
+        train_selection = ~train_mask if train_mask is not None else None
 
         residual = self.residual_
 
         # -------- crop the ordar first values
         residual = residual[:, ordar:]
         basis = basis[:, :, ordar:]
-        if mask is not None:
-            mask = mask[:, ordar:]
+        if train_selection is not None:
+            train_selection = train_selection[:, ordar:]
 
         # concatenate the epochs since it does not change the computations
         # as in estimating the AR coefficients
-        if mask is not None:
-            residual = residual[mask != 0]
-            basis = basis[:, mask != 0]
-            mask = mask[mask != 0].reshape(1, -1)
+        if train_selection is not None:
+            residual = residual[train_selection]
+            basis = basis[:, train_selection]
+            train_selection = train_selection[train_selection].reshape(1, -1)
         residual = residual.reshape(1, -1)
         basis = basis.reshape(basis.shape[0], -1)
 
@@ -631,8 +615,8 @@ class BaseDAR(object):
         for k, (this_min, this_max) in enumerate(zip(kmin, kmax)):
             e[k] = np.mean(residual2[0, index[this_min:this_max]])
 
-        if mask is not None:
-            masked_basis = basis * mask
+        if train_selection is not None:
+            masked_basis = basis * train_selection
         else:
             masked_basis = basis
 
@@ -661,7 +645,9 @@ class BaseDAR(object):
             logsigma = np.dot(self.G_, basis)
             sigma2 = np.exp(2 * logsigma)
 
-            loglike[itnum] = wgn_log_likelihood(residual, sigma2, mask)
+            train_mask = (~train_selection if train_selection is not None
+                          else None)
+            loglike[itnum] = wgn_log_likelihood(residual, sigma2, train_mask)
 
             gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
             hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
@@ -708,18 +694,18 @@ class BaseDAR(object):
         skip : how many initial samples to skip
         """
         # -------- get the left-out data
-        mask, basis = self.get_test_data(self.basis_)
+        test_mask, basis = self.get_test_data(self.basis_)
 
         # skip first samples
-        if mask is not None:
-            mask = mask[:, skip:]
+        if test_mask is not None:
+            test_mask = test_mask[:, skip:]
         residual = self.residual_[:, skip:]
 
         # -------- estimate the gain
         gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(residual, gain2, mask)
+        logL = wgn_log_likelihood(residual, gain2, test_mask)
 
         tmax = gain2.size
 
@@ -869,7 +855,7 @@ class BaseDAR(object):
         return spec
 
     def amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                            xlim=None, fc=None):
+                            xlim=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -882,7 +868,7 @@ class BaseDAR(object):
         xlim : minimum and maximum amplitude
 
         """
-        xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim, fc)
+        xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim)
 
         # -------- compute spectra
         spec = self._basis2spec(sigdriv[None, :], sigdriv_imag=sigdriv_imag,
@@ -896,7 +882,7 @@ class BaseDAR(object):
 
         return spec, xlim, sigdriv, sigdriv_imag
 
-    def _driver_range(self, nbcols=256, xlim=None, fc=None):
+    def _driver_range(self, nbcols=256, xlim=None):
         # -------- define the horizontal axis
         if xlim is None:
             xlim = self.get_sigdriv_bounds()
@@ -921,8 +907,8 @@ class BaseDAR(object):
         else:
             if sigdriv is None:
                 sigdriv = self.sigdriv
-            if self.mask is not None:
-                sigdriv = sigdriv[self.mask != 0]
+            if self.train_mask is not None:
+                sigdriv = sigdriv[~self.train_mask]
             bounds = np.percentile(sigdriv, [5, 95])
         bound_min = min(-bounds[0], bounds[1])
         bounds = (-bound_min, bound_min)
@@ -971,8 +957,8 @@ def wgn_log_likelihood(eps, sigma2, mask=None):
     sigma2 : variance of this signal
     """
     if mask is not None:
-        eps = eps[mask != 0]
-        sigma2 = sigma2[mask != 0]
+        eps = eps[~mask]
+        sigma2 = sigma2[~mask]
 
     tmax = eps.size
     logL = tmax * np.log(2.0 * np.pi)
