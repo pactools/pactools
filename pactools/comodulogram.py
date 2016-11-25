@@ -602,7 +602,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
 def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                         high_fq_range, low_fq_width, method='firstlast',
-                        fill=0, ordar=12, enf=50., random_noise=None,
+                        fill=5, ordar=12, enf=50., random_noise=None,
                         normalize=True, whitening='after',
                         progress_bar=True, n_surrogates=0, random_state=None,
                         minimum_shift=1.0):
@@ -645,7 +645,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     method : string in ('firstlast', 'minmax')
         Method for extracting a PAC metric from a DAR model
 
-    fill : int in (0, 1, 2, 3, 4)
+    fill : int in (0, 1, 2, 3, 4, 5)
         Method to fill the spectral gap when removing the low frequencies
 
     ordar : int

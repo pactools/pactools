@@ -825,7 +825,7 @@ class BaseDAR(object):
         else:
             basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
 
-        AR_cols, G_cols = self.develop(basis=basis, sigdriv=sigdriv)
+        AR_cols, G_cols = self.develop(basis=basis)
 
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]

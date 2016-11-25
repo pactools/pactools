@@ -135,6 +135,40 @@ class Carrier:
             return filtered
 
 
+class LowPass:
+    def __init__(self, fs=1.):
+        self.fir = np.ones(1)
+        self.fs = fs
+
+    def design(self, fs, fc):
+        """
+        No design, just match the API of Carrier
+        fs         : sampling frequency (Hz)
+        fc         : frequency of the carrier (Hz)
+        """
+        self.fs = fs
+        self.fc = fc
+        return self
+
+    def plot(self, fig=None, fscale='log', print_width=False):
+        """
+        plots the impulse response and the transfer function of the filter
+        """
+        # Not Implemented
+        return fig
+
+    def direct(self, sigin):
+        """
+        apply this filter to a signal
+        sigin : input signal (ndarray)
+        returns the filtered signal (ndarray)
+        """
+        from mne.filter import low_pass_filter
+        filtered = low_pass_filter(sigin.astype(np.float64),
+                                   Fs=self.fs, Fp=self.fc, method='iir')
+        return filtered
+
+
 def test1():
     print('testing carrier with constant n_cycles')
     fs = 33.83

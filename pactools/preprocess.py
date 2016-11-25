@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from .io.smr2mne import smr2sig
 from .utils.spectrum import Spectrum
-from .utils.carrier import Carrier
+from .utils.carrier import Carrier, LowPass
 from .utils.dehumming import dehummer
 from .utils.arma import Arma
 
@@ -196,6 +196,17 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
             plt.legend(['signal', 'driver', 'signal-driver',
                         'white_signal', 'wide_driver',
                         'white_signal-wide_driver', 'high_frequencies'], loc=0)
+    elif fill == 5:
+        high_sig = sig - low_sig
+
+        if extract_complex:
+            fill_sig, _ = filt.direct(random_noise)
+        else:
+            fill_sig = filt.direct(random_noise)
+        fill_sig.shape = sig.shape
+
+        high_sig = fill_gap(high_sig, fs, fa=fc, dfa=bandwidth, draw=draw,
+                            fill_sig=fill_sig)
     else:
         raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
 
@@ -203,6 +214,17 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         return low_sig, high_sig, low_sig_imag
     else:
         return low_sig, high_sig
+
+
+def low_pass_and_fill(sig, fs, fc=1.0, draw=''):
+    low_sig, high_sig = extract(sig, fs, fc, fill=1, low_pass=True)
+
+    random_noise = np.random.randn(*sig.shape)
+    filt = LowPass().design(fs=fs, fc=fc)
+    fill_sig = filt.direct(random_noise)
+    filled_sig = fill_gap(sig=high_sig, fs=fs, fa=fc / 2., dfa=fc / 2.,
+                          draw=draw, fill_sig=fill_sig)
+    return filled_sig
 
 
 def plot_multiple_spectrum(signals, fs, labels, colors):
@@ -378,6 +400,10 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
         sigs = [dehummer(sig, fs, enf=enf, hmax=hmax,
                          block_length=block_length, draw=draw) for sig in sigs]
         show_plot(draw)
+
+    # -------- lowpass at 1 Hz
+    sigs = [low_pass_and_fill(sig=sig, fs=fs, draw=draw) for sig in sigs]
+    show_plot(draw)
 
     if custom_func is not None:
         sigs = [custom_func(sig=sig, fs=fs, draw=draw) for sig in sigs]
