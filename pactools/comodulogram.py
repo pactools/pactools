@@ -13,6 +13,8 @@ from .utils.maths import norm, argmax_2d, check_random_state
 from .plot_comodulogram import plot_comodulogram
 from .preprocess import extract
 
+N_BINS_TORT = 18
+
 
 def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
                        n_cycles=None, filter_method='carrier'):
@@ -106,7 +108,7 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
     for i in range(n_low):
         # preproces the phase array
         if method == 'tort':
-            n_bins = 18
+            n_bins = N_BINS_TORT
             phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
@@ -171,19 +173,11 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
     # Modulation index as in [Tort & al 2010]
     elif method == 'tort':
         # mean amplitude distribution along phase bins
-        for n_bins in range(18, 8, -2):
-            amplitude_dist = np.zeros(n_bins)
-            for b in range(n_bins):
-                selection = amplitude[phase_preprocessed == b]
-                if selection.size == 0:  # no sample in that bin
-                    continue
-                amplitude_dist[b] = np.mean(selection)
-            if np.any(amplitude_dist == 0):
-                continue
-            break
-
-        if np.any(amplitude_dist == 0):
-            raise RuntimeError("Not enough data to fill %d bins !" % n_bins)
+        n_bins = N_BINS_TORT
+        amplitude_dist = np.ones(n_bins)  # default is 1 to avoid log(0)
+        for b in np.unique(phase_preprocessed):
+            selection = amplitude[phase_preprocessed == b]
+            amplitude_dist[b] = np.mean(selection)
 
         # Kullback-Leibler divergence of the distribution vs uniform
         amplitude_dist /= np.sum(amplitude_dist)

@@ -231,7 +231,8 @@ def plot_multiple_spectrum(signals, fs, labels, colors):
     """
     plot the signals spectrum
     """
-    s = Spectrum(block_length=2048, fs=fs, wfunc=np.blackman)
+    s = Spectrum(block_length=min(2048, signals[0].size), fs=fs,
+                 wfunc=np.blackman)
     for sig in signals:
         s.periodogram(sig, hold=True)
     s.plot(labels=labels, colors=colors, fscale='lin')
@@ -255,7 +256,7 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
 
     """
     # -------- create the AR model and its spectrum
-    ar = Arma(ordar=ordar, ordma=0, fs=fs)
+    ar = Arma(ordar=ordar, ordma=0, fs=fs, block_length=min(1024, sig.size))
     ar.periodogram(sig)
     # duplicate to see the removal of the electric network frequency
     ar.periodogram(sig, hold=True)
@@ -315,7 +316,7 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None):
     """Fill a gap with white noise.
     """
     # -------- get the amplitude of the gap
-    sp = Spectrum(block_length=2048, fs=fs, wfunc=np.blackman)
+    sp = Spectrum(block_length=min(2048, sig.size), fs=fs, wfunc=np.blackman)
     fft_length, _ = sp.check_params()
     sp.periodogram(sig)
     fmin = fa - dfa

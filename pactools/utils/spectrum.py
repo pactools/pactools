@@ -57,7 +57,7 @@ class Spectrum(object):
 
         # fft_length
         if self.fft_length is None:
-            fft_length = int(self.block_length)
+            fft_length = int(2 ** np.ceil(np.log2(self.block_length)))
         else:
             fft_length = int(self.fft_length)
         if not is_power2(fft_length):
