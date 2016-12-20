@@ -595,7 +595,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
 
 
 def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
-                        high_fq_range, low_fq_width, method='firstlast',
+                        high_fq_range, low_fq_width, method='kl',
                         fill=5, ordar=12, enf=50., random_noise=None,
                         normalize=True, whitening='after',
                         progress_bar=True, n_surrogates=0, random_state=None,
@@ -636,7 +636,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     low_fq_width : float
         Bandwidth of the band-pass filter (phase signal)
 
-    method : string in ('firstlast', 'minmax')
+    method : string in ('kl', firstlast', 'minmax')
         Method for extracting a PAC metric from a DAR model
 
     fill : int in (0, 1, 2, 3, 4, 5)
@@ -776,6 +776,13 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
             spec_diff = np.abs(spec - np.roll(spec, n_phases // 2, axis=1))
             _, j = argmax_2d(spec_diff)
             spec_diff = spec_diff[:, j]
+    elif method == 'kl':
+        # KL divergence for each phase, as in Tort & al 2010
+        n_freq, n_phases = spec.shape
+        spec = 10 ** (spec / 20)
+        spec = spec / np.sum(spec, axis=1)[:, None]
+        spec_diff = np.sum(spec * np.log(spec * n_phases), axis=1)
+        spec_diff /= np.log(n_phases)
 
     # crop the spectrum to high_fq_range
     frequencies = np.linspace(0, fs // 2, spec_diff.size)
