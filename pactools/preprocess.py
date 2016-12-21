@@ -207,6 +207,13 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         high_sig = fill_gap(high_sig, fs, fa=fc, dfa=bandwidth, draw=draw,
                             fill_sig=fill_sig)
+
+        if 'z' in draw or 'c' in draw:
+            plot_multiple_spectrum(
+                [sig, low_sig, sig - low_sig, high_sig],
+                labels=None, fs=fs, colors='bgcr')
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'high_frequencies'], loc=0)
     else:
         raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
 
@@ -355,7 +362,7 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None):
     if 'g' in draw or 'z' in draw:
         labels = ['signal', 'fill signal', 'gap filled']
         sp.periodogram(sig, hold=True)
-        sp.plot(labels=labels, fscale='lin')
+        sp.plot(labels=labels, fscale='lin', title='fill')
 
     return sig
 
