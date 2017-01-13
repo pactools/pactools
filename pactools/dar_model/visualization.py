@@ -52,13 +52,13 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     # ax.cla()
 
     # -------- plot spectrum
-    # colors = 'bcgyrm'
     n_frequency, n_amplitude = spec.shape
     if sigdriv_imag is None:
-        max_i = (n_amplitude - 1)
+        n_lines = 5
+        ploted_amplitudes = np.linspace(0, n_amplitude - 1, n_lines)
     else:
-        max_i = (n_amplitude - 1) / 2
-    ploted_amplitudes = np.linspace(0, max_i, 5)
+        n_lines = 5
+        ploted_amplitudes = np.linspace(0, n_amplitude, n_lines + 1)[:-1]
     ploted_amplitudes = np.floor(ploted_amplitudes).astype(np.int)
 
     frequencies = np.linspace(frange[0], frange[1], n_frequency)
@@ -71,8 +71,7 @@ def plot_dar_lines(model, title='', frange=None, mode='',
         str_x_imag = ''
         label = r'$x=%.2f%s$' % (sigdriv[i_amplitude], str_x_imag)
 
-        ax.plot(frequencies, spec[:, i_amplitude], #  color=colors[i],
-                label=label)
+        ax.plot(frequencies, spec[:, i_amplitude], label=label)
 
     # plot simple periodogram
     if True:

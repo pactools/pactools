@@ -14,7 +14,7 @@ from ..utils.spectrum import phase_amplitude
 class BaseDAR(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, ordar=1, ordriv=0, ordriv_d=0, criterion=None,
+    def __init__(self, ordar=1, ordriv=0, criterion=None,
                  normalize=True, ortho=True, center=True, iter_gain=10,
                  eps_gain=1.0e-4, progress_bar=False,
                  cross_term_driver=True, use_driver_phase=False):
@@ -26,9 +26,6 @@ class BaseDAR(object):
 
         ordriv : int >= 0
             Order of the taylor expansion for sigdriv
-
-        ordriv_d : int >= 0
-            Order of the taylor expansion for sigdriv_imag
 
         criterion : None or string in ('bic', 'aic', 'logl')
             If not None, select the criterion used for model selection.
@@ -68,9 +65,8 @@ class BaseDAR(object):
 
         # power of the Taylor expansion
         self.ordriv = ordriv
-        self.ordriv_d = ordriv_d
         self.cross_term_driver = cross_term_driver
-        self.compute_cross_orders(ordriv, ordriv_d, cross_term_driver)
+        self.compute_cross_orders(ordriv, cross_term_driver)
 
         # left-out system
         self.train_mask = None
@@ -80,7 +76,6 @@ class BaseDAR(object):
         self.basis_ = None
         self.ordar_ = ordar
         self.ordriv_ = ordriv
-        self.ordriv_d_ = ordriv_d
 
     def check_all_arrays(self, sigin, sigdriv, sigdriv_imag,
                          train_mask, test_mask):
@@ -97,7 +92,7 @@ class BaseDAR(object):
         if self.use_driver_phase:
             phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
             sigdriv = np.cos(phase)
-            if self.ordriv_d_ > 0:
+            if self.ordriv_ > 0:
                 sigdriv_imag = np.sin(phase)
 
         test_mask = check_array(test_mask, dtype='bool', accept_none=True)
@@ -184,10 +179,9 @@ class BaseDAR(object):
             self.estimate_gain()
         return self
 
-    def compute_cross_orders(self, ordriv, ordriv_d, cross_term_driver):
-        max_order_cross_term = max(ordriv, ordriv_d)
-
+    def compute_cross_orders(self, ordriv, cross_term_driver):
         power_list, power_list_d = [], []
+        ordriv_d = ordriv
 
         # power of the driver
         for j in np.arange(1, ordriv + 1):
@@ -203,7 +197,7 @@ class BaseDAR(object):
             # cross terms
             for j in range(1, ordriv):
                 for k in range(1, ordriv_d):
-                    if j + k >= max_order_cross_term:
+                    if j + k >= ordriv:
                         power_list.append(j)
                         power_list_d.append(k)
 
@@ -257,9 +251,9 @@ class BaseDAR(object):
             ortho, normalize = False, False
 
         n_epochs, n_points = sigdriv.shape
-        ordriv_, ordriv_d_ = self.ordriv_, self.ordriv_d_
+        ordriv_ = self.ordriv_
         power_list, power_list_d, n_basis = self.compute_cross_orders(
-            ordriv_, ordriv_d_, self.cross_term_driver)
+            ordriv_, self.cross_term_driver)
 
         # -------- memorize in alpha the various transforms
         alpha = np.eye(n_basis)
@@ -268,15 +262,8 @@ class BaseDAR(object):
         basis = np.zeros((n_basis, n_epochs * n_points))
         basis[0] = 1.0
 
-        # -------- create derivative if sigdriv_imag is not given
-        if ordriv_d_ > 0:
-            if sigdriv_imag is None:
-                sigdriv_d = np.copy(sigdriv)
-                sigdriv_d -= np.roll(sigdriv, shift=1, axis=1)
-                sigdriv_d[:, 0] = sigdriv_d[:, 1]
-                sigdriv_d *= sigdriv.std() / sigdriv_d.std()
-            else:
-                sigdriv_d = np.atleast_2d(sigdriv_imag)
+        if self.ordriv > 0:
+            sigdriv_d = np.atleast_2d(sigdriv_imag)
 
         # -------- create successive components
         for k, (power, power_d) in enumerate(zip(power_list, power_list_d)):
@@ -328,8 +315,6 @@ class BaseDAR(object):
             raise ValueError('self.ordar is zero or negative')
         if self.ordriv_ < 0:
             raise ValueError('self.ordriv is negative')
-        if self.ordriv_d_ < 0:
-            raise ValueError('self.ordriv_d is negative')
         if self.basis_ is None:
             raise ValueError('basis does not yet exist')
 
@@ -398,13 +383,17 @@ class BaseDAR(object):
         if name:
             title += self.__class__.__name__
 
-        ordar_ = self.ordar_
-        ordriv_ = self.ordriv_
-        ordriv_d_ = self.ordriv_d_
-        if ordriv_d_ > 0:
-            title += '(%d, %d+%d)' % (ordar_, ordriv_, ordriv_d_)
-        else:
-            title += '(%d, %d)' % (ordar_, ordriv_)
+        ordar = self.ordar_
+        ordriv = self.ordriv_
+
+        title += '(%d, %d' % (ordar, ordriv)
+
+        if ordriv > 0:
+            title += '+%d' % (ordriv, )
+        if self.cross_term_driver:
+            title += '+%d' % (self.n_basis - ordriv - ordriv - 1, )
+
+        title += ')'
 
         if criterion is not None:
             title += '_%s=%.4f' % (criterion, self.get_criterion(criterion))
@@ -470,13 +459,12 @@ class BaseDAR(object):
         self.G_ = np.ndarray(0)
         ordar = self.ordar
         ordriv = self.ordriv
-        ordriv_d = self.ordriv_d
 
         best_criterion = {'aic': np.inf, 'bic': np.inf, '-logl': np.inf}
 
-        logl = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
-        aic = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
-        bic = np.empty((ordar + 1, ordriv + 1, ordriv_d + 1))
+        logl = np.empty((ordar + 1, ordriv + 1))
+        aic = np.empty((ordar + 1, ordriv + 1))
+        bic = np.empty((ordar + 1, ordriv + 1))
 
         # backward compatibility
         if not isinstance(criterion, str) and criterion:
@@ -489,46 +477,41 @@ class BaseDAR(object):
             bar = ProgressBar(title='%s' % self.__class__.__name__,
                               max_value=logl.size)
             bar_k = 0
-        for ordriv_d_ in range(ordriv_d + 1):
-            for ordriv_ in range(ordriv + 1):
-                A = self.copy()
-                # A.ordriv = ordriv_
-                A.ordriv_ = ordriv_
-                # A.ordriv_d = ordriv_d_
-                A.ordriv_d_ = ordriv_d_
-                A.make_basis()
+        for ordriv_ in range(ordriv + 1):
+            A = self.copy()
+            A.ordriv_ = ordriv_
+            A.make_basis()
 
-                # -------- estimate the best AR order for this value of ordriv
-                for AR_ in A.next_model():
-                    ordar_ = AR_.shape[0]
-                    A.AR_ = AR_
-                    A.ordar_ = ordar_
-                    if self.progress_bar:
-                        title = A.get_title(name=True)
-                        bar_k += 1
-                        bar.update(bar_k, title=title)
+            # -------- estimate the best AR order for this value of ordriv
+            for AR_ in A.next_model():
+                ordar_ = AR_.shape[0]
+                A.AR_ = AR_
+                A.ordar_ = ordar_
+                if self.progress_bar:
+                    title = A.get_title(name=True)
+                    bar_k += 1
+                    bar.update(bar_k, title=title)
 
-                    # compute the residual on training data to fit the gain
-                    A.estimate_error(train=True)
-                    A.estimate_gain()
+                # compute the residual on training data to fit the gain
+                A.estimate_error(train=True)
+                A.estimate_gain()
 
-                    # compute the residual on testing data to compute
-                    # the likelihood
-                    A.estimate_error(train=False)
-                    A.reset_criterions()
-                    this_criterion = A.compute_criterions()
-                    logl[ordar_, ordriv_, ordriv_d_] = this_criterion['logl']
-                    aic[ordar_, ordriv_, ordriv_d_] = this_criterion['aic']
-                    bic[ordar_, ordriv_, ordriv_d_] = this_criterion['bic']
+                # compute the residual on testing data to compute
+                # the likelihood
+                A.estimate_error(train=False)
+                A.reset_criterions()
+                this_criterion = A.compute_criterions()
+                logl[ordar_, ordriv_] = this_criterion['logl']
+                aic[ordar_, ordriv_] = this_criterion['aic']
+                bic[ordar_, ordriv_] = this_criterion['bic']
 
-                    # -------- actualize the best model
-                    if this_criterion[criterion] < best_criterion[criterion]:
-                        best_criterion = this_criterion
-                        self.ordar_ = ordar_
-                        self.ordriv_ = ordriv_
-                        self.ordriv_d_ = ordriv_d_
-                        self.AR_ = np.copy(AR_)
-                        self.G_ = np.copy(A.G_)
+                # -------- actualize the best model
+                if this_criterion[criterion] < best_criterion[criterion]:
+                    best_criterion = this_criterion
+                    self.ordar_ = ordar_
+                    self.ordriv_ = ordriv_
+                    self.AR_ = np.copy(AR_)
+                    self.G_ = np.copy(A.G_)
 
         # store all criterions
         self.model_selection_criterions_ = \
@@ -536,7 +519,7 @@ class BaseDAR(object):
              'tmax': best_criterion['tmax']}
         self.criterions_ = best_criterion
 
-        # recompute the basis with ordriv_ and ordriv_d_
+        # recompute the basis with ordriv_
         self.make_basis()
 
     def estimate_gain(self, regul=0.01):
@@ -887,7 +870,7 @@ class BaseDAR(object):
         if xlim is None:
             xlim = self.get_sigdriv_bounds()
 
-        if self.ordriv_d > 0 or False:
+        if self.ordriv_ > 0:
             # full oscillation for derivative
             phase = np.linspace(0, 2 * np.pi, nbcols, endpoint=False)
             sigdriv = xlim[1] * np.cos(phase)
@@ -900,17 +883,28 @@ class BaseDAR(object):
 
         return xlim, sigdriv, sigdriv_imag
 
-    def get_sigdriv_bounds(self, sigdriv=None):
+    def get_sigdriv_bounds(self, sigdriv=None, sigdriv_imag=None):
         if self.use_driver_phase:
             bounds = [-1, 1]
 
         else:
             if sigdriv is None:
                 sigdriv = self.sigdriv
+            if sigdriv_imag is None:
+                sigdriv_imag = self.sigdriv_imag
+
             if self.train_mask is not None:
-                sigdriv = sigdriv[~self.train_mask]
-            bounds = np.percentile(sigdriv, [5, 95])
-        bound_min = min(-bounds[0], bounds[1])
+                sigdriv = sigdriv[self.train_mask != 0]
+                if sigdriv_imag is not None:
+                    sigdriv_imag = sigdriv_imag[self.train_mask != 0]
+
+            if sigdriv_imag is None:
+                bounds = np.percentile(sigdriv, [5, 95])
+                bound_min = min(-bounds[0], bounds[1])
+            else:
+                squared_abs = sigdriv ** 2 + sigdriv_imag ** 2
+                bound_min = np.sqrt(np.percentile(squared_abs, [95]))
+
         bounds = (-bound_min, bound_min)
         return bounds
 
