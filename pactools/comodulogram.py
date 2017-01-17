@@ -691,7 +691,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     if not multiple_masks:
         mask = [mask]
 
-    extract_complex = model.ordriv_d > 0
+    extract_complex = True
 
     comod_list = None
     if progress_bar:

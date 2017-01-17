@@ -65,11 +65,11 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     for i, i_amplitude in enumerate(ploted_amplitudes[::-1]):
 
         # build label
-        # if sigdriv_imag is not None:
-        #     str_x_imag = r' \bar{x}=%.2f' % sigdriv_imag[i_amplitude]
-        # else:
-        str_x_imag = ''
-        label = r'$x=%.2f%s$' % (sigdriv[i_amplitude], str_x_imag)
+        if sigdriv_imag is not None:
+            sig_complex = sigdriv[i_amplitude] + 1j * sigdriv_imag[i_amplitude]
+            label = r'$\phi_x=%s$' % phase_string(sig_complex)
+        else:
+            label = r'$x=%.2f$' % sigdriv_imag[i_amplitude]
 
         ax.plot(frequencies, spec[:, i_amplitude], label=label)
 
@@ -102,3 +102,16 @@ def plot_dar_lines(model, title='', frange=None, mode='',
     ax.grid('on')
 
     return fig
+
+
+def phase_string(sig_complex):
+    """Take the angle and create a string as \pi if close to some \pi values"""
+    angle = np.angle(sig_complex)
+    pi_multiples = np.pi * np.arange(-1, 1.25, 0.25)
+    strings = ['-\pi', '-3\pi/4', '-\pi/2', '-\pi/4', '0',
+               '\pi/4', '\pi/2', '3\pi/4', '\pi']
+
+    if np.min(np.abs(angle - pi_multiples)) < 1e-3:
+        return strings[np.argmin(np.abs(angle - pi_multiples))]
+    else:
+        return '%.2f' % angle
