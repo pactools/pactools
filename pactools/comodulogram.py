@@ -20,6 +20,9 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth,
                        n_cycles=None, filter_method='carrier'):
     """
     Band-pass filter the signal at multiple frequencies
+    Return
+    ------
+    shape (n_frequencies, n_epochs, n_points)
     """
     fixed_n_cycles = n_cycles
 

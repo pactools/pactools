@@ -462,9 +462,9 @@ class BaseDAR(object):
 
         best_criterion = {'aic': np.inf, 'bic': np.inf, '-logl': np.inf}
 
-        logl = np.empty((ordar + 1, ordriv + 1))
-        aic = np.empty((ordar + 1, ordriv + 1))
-        bic = np.empty((ordar + 1, ordriv + 1))
+        logl = np.zeros((ordar + 1, ordriv + 1))
+        aic = np.zeros((ordar + 1, ordriv + 1))
+        bic = np.zeros((ordar + 1, ordriv + 1))
 
         # backward compatibility
         if not isinstance(criterion, str) and criterion:
