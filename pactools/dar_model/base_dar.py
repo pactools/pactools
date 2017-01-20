@@ -104,7 +104,6 @@ class BaseDAR(object):
 
             # if test_mask is None, we use train_mask
             if test_mask is None:
-                test_mask = train_mask
                 both_masks = train_mask
             else:
                 both_masks = np.logical_and(test_mask, train_mask)
@@ -169,14 +168,14 @@ class BaseDAR(object):
         if self.criterion:
             # -------- select the best order
             self.order_selection(self.criterion)
-            self.estimate_error()
+            self.estimate_error(recompute=True)
             self.estimate_gain()
 
         else:
             # -------- estimate a single model
             self.make_basis()
             self.estimate_ar()
-            self.estimate_error()
+            self.estimate_error(recompute=self.test_mask is not None)
             self.estimate_gain()
         return self
 
@@ -492,13 +491,8 @@ class BaseDAR(object):
                     bar_k += 1
                     bar.update(bar_k, title=title)
 
-                # compute the residual on training data to fit the gain
-                model.estimate_error(train=True)
+                model.estimate_error(recompute=self.test_mask is not None)
                 model.estimate_gain()
-
-                # compute the residual on testing data to compute
-                # the likelihood
-                model.estimate_error(train=False)
                 model.reset_criterions()
                 this_criterion = model.compute_criterions()
                 logl[model.ordar_, model.ordriv_] = this_criterion['logl']
@@ -542,7 +536,7 @@ class BaseDAR(object):
         uses self.residual_.
         """
         # -------- get the training data
-        train_mask, residual = self.get_train_data(self.residual_)
+        _, residual = self.get_train_data(self.residual_)
         # -------- crop the ordar first values
         residual = residual[:, self.ordar_:]
 
@@ -570,25 +564,16 @@ class BaseDAR(object):
         eps_gain   : stop iteration when corrections get smaller than eps_gain
         regul     : regularization factor (for inversion of the Hessian)
         """
-        # -------- estimate the gain (self.G_) given the following data
-        # self.ordriv_   : order of the regression of the parameters
-        # self.residual_ : residual signal (from ordar to n_points)
-        # self.basis_    : basis of functions (build from sigdriv)
-
-        # -------- compute these intermediate quantities
-        # resreg    : regression residual (residual * basis)
-        # residual  : copy of self.residual_
-        # residual2 : squared residual
-
         iter_gain = self.iter_gain
         eps_gain = self.eps_gain
         ordar_ = self.ordar_
 
         # -------- get the training data
-        train_mask, basis = self.get_train_data(self.basis_)
+        _, basis = self.get_train_data(self.basis_)
+        train_mask, residual = self.get_train_data(self.residual_)
         train_selection = ~train_mask if train_mask is not None else None
 
-        residual = self.residual_ + EPSILON
+        residual += EPSILON
 
         # -------- crop the ordar first values
         residual = residual[:, ordar_:]
@@ -704,7 +689,7 @@ class BaseDAR(object):
         self.basis_ = self.make_basis(sigdriv=sigdriv,
                                       sigdriv_imag=sigdriv_imag)
 
-        self.estimate_error(train=True, recompute=True)
+        self.estimate_error(recompute=True)
         return self.residual_
 
     def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
@@ -726,11 +711,12 @@ class BaseDAR(object):
         """
         # -------- get the left-out data
         test_mask, basis = self.get_test_data(self.basis_)
+        test_mask, residual = self.get_test_data(self.residual_)
 
         # skip first samples
         if test_mask is not None:
             test_mask = test_mask[:, skip:]
-        residual = self.residual_[:, skip:]
+        residual = residual[:, skip:]
 
         # -------- estimate the gain
         gain2 = self.develop_gain(basis[:, :, skip:], squared=True) + EPSILON
@@ -791,7 +777,7 @@ class BaseDAR(object):
         pass
 
     @abstractmethod
-    def estimate_error(self, train=True, recompute=False):
+    def estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_

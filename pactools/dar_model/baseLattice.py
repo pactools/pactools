@@ -150,7 +150,7 @@ class BaseLattice(BaseDAR):
         f_residual[:, 1:] += parcor_list[:, 1:] * delayed
         return f_residual, b_residual
 
-    def whiten(self, train=True):
+    def whiten(self):
         """Apply the direct lattice filter to whiten the original signal
 
         returns:
@@ -158,14 +158,9 @@ class BaseLattice(BaseDAR):
         backward : array containing the backward residual (whitened) signal
 
         """
-        if train:
-            # -------- get training data
-            _, sigin = self.get_train_data(self.sigin)
-            _, basis = self.get_train_data(self.basis_)
-        else:
-            # -------- get left-out data
-            _, sigin = self.get_test_data(self.sigin)
-            _, basis = self.get_test_data(self.basis_)
+        # compute the error on both the train and test part
+        sigin = self.sigin
+        basis = self.basis_
 
         # -------- select ordar (prefered: ordar_)
         ordar = self.ordar_
@@ -398,16 +393,12 @@ class BaseLattice(BaseDAR):
             AR_ = np.vstack((AR_, np.reshape(LAR, (1, n_basis))))
             yield AR_
 
-    def estimate_error(self, train=True, recompute=False):
+    def estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_
 
         """
-        if not train:
-            # compute the prediction error of the testing data
-            recompute = True
-
         if not recompute:
             # if residual are stored, simply return the right one
             try:
@@ -417,7 +408,7 @@ class BaseLattice(BaseDAR):
                 recompute = True
 
         if recompute:
-            self.residual_, _ = self.whiten(train=train)
+            self.residual_, _ = self.whiten()
 
     def develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
