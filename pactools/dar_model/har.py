@@ -102,12 +102,12 @@ class HAR(BaseDAR):
 
         """
         n_basis, n_epochs, n_points = basis.shape
-        ordar = self.ordar_
+        ordar_ = self.ordar_
 
         # -------- duplicate the AR part
-        this_AR = np.empty(ordar + 1)
+        this_AR = np.empty(ordar_ + 1)
         this_AR[0] = 1.0
-        if ordar > 0:
+        if ordar_ > 0:
             this_AR[1:] = self.AR_[:, 0]
         AR_cols = this_AR[:, None, None] * np.ones((1, n_epochs, n_points))
 

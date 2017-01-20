@@ -1,7 +1,6 @@
 from __future__ import print_function
 from abc import ABCMeta, abstractmethod
 import warnings
-import sys
 
 import numpy as np
 from scipy import linalg
@@ -78,8 +77,6 @@ class BaseDAR(object):
 
         # prepare other arrays
         self.basis_ = None
-        self.ordar_ = ordar
-        self.ordriv_ = ordriv
 
     def check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_mask,
                          test_mask):
@@ -96,7 +93,7 @@ class BaseDAR(object):
         if self.use_driver_phase:
             phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
             sigdriv = np.cos(phase)
-            if self.ordriv_ > 0:
+            if self.ordriv > 0:
                 sigdriv_imag = np.sin(phase)
 
         test_mask = check_array(test_mask, dtype='bool', accept_none=True)
@@ -255,9 +252,9 @@ class BaseDAR(object):
             ortho, normalize = False, False
 
         n_epochs, n_points = sigdriv.shape
-        ordriv_ = self.ordriv_
+        ordriv = self.ordriv
         power_list, power_list_d, n_basis = self.compute_cross_orders(
-            ordriv_, self.cross_term_driver)
+            ordriv, self.cross_term_driver)
 
         # -------- memorize in alpha the various transforms
         alpha = np.eye(n_basis)
@@ -312,12 +309,11 @@ class BaseDAR(object):
         uses self.sigin, self.sigdriv and self.basis_ (which must be
         computed with make_basis before calling estimate_ar)
         self.ordar defines the order
-        self.ordar_ receives this value after estimation
         """
         # -------- verify all parameters for the estimator
         if self.ordar < 1:
             raise ValueError('self.ordar is zero or negative')
-        if self.ordriv_ < 0:
+        if self.ordriv < 0:
             raise ValueError('self.ordriv is negative')
         if self.basis_ is None:
             raise ValueError('basis does not yet exist')
@@ -327,7 +323,6 @@ class BaseDAR(object):
             bar = ProgressBar(title=self.get_title(name=True))
         for AR_ in self.last_model():
             self.AR_ = AR_
-            self.ordar_ = AR_.shape[0]
             if self.progress_bar:
                 bar.update(
                     float(self.ordar_) / self.ordar,
@@ -388,22 +383,19 @@ class BaseDAR(object):
         if name:
             title += self.__class__.__name__
 
-        ordar = self.ordar_
-        ordriv = self.ordriv_
+        if hasattr(self, 'AR_'):
+            ordar_ = self.ordar_
+            ordriv_ = self.ordriv_
+            title += '(%d, %d)' % (ordar_, ordriv_)
 
-        title += '(%d, %d' % (ordar, ordriv)
-
-        # if ordriv > 0:
-        #     title += '+%d' % (ordriv, )
-        #
-        # n_cross_term = self.n_basis - ordriv - ordriv - 1
-        # if self.cross_term_driver and n_cross_term > 0:
-        #     title += '+%d' % (n_cross_term, )
-
-        title += ')'
-
-        if criterion is not None:
-            title += '_%s=%.4f' % (criterion, self.get_criterion(criterion))
+            if criterion is not None:
+                title += '_%s=%.4f' % (criterion,
+                                       self.get_criterion(criterion))
+        else:
+            # non fitted model
+            ordar = self.ordar
+            ordriv = self.ordriv
+            title += '(%d, %d)' % (ordar, ordriv)
 
         return title
 
@@ -463,7 +455,6 @@ class BaseDAR(object):
         log likelihood.
 
         Attributes ordar and ordriv define the maximum values.
-        This function saves the optimal values as ordar_ and ordriv_
         """
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
@@ -488,41 +479,37 @@ class BaseDAR(object):
             bar = ProgressBar(title='%s' % self.__class__.__name__,
                               max_value=logl.size)
             bar_k = 0
-        for ordriv_ in range(ordriv + 1):
-            A = self.copy()
-            A.ordriv_ = ordriv_
-            A.make_basis()
+        for ordriv in range(ordriv + 1):
+            model = self.copy()
+            model.ordriv = ordriv
+            model.make_basis()
 
             # -------- estimate the best AR order for this value of ordriv
-            for AR_ in A.next_model():
-                ordar_ = AR_.shape[0]
-                A.AR_ = AR_
-                A.ordar_ = ordar_
+            for AR_ in model.next_model():
+                model.AR_ = AR_
                 if self.progress_bar:
-                    title = A.get_title(name=True)
+                    title = model.get_title(name=True)
                     bar_k += 1
                     bar.update(bar_k, title=title)
 
                 # compute the residual on training data to fit the gain
-                A.estimate_error(train=True)
-                A.estimate_gain()
+                model.estimate_error(train=True)
+                model.estimate_gain()
 
                 # compute the residual on testing data to compute
                 # the likelihood
-                A.estimate_error(train=False)
-                A.reset_criterions()
-                this_criterion = A.compute_criterions()
-                logl[ordar_, ordriv_] = this_criterion['logl']
-                aic[ordar_, ordriv_] = this_criterion['aic']
-                bic[ordar_, ordriv_] = this_criterion['bic']
+                model.estimate_error(train=False)
+                model.reset_criterions()
+                this_criterion = model.compute_criterions()
+                logl[model.ordar_, model.ordriv_] = this_criterion['logl']
+                aic[model.ordar_, model.ordriv_] = this_criterion['aic']
+                bic[model.ordar_, model.ordriv_] = this_criterion['bic']
 
                 # -------- actualize the best model
                 if this_criterion[criterion] < best_criterion[criterion]:
                     best_criterion = this_criterion
-                    self.ordar_ = ordar_
-                    self.ordriv_ = ordriv_
-                    self.AR_ = np.copy(AR_)
-                    self.G_ = np.copy(A.G_)
+                    self.AR_ = np.copy(model.AR_)
+                    self.G_ = np.copy(model.G_)
 
         # store all criterions
         self.model_selection_criterions_ = \
@@ -532,6 +519,22 @@ class BaseDAR(object):
 
         # recompute the basis with ordriv_
         self.make_basis()
+
+    @property
+    def ordar_(self):
+        AR_ = getattr(self, 'AR_', None)
+        if AR_ is None:
+            raise NotFittedError('%s is not fitted.' % self)
+        else:
+            return self.AR_.shape[0]
+
+    @property
+    def ordriv_(self):
+        AR_ = getattr(self, 'AR_', None)
+        if AR_ is None:
+            raise NotFittedError('%s is not fitted.' % self)
+        else:
+            return self.AR_.shape[1]
 
     def estimate_fixed_gain(self):
         """Estimates a fixed gain from the predicton error
@@ -579,7 +582,7 @@ class BaseDAR(object):
 
         iter_gain = self.iter_gain
         eps_gain = self.eps_gain
-        ordar = self.ordar_
+        ordar_ = self.ordar_
 
         # -------- get the training data
         train_mask, basis = self.get_train_data(self.basis_)
@@ -588,10 +591,10 @@ class BaseDAR(object):
         residual = self.residual_ + EPSILON
 
         # -------- crop the ordar first values
-        residual = residual[:, ordar:]
-        basis = basis[:, :, ordar:]
+        residual = residual[:, ordar_:]
+        basis = basis[:, :, ordar_:]
         if train_selection is not None:
-            train_selection = train_selection[:, ordar:]
+            train_selection = train_selection[:, ordar_:]
 
         # concatenate the epochs since it does not change the computations
         # as in estimating the AR coefficients
@@ -752,14 +755,12 @@ class BaseDAR(object):
         pvalue : the p-value for the test (1-F(chi2(ratio)))
         """
         # -------- verify that the models have been fitted
-        if not hasattr(self, 'ordar_'):
-            raise ValueError('model was not fit before LR test.')
-        if not hasattr(ar0, 'ordar_'):
-            raise ValueError('ar0 was not fit before LR test.')
+        ordar_1 = self.ordar_
+        ordar_0 = ar0.ordar_
 
         # -------- compute the log likelihood for the models
-        logL1, _ = self.log_likelihood(skip=self.ordar_)
-        logL0, _ = ar0.log_likelihood(skip=ar0.ordar_)
+        logL1, _ = self.log_likelihood(skip=ordar_1)
+        logL0, _ = ar0.log_likelihood(skip=ordar_0)
 
         # -------- compute the log likelihood ratio
         test = 2.0 * (logL1 - logL0)
@@ -786,7 +787,6 @@ class BaseDAR(object):
         Typical usage:
         for AR_ in A.next_model():
             A.AR_ = AR_
-            A.ordar_ = AR_.shape[0]
         """
         pass
 
@@ -844,7 +844,7 @@ class BaseDAR(object):
         plot_drive_freq
         """
         # -------- distinguish estimated or target model
-        ordar = self.ordar_
+        ordar_ = self.ordar_
 
         # -------- Compute the AR models and gains for every instant of sigdriv
         if sigdriv is None:
@@ -861,10 +861,10 @@ class BaseDAR(object):
 
         # -------- estimate AR spectrum
         nfft = 256
-        while nfft < (ordar + 1):
+        while nfft < (ordar_ + 1):
             nfft *= 2
 
-        if ordar > 0:
+        if ordar_ > 0:
             AR_cols = AR_cols / (G_cols + EPSILON)
             AR_spec = np.fft.rfft(AR_cols, n=nfft, axis=0)
         else:
@@ -1005,6 +1005,10 @@ def wgn_log_likelihood(eps, sigma2, mask=None):
     logL *= -0.5
 
     return logL
+
+
+class NotFittedError(ValueError, AttributeError):
+    """Exception class to raise if estimator is used before fitting."""
 
 
 def check_array(sig, dtype='float64', accept_none=False):

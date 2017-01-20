@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.interpolate import interp1d, interp2d
 
-from .dar_model import DAR, StableDAR
+from .dar_model.base_dar import BaseDAR
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
@@ -572,7 +572,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
             if progress_bar:
                 progress_bar.update_with_increment_value(1)
 
-    elif isinstance(method, (StableDAR, DAR)):
+    elif isinstance(method, BaseDAR):
         comod_list = driven_comodulogram(fs=fs, low_sig=low_sig,
                                          high_sig=high_sig,
                                          mask=mask, model=method,

@@ -16,16 +16,6 @@ class BaseLattice(BaseDAR):
 
         iter_newton : maximum number of Newton-Raphson iterations
         eps_newton  : threshold to stop Newton-Raphson iterations
-
-        Other parameters for base AR (super class) are:
-
-        ordar     : order of the autoregressive model
-        ordriv    : order of the taylor expansion
-        bic       : select order through BIC [boolean]
-        normalize : normalize basis (to unit energy) [boolean]
-        ortho     : orthogonalize basis [boolean]
-        center    : subtract mean from signal [boolean]
-        fmax      : highest frequency to plot
         """
         super(BaseLattice, self).__init__(**kwargs)
         self.iter_newton = iter_newton

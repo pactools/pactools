@@ -50,29 +50,31 @@ class DAR(BaseDAR):
         AR_ = np.empty((0, m))
         yield AR_
 
-        # -------- prepare regression signals
-        sigreg = np.empty((K * m, n_epochs, n_points - K))
-        for k in range(K):
-            sigreg[k * m:(k + 1) * m, :, :] = (
-                masked_basis[:, :, K:] * sigin[:, K - 1 - k:n_points - 1 - k])
+        if K > 0:
+            # -------- prepare regression signals
+            sigreg = np.empty((K * m, n_epochs, n_points - K))
+            for k in range(K):
+                sigreg[k * m:(k + 1) * m, :, :] = (
+                    masked_basis[:, :, K:] *
+                    sigin[:, K - 1 - k:n_points - 1 - k])
 
-        # -------- prepare auto/inter correlations
-        scale = 1.0 / n_points
-        R = scale * np.dot(sigreg.reshape(K * m, -1),
-                           sigreg.reshape(K * m, -1).T)
-        r = scale * np.dot(masked_sigin[:, K:].reshape(1, -1),
-                           sigreg.reshape(K * m, -1).T)
+            # -------- prepare auto/inter correlations
+            scale = 1.0 / n_points
+            R = scale * np.dot(sigreg.reshape(K * m, -1),
+                               sigreg.reshape(K * m, -1).T)
+            r = scale * np.dot(masked_sigin[:, K:].reshape(1, -1),
+                               sigreg.reshape(K * m, -1).T)
 
-        # -------- loop on successive orders
-        range_iter = [K - 1, ] if only_last else range(K)
-        for k in range_iter:
-            km = k * m
-            km_m = km + m
+            # -------- loop on successive orders
+            range_iter = [K - 1, ] if only_last else range(K)
+            for k in range_iter:
+                km = k * m
+                km_m = km + m
 
-            AR_ = -np.linalg.solve(R[0:km_m, 0:km_m], r[:1, 0:km_m].T)
+                AR_ = -np.linalg.solve(R[0:km_m, 0:km_m], r[:1, 0:km_m].T)
 
-            AR_ = np.reshape(AR_, (k + 1, m))
-            yield AR_
+                AR_ = np.reshape(AR_, (k + 1, m))
+                yield AR_
 
     def estimate_error(self, train=True, recompute=False):
         """Estimates the prediction error
@@ -106,16 +108,16 @@ class DAR(BaseDAR):
         ARcols : array containing the AR parts
         Gcols  : array containing the gains
 
-        The size of ARcols is (1 + ordar, n_epochs, n_points)
+        The size of ARcols is (1 + ordar_, n_epochs, n_points)
         The size of Gcols is (1, n_epochs, n_points)
 
         """
         n_basis, n_epochs, n_points = basis.shape
-        ordar = self.ordar_
+        ordar_ = self.ordar_
 
         # -------- expand on the basis
         AR_cols_ones = np.ones((1, n_epochs, n_points))
-        if ordar > 0:
+        if ordar_ > 0:
             AR_cols = np.tensordot(self.AR_, basis, axes=([1], [0]))
             AR_cols = np.vstack((AR_cols_ones, AR_cols))
         else:
