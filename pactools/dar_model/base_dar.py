@@ -369,6 +369,8 @@ class BaseDAR(object):
 
     def get_test_data(self, sig):
         test_mask = self.test_mask
+        if test_mask is None:
+            test_mask = self.train_mask
         test_mask, sig = self.remove_far_masked_data(test_mask,
                                                      [test_mask, sig])
 
@@ -398,21 +400,21 @@ class BaseDAR(object):
 
         return title
 
-    def get_criterion(self, criterion):
+    def get_criterion(self, criterion, train=False):
         criterion = criterion.lower()
         try:
-            value = self.compute_criterions()[criterion]
+            value = self.compute_criterions(train=train)[criterion]
         except:
             raise KeyError('Wrong criterion: %s' % criterion)
         return value
 
-    def compute_criterions(self):
+    def compute_criterions(self, train=False):
         criterions = getattr(self, 'criterions_', None)
         if criterions is not None:
             return criterions
 
         # else compute the criterions base on the log likelihood
-        logl, tmax = self.log_likelihood(skip=self.ordar_)
+        logl, tmax = self.log_likelihood(train=train, skip=self.ordar_)
         degrees = self.degrees_of_freedom()
 
         # Akaike Information Criterion
@@ -703,26 +705,30 @@ class BaseDAR(object):
             G_cols = np.exp(G_cols)
         return G_cols
 
-    def log_likelihood(self, skip=0):
+    def log_likelihood(self, train=False, skip=0):
         """Approximate computation of the logarithm of the likelihood
         the computation uses self.residual_, self.basis_ and self.G_
 
         skip : how many initial samples to skip
         """
-        # -------- get the left-out data
-        test_mask, basis = self.get_test_data(self.basis_)
-        test_mask, residual = self.get_test_data(self.residual_)
+        if train:
+            mask, basis = self.get_train_data(self.basis_)
+            mask, residual = self.get_train_data(self.residual_)
+        else:
+            mask, basis = self.get_test_data(self.basis_)
+            mask, residual = self.get_test_data(self.residual_)
 
         # skip first samples
-        if test_mask is not None:
-            test_mask = test_mask[:, skip:]
+        if mask is not None:
+            mask = mask[:, skip:]
         residual = residual[:, skip:]
 
         # -------- estimate the gain
-        gain2 = self.develop_gain(basis[:, :, skip:], squared=True) + EPSILON
+        gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
+        gain2 += EPSILON
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(residual, gain2, test_mask)
+        logL = wgn_log_likelihood(residual, gain2, mask)
 
         tmax = gain2.size
 
