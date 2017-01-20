@@ -12,17 +12,16 @@ from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
 from ..utils.spectrum import phase_amplitude
 
-
 EPSILON = np.finfo(np.float32).eps
 
 
 class BaseDAR(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, ordar=1, ordriv=0, criterion=None,
-                 normalize=True, ortho=True, center=True, iter_gain=10,
-                 eps_gain=1.0e-4, progress_bar=False,
-                 cross_term_driver=True, use_driver_phase=False):
+    def __init__(self, ordar=1, ordriv=0, criterion=None, normalize=True,
+                 ortho=True, center=True, iter_gain=10, eps_gain=1.0e-4,
+                 progress_bar=False, cross_term_driver=True,
+                 use_driver_phase=False):
         """
         Parameters
         ----------
@@ -82,8 +81,8 @@ class BaseDAR(object):
         self.ordar_ = ordar
         self.ordriv_ = ordriv
 
-    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag,
-                         train_mask, test_mask):
+    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_mask,
+                         test_mask):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -131,8 +130,8 @@ class BaseDAR(object):
         self.train_mask = train_mask
         self.test_mask = test_mask
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None,
-            train_mask=None, test_mask=None):
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, train_mask=None,
+            test_mask=None):
         """ Estimate a DAR model from input signals.
 
         Parameters
@@ -161,8 +160,8 @@ class BaseDAR(object):
         self
         """
         self.reset_criterions()
-        self.check_all_arrays(sigin, sigdriv, sigdriv_imag,
-                              train_mask, test_mask)
+        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, train_mask,
+                              test_mask)
         self.fs = fs
 
         # -------- prepare the estimates
@@ -286,14 +285,14 @@ class BaseDAR(object):
             if ortho:
                 # correct current component with corrected components
                 for m in range(k):
-                    alpha[k, m] = - (np.sum(basis[k] * basis[m]) /
-                                     np.sum(basis[m] * basis[m]))
+                    alpha[k, m] = -(np.sum(basis[k] * basis[m]) /
+                                    np.sum(basis[m] * basis[m]))
                 basis[k] += np.dot(alpha[k, :k], basis[:k, :])
                 # recompute the expression over initial components
                 alpha[k, :k] = np.dot(alpha[k, :k], alpha[:k, :k])
             if normalize:
-                scale = np.sqrt(float(n_epochs * n_points) /
-                                squared_norm(basis[k]))
+                scale = np.sqrt(
+                    float(n_epochs * n_points) / squared_norm(basis[k]))
                 basis[k] *= scale
                 alpha[k, :k + 1] *= scale
 
@@ -330,8 +329,9 @@ class BaseDAR(object):
             self.AR_ = AR_
             self.ordar_ = AR_.shape[0]
             if self.progress_bar:
-                bar.update(float(self.ordar_) / self.ordar,
-                           title=self.get_title(name=True))
+                bar.update(
+                    float(self.ordar_) / self.ordar,
+                    title=self.get_title(name=True))
 
     def remove_far_masked_data(self, mask, list_signals):
         """Remove unnecessary data which is masked
@@ -368,15 +368,15 @@ class BaseDAR(object):
 
     def get_train_data(self, sig):
         train_mask = self.train_mask
-        train_mask, sig = self.remove_far_masked_data(
-            train_mask, [train_mask, sig])
+        train_mask, sig = self.remove_far_masked_data(train_mask,
+                                                      [train_mask, sig])
 
         return train_mask, sig
 
     def get_test_data(self, sig):
         test_mask = self.test_mask
-        test_mask, sig = self.remove_far_masked_data(
-            test_mask, [test_mask, sig])
+        test_mask, sig = self.remove_far_masked_data(test_mask,
+                                                     [test_mask, sig])
 
         return test_mask, sig
 
@@ -393,10 +393,12 @@ class BaseDAR(object):
 
         title += '(%d, %d' % (ordar, ordriv)
 
-        if ordriv > 0:
-            title += '+%d' % (ordriv, )
-        if self.cross_term_driver:
-            title += '+%d' % (self.n_basis - ordriv - ordriv - 1, )
+        # if ordriv > 0:
+        #     title += '+%d' % (ordriv, )
+        #
+        # n_cross_term = self.n_basis - ordriv - ordriv - 1
+        # if self.cross_term_driver and n_cross_term > 0:
+        #     title += '+%d' % (n_cross_term, )
 
         title += ')'
 
@@ -430,9 +432,13 @@ class BaseDAR(object):
         eta_bic = np.log(tmax)
         bic = -2.0 * logl + eta_bic * degrees
 
-        self.criterions_ = {'aic': aic / tmax, 'bic': bic / tmax,
-                            'logl': logl / tmax, '-logl': -logl / tmax,
-                            'tmax': tmax}
+        self.criterions_ = {
+            'aic': aic / tmax,
+            'bic': bic / tmax,
+            'logl': logl / tmax,
+            '-logl': -logl / tmax,
+            'tmax': tmax
+        }
 
         return self.criterions_
 
@@ -535,7 +541,7 @@ class BaseDAR(object):
         # -------- get the training data
         train_mask, residual = self.get_train_data(self.residual_)
         # -------- crop the ordar first values
-        residual = residual[:, self.get_ordar():]
+        residual = residual[:, self.ordar_:]
 
         # -------- estimate an initial (fixed) model of the residual
         self.G_ = np.zeros((1, self.n_basis))
@@ -545,8 +551,7 @@ class BaseDAR(object):
         """helper to handle failure in gain estimation"""
         try:
             self._estimate_gain(regul=regul)
-        except:
-            e = sys.exc_info()[0]
+        except Exception as e:
             msg = 'Gain estimation failed, fixed gain used. Error: %s' % e
             warnings.warn(msg)
             self.estimate_fixed_gain()
@@ -615,9 +620,9 @@ class BaseDAR(object):
         else:
             index = np.arange(n_points, dtype=int)
 
-        nbslices = 3 * self.n_basis        # number of slices
-        lenslice = n_points // nbslices    # length of a slice
-        e = np.zeros(nbslices)             # log energies
+        nbslices = 3 * self.n_basis  # number of slices
+        lenslice = n_points // nbslices  # length of a slice
+        e = np.zeros(nbslices)  # log energies
 
         # -------- prepare least-squares equations
         tmp = lenslice * np.arange(nbslices + 1)
@@ -633,8 +638,7 @@ class BaseDAR(object):
             masked_basis = basis
 
         e = 0.5 * np.log(e)
-        R = np.dot(basis[:, index[kmid]],
-                   masked_basis[:, index[kmid]].T)
+        R = np.dot(basis[:, index[kmid]], masked_basis[:, index[kmid]].T)
         r = np.dot(e, masked_basis[:, index[kmid]].T)
 
         # -------- regularize matrix R
@@ -654,11 +658,10 @@ class BaseDAR(object):
 
         # -------- refine this model (iteratively maximise the likelihood)
         for itnum in range(iter_gain):
-            logsigma = np.dot(self.G_, basis)
-            sigma2 = np.exp(2 * logsigma) + EPSILON
+            sigma2 = self._compute_sigma2(basis)
 
-            train_mask = (~train_selection if train_selection is not None
-                          else None)
+            train_mask = (~train_selection
+                          if train_selection is not None else None)
             loglike[itnum] = wgn_log_likelihood(residual, sigma2, train_mask)
 
             gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
@@ -669,12 +672,19 @@ class BaseDAR(object):
                 iter_gain = itnum + 1
                 break
 
-        logsigma = np.dot(self.G_, basis)
-        sigma2 = np.exp(2 * logsigma) + EPSILON
+        sigma2 = self._compute_sigma2(basis)
+        self.residual_bis_ = residual / np.sqrt(sigma2)
+
+    def _compute_sigma2(self, basis):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            logsigma = np.dot(self.G_, basis)
+            sigma2 = np.exp(2 * logsigma) + EPSILON
+
         if sigma2.max() > 1e5:
             raise RuntimeError('estimate_gain: sigma2.max() = %f' %
                                sigma2.max())
-        self.residual_bis_ = residual / np.sqrt(sigma2)
+        return sigma2
 
     def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
         """Same as fit, but return the residual instead of the model object
@@ -872,8 +882,7 @@ class BaseDAR(object):
             spec = spec[mask, :]
         return spec
 
-    def amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                            xlim=None):
+    def amplitude_frequency(self, nbcols=256, frange=None, mode='', xlim=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -950,7 +959,7 @@ class BaseDAR(object):
         data = self.__dict__
         for k in data.keys():
             if '__' in k or k[0] == '_':
-                del(data[k])
+                del (data[k])
         return data
 
     def copy(self):
