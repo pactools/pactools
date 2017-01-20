@@ -1,5 +1,7 @@
 from __future__ import print_function
 from abc import ABCMeta, abstractmethod
+import warnings
+import sys
 
 import numpy as np
 from scipy import linalg
@@ -9,6 +11,9 @@ from scipy import stats
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
 from ..utils.spectrum import phase_amplitude
+
+
+EPSILON = np.finfo(np.float32).eps
 
 
 class BaseDAR(object):
@@ -522,7 +527,31 @@ class BaseDAR(object):
         # recompute the basis with ordriv_
         self.make_basis()
 
+    def estimate_fixed_gain(self):
+        """Estimates a fixed gain from the predicton error
+
+        uses self.residual_.
+        """
+        # -------- get the training data
+        train_mask, residual = self.get_train_data(self.residual_)
+        # -------- crop the ordar first values
+        residual = residual[:, self.get_ordar():]
+
+        # -------- estimate an initial (fixed) model of the residual
+        self.G_ = np.zeros((1, self.n_basis))
+        self.G_[0, 0] = np.log(np.std(residual))
+
     def estimate_gain(self, regul=0.01):
+        """helper to handle failure in gain estimation"""
+        try:
+            self._estimate_gain(regul=regul)
+        except:
+            e = sys.exc_info()[0]
+            msg = 'Gain estimation failed, fixed gain used. Error: %s' % e
+            warnings.warn(msg)
+            self.estimate_fixed_gain()
+
+    def _estimate_gain(self, regul=0.01):
         """Estimate the gain expressed over the basis by maximizing
         the likelihood, through a Newton-Raphson procedure
 
@@ -551,7 +580,7 @@ class BaseDAR(object):
         train_mask, basis = self.get_train_data(self.basis_)
         train_selection = ~train_mask if train_mask is not None else None
 
-        residual = self.residual_
+        residual = self.residual_ + EPSILON
 
         # -------- crop the ordar first values
         residual = residual[:, ordar:]
@@ -626,7 +655,7 @@ class BaseDAR(object):
         # -------- refine this model (iteratively maximise the likelihood)
         for itnum in range(iter_gain):
             logsigma = np.dot(self.G_, basis)
-            sigma2 = np.exp(2 * logsigma)
+            sigma2 = np.exp(2 * logsigma) + EPSILON
 
             train_mask = (~train_selection if train_selection is not None
                           else None)
@@ -639,6 +668,12 @@ class BaseDAR(object):
             if np.amax(np.absolute(dG)) < eps_gain:
                 iter_gain = itnum + 1
                 break
+
+        logsigma = np.dot(self.G_, basis)
+        sigma2 = np.exp(2 * logsigma) + EPSILON
+        if sigma2.max() > 1e5:
+            raise RuntimeError('estimate_gain: sigma2.max() = %f' %
+                               sigma2.max())
         self.residual_bis_ = residual / np.sqrt(sigma2)
 
     def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
@@ -685,7 +720,7 @@ class BaseDAR(object):
         residual = self.residual_[:, skip:]
 
         # -------- estimate the gain
-        gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
+        gain2 = self.develop_gain(basis[:, :, skip:], squared=True) + EPSILON
 
         # -------- compute the log likelihood from the residual
         logL = wgn_log_likelihood(residual, gain2, test_mask)
@@ -820,10 +855,10 @@ class BaseDAR(object):
             nfft *= 2
 
         if ordar > 0:
-            AR_cols = AR_cols / G_cols
+            AR_cols = AR_cols / (G_cols + EPSILON)
             AR_spec = np.fft.rfft(AR_cols, n=nfft, axis=0)
         else:
-            Ginv_cols = 1.0 / G_cols
+            Ginv_cols = 1.0 / (G_cols + EPSILON)
             AR_spec = np.fft.rfft(Ginv_cols, n=nfft, axis=0)
 
         # -------- estimate AR spectrum
