@@ -676,18 +676,21 @@ class BaseDAR(object):
                                sigma2.max())
         return sigma2
 
-    def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+    def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
+                      train_mask=None, test_mask=None):
         """Same as fit, but return the residual instead of the model object
         """
         self.fit(sigin=sigin, sigdriv=sigdriv, fs=fs,
-                 sigdriv_imag=sigdriv_imag, mask=mask)
+                 sigdriv_imag=sigdriv_imag, train_mask=train_mask,
+                 test_mask=test_mask)
         return self.residual_
 
-    def transform(self, sigin, sigdriv, fs, sigdriv_imag=None, mask=None):
+    def transform(self, sigin, sigdriv, fs, sigdriv_imag=None, test_mask=None):
         """Whiten a signal with the already fitted model
         """
+        assert fs == self.fs
         self.reset_criterions()
-        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, mask)
+        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
         self.basis_ = self.make_basis(sigdriv=sigdriv,
                                       sigdriv_imag=sigdriv_imag)
 
