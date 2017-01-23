@@ -19,8 +19,7 @@ class BaseDAR(object):
 
     def __init__(self, ordar=1, ordriv=0, criterion=None, normalize=True,
                  ortho=True, center=True, iter_gain=10, eps_gain=1.0e-4,
-                 progress_bar=False, cross_term_driver=True,
-                 use_driver_phase=False):
+                 progress_bar=False, use_driver_phase=False):
         """
         Parameters
         ----------
@@ -48,9 +47,6 @@ class BaseDAR(object):
         eps_gain : float >= 0
             Threshold to stop iterations in gain estimation
 
-        cross_term_driver: boolean
-            If True, the cross terms are used when using two drivers.
-
         use_driver_phase : boolean
             If True, we divide the driver by its instantaneous amplitude.
 
@@ -68,8 +64,7 @@ class BaseDAR(object):
 
         # power of the Taylor expansion
         self.ordriv = ordriv
-        self.cross_term_driver = cross_term_driver
-        self.compute_cross_orders(ordriv, cross_term_driver)
+        self.compute_cross_orders(ordriv)
 
         # left-out system
         self.train_mask = None
@@ -83,26 +78,17 @@ class BaseDAR(object):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
-        check_consistent_shape(sigin, sigdriv)
-
-        # -------- also store the sigdriv imaginary part if present
-        if sigdriv_imag is not None:
-            sigdriv_imag = check_array(sigdriv_imag)
-            check_consistent_shape(sigdriv, sigdriv_imag)
-
-        if self.use_driver_phase:
-            phase, _ = phase_amplitude(sigdriv, phase=True, amplitude=False)
-            sigdriv = np.cos(phase)
-            if self.ordriv > 0:
-                sigdriv_imag = np.sin(phase)
+        sigdriv_imag = check_array(sigdriv_imag)
+        check_consistent_shape(sigin, sigdriv, sigdriv_imag)
+        check_consistent_shape(sigdriv, sigdriv_imag)
 
         test_mask = check_array(test_mask, dtype='bool', accept_none=True)
+        train_mask = check_array(train_mask, dtype='bool', accept_none=True)
 
         if train_mask is not None:
-            train_mask = check_array(train_mask, dtype='bool')
             check_consistent_shape(sigdriv, train_mask)
 
-            # if test_mask is None, we use train_mask
+            # if test_mask is None, we set test_mask = train_mask
             if test_mask is None:
                 both_masks = train_mask
             else:
@@ -110,11 +96,16 @@ class BaseDAR(object):
 
             # we remove far masked data (by both masks)
             train_mask, test_mask, sigin, sigdriv, sigdriv_imag = \
-                self.remove_far_masked_data(
+                self._remove_far_masked_data(
                     both_masks,
                     [train_mask, test_mask, sigin, sigdriv, sigdriv_imag])
 
             check_consistent_shape(sigdriv, train_mask)
+
+        if self.use_driver_phase and self.ordriv > 0:
+            amplitude = np.sqrt(sigdriv ** 2 + sigdriv_imag ** 2)
+            sigdriv = sigdriv / amplitude
+            sigdriv_imag = sigdriv_imag / amplitude
 
         if self.center:
             sigin -= np.mean(sigin)
@@ -167,42 +158,33 @@ class BaseDAR(object):
         # -------- estimation of the model
         if self.criterion:
             # -------- select the best order
-            self.order_selection(self.criterion)
+            self.order_selection()
             self.estimate_error(recompute=True)
             self.estimate_gain()
 
         else:
-            # -------- estimate a single model
-            self.make_basis()
-            self.estimate_ar()
-            self.estimate_error(recompute=self.test_mask is not None)
-            self.estimate_gain()
+            self._fit()
+
         return self
 
-    def compute_cross_orders(self, ordriv, cross_term_driver):
-        power_list, power_list_d = [], []
-        ordriv_d = ordriv
+    def _fit(self):
+        # -------- estimate a single model
+        self.make_basis()
+        self.estimate_ar()
+        self.estimate_error(recompute=self.test_mask is not None)
+        self.estimate_gain()
+
+    def compute_cross_orders(self, ordriv):
+        power_list_re, power_list_im = [], []
 
         # power of the driver
-        for j in np.arange(1, ordriv + 1):
-            power_list.append(j)
-            power_list_d.append(0)
+        for j in np.arange(ordriv + 1):
+            for k in np.arange(j + 1):
+                power_list_re.append(j - k)
+                power_list_im.append(k)
 
-        # power of the derivative of the driver
-        for k in np.arange(1, ordriv_d + 1):
-            power_list.append(0)
-            power_list_d.append(k)
-
-        if cross_term_driver:
-            # cross terms
-            for j in range(1, ordriv):
-                for k in range(1, ordriv_d):
-                    if j + k >= ordriv:
-                        power_list.append(j)
-                        power_list_d.append(k)
-
-        self.n_basis = len(power_list) + 1
-        return power_list, power_list_d, self.n_basis
+        self.n_basis = len(power_list_re)
+        return power_list_re, power_list_im, self.n_basis
 
     def make_basis(self, sigdriv=None, sigdriv_imag=None):
         """Creates a basis from the driving signal, with the successive
@@ -252,31 +234,36 @@ class BaseDAR(object):
 
         n_epochs, n_points = sigdriv.shape
         ordriv = self.ordriv
-        power_list, power_list_d, n_basis = self.compute_cross_orders(
-            ordriv, self.cross_term_driver)
+        if sigdriv_imag is None:
+            power_list_re = np.arange(1, ordriv + 1)
+            power_list_im = np.zeros_like(ordriv)
+            n_basis = ordriv + 1
+        else:
+            power_list_re, power_list_im, n_basis = self.compute_cross_orders(
+                ordriv)
 
         # -------- memorize in alpha the various transforms
         alpha = np.eye(n_basis)
 
         # -------- create the basis
         basis = np.zeros((n_basis, n_epochs * n_points))
-        basis[0] = 1.0
-
-        if self.ordriv > 0:
-            sigdriv_d = np.atleast_2d(sigdriv_imag)
 
         # -------- create successive components
-        for k, (power, power_d) in enumerate(zip(power_list, power_list_d)):
+        for k, (power_real,
+                power_imag) in enumerate(zip(power_list_re, power_list_im)):
             k += 1
-            if power_d > 0 and power == 0:
-                basis[k] = sigdriv_d.ravel() ** power_d
-            elif power_d == 0 and power > 0:
-                basis[k] = sigdriv.ravel() ** power
-            elif power_d > 0 and power > 0:
-                basis[k] = sigdriv_d.ravel() ** power_d
-                basis[k] *= sigdriv.ravel() ** power
+            if power_imag == 0 and power_real == 0:
+                basis[k] = 1.0
+            elif power_imag > 0 and power_real == 0:
+                basis[k] = sigdriv_imag.ravel() ** power_imag
+            elif power_imag == 0 and power_real > 0:
+                basis[k] = sigdriv.ravel() ** power_real
+            elif power_imag > 0 and power_real > 0:
+                basis[k] = sigdriv_imag.ravel() ** power_imag
+                basis[k] *= sigdriv.ravel() ** power_real
             else:
-                raise ValueError('impossible !')
+                raise ValueError('Power cannot be negative : (%s, %s)' %
+                                 (power_real, power_imag))
 
             if ortho:
                 # correct current component with corrected components
@@ -327,7 +314,7 @@ class BaseDAR(object):
                     float(self.ordar_) / self.ordar,
                     title=self.get_title(name=True))
 
-    def remove_far_masked_data(self, mask, list_signals):
+    def _remove_far_masked_data(self, mask, list_signals):
         """Remove unnecessary data which is masked
         and far (> self.ordar) from the unmasked data.
         """
@@ -362,8 +349,8 @@ class BaseDAR(object):
 
     def get_train_data(self, sig):
         train_mask = self.train_mask
-        train_mask, sig = self.remove_far_masked_data(train_mask,
-                                                      [train_mask, sig])
+        train_mask, sig = self._remove_far_masked_data(train_mask,
+                                                       [train_mask, sig])
 
         return train_mask, sig
 
@@ -371,9 +358,6 @@ class BaseDAR(object):
         test_mask = self.test_mask
         if test_mask is None:
             test_mask = self.train_mask
-        test_mask, sig = self.remove_far_masked_data(test_mask,
-                                                     [test_mask, sig])
-
         return test_mask, sig
 
     def degrees_of_freedom(self):
@@ -403,12 +387,12 @@ class BaseDAR(object):
     def get_criterion(self, criterion, train=False):
         criterion = criterion.lower()
         try:
-            value = self.compute_criterions(train=train)[criterion]
+            value = self._compute_criterion(train=train)[criterion]
         except:
             raise KeyError('Wrong criterion: %s' % criterion)
         return value
 
-    def compute_criterions(self, train=False):
+    def _compute_criterion(self, train=False):
         criterions = getattr(self, 'criterions_', None)
         if criterions is not None:
             return criterions
@@ -437,26 +421,33 @@ class BaseDAR(object):
 
     @property
     def logl(self):
-        return self.compute_criterions()['logl']
+        """Log likelihood of the model"""
+        return self._compute_criterion()['logl']
 
     @property
     def aic(self):
-        return self.compute_criterions()['aic']
+        """Akaike information criterion (AIC) of the model"""
+        return self._compute_criterion()['aic']
 
     @property
     def bic(self):
-        return self.compute_criterions()['bic']
+        """Bayesian information criterion (BIC) of the model"""
+        return self._compute_criterion()['bic']
 
     def reset_criterions(self):
+        """Reset stored criterions (negative log_likelihood, AIC or BIC)"""
         self.model_selection_criterions_ = None
         self.criterions_ = None
 
-    def order_selection(self, criterion):
-        """Select the order of the model with a criterion based on the
-        log likelihood.
-
-        Attributes ordar and ordriv define the maximum values.
+    def order_selection(self):
+        """Fit several models with a grid-search over self.ordar and
+        self.ordriv, and select the model with the best criterion
+        self.criterion (negative log_likelihood, AIC or BIC)
         """
+        # compute the basis once and for all
+        self.make_basis()
+
+        criterion = self.criterion
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
         self.G_ = np.ndarray(0)
@@ -483,7 +474,8 @@ class BaseDAR(object):
         for ordriv in range(ordriv + 1):
             model = self.copy()
             model.ordriv = ordriv
-            model.make_basis()
+            _, _, n_basis = model.compute_cross_orders(ordriv)
+            model.basis_ = self.basis_[:n_basis]
 
             # -------- estimate the best AR order for this value of ordriv
             for AR_ in model.next_model():
@@ -496,7 +488,7 @@ class BaseDAR(object):
                 model.estimate_error(recompute=self.test_mask is not None)
                 model.estimate_gain()
                 model.reset_criterions()
-                this_criterion = model.compute_criterions()
+                this_criterion = model._compute_criterion()
                 logl[model.ordar_, model.ordriv_] = this_criterion['logl']
                 aic[model.ordar_, model.ordriv_] = this_criterion['aic']
                 bic[model.ordar_, model.ordriv_] = this_criterion['bic']
@@ -513,11 +505,16 @@ class BaseDAR(object):
              'tmax': best_criterion['tmax']}
         self.criterions_ = best_criterion
 
-        # recompute the basis with ordriv_
-        self.make_basis()
+        # select the corresponding basis
+        ordriv_ = self.AR_.shape[1]
+        self.n_basis = ordriv_
+        self.basis_ = self.basis_[:ordriv_]
 
     @property
     def ordar_(self):
+        """AR order of the model, different from self.ordar if a model
+        selection has been performed
+        """
         AR_ = getattr(self, 'AR_', None)
         if AR_ is None:
             raise NotFittedError('%s is not fitted.' % self)
@@ -526,6 +523,9 @@ class BaseDAR(object):
 
     @property
     def ordriv_(self):
+        """Polynomial order of the model, different from self.ordriv if a model
+        selection has been performed
+        """
         AR_ = getattr(self, 'AR_', None)
         if AR_ is None:
             raise NotFittedError('%s is not fitted.' % self)
@@ -533,9 +533,7 @@ class BaseDAR(object):
             return self.AR_.shape[1]
 
     def estimate_fixed_gain(self):
-        """Estimates a fixed gain from the predicton error
-
-        uses self.residual_.
+        """Estimates a fixed gain from the predicton error self.residual_.
         """
         # -------- get the training data
         _, residual = self.get_train_data(self.residual_)
@@ -560,10 +558,11 @@ class BaseDAR(object):
         the likelihood, through a Newton-Raphson procedure
 
         The residual e(t) is modelled as a white noise with standard
-        deviation: std(e(t)) = exp(b(0) + b(1)u(t) + ... + b(m)u(t)^M)
+        deviation driven by the driver x:
+            std(e(t)) = exp(b(0) + b(1)x(t) + ... + b(m)x(t)^m)
 
         iter_gain : maximum number of iterations
-        eps_gain   : stop iteration when corrections get smaller than eps_gain
+        eps_gain  : stop iteration when corrections get smaller than eps_gain
         regul     : regularization factor (for inversion of the Hessian)
         """
         iter_gain = self.iter_gain
@@ -666,6 +665,7 @@ class BaseDAR(object):
         self.residual_bis_ = residual / np.sqrt(sigma2)
 
     def _compute_sigma2(self, basis):
+        """Helper to compute the instantaneous variance of the model"""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             logsigma = np.dot(self.G_, basis)
@@ -689,6 +689,8 @@ class BaseDAR(object):
         """Whiten a signal with the already fitted model
         """
         assert fs == self.fs
+        assert hasattr(self, 'AR_')
+        assert hasattr(self, 'G_')
         self.reset_criterions()
         self.check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
         self.basis_ = self.make_basis(sigdriv=sigdriv,
@@ -747,7 +749,7 @@ class BaseDAR(object):
         ar0 : model representing the null hypothesis
 
         returns:
-        pvalue : the p-value for the test (1-F(chi2(ratio)))
+        p_value : the p-value for the test (1-F(chi2(ratio)))
         """
         # -------- verify that the models have been fitted
         ordar_1 = self.ordar_
@@ -765,9 +767,9 @@ class BaseDAR(object):
         df0 = ar0.degrees_of_freedom()
 
         # -------- compute the p-value
-        pvalue = stats.chi2.sf(test, df1 - df0)
+        p_value = stats.chi2.sf(test, df1 - df0)
 
-        return pvalue
+        return p_value
 
     # ------------------------------------------------ #
     # Functions that should be overloaded              #
@@ -907,7 +909,7 @@ class BaseDAR(object):
     def _driver_range(self, nbcols=256, xlim=None):
         # -------- define the horizontal axis
         if xlim is None:
-            xlim = self.get_sigdriv_bounds()
+            xlim = self._get_sigdriv_bounds()
 
         if self.ordriv_ > 0:
             # full oscillation for derivative
@@ -922,7 +924,7 @@ class BaseDAR(object):
 
         return xlim, sigdriv, sigdriv_imag
 
-    def get_sigdriv_bounds(self, sigdriv=None, sigdriv_imag=None):
+    def _get_sigdriv_bounds(self, sigdriv=None, sigdriv_imag=None):
         if self.use_driver_phase:
             bounds = [-1, 1]
 
