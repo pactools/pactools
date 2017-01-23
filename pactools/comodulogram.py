@@ -786,6 +786,8 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
         spec = spec / np.sum(spec, axis=1)[:, None]
         spec_diff = np.sum(spec * np.log(spec * n_phases), axis=1)
         spec_diff /= np.log(n_phases)
+    else:
+        raise ValueError('Wrong DAR method %s' % method)
 
     # crop the spectrum to high_fq_range
     frequencies = np.linspace(0, fs // 2, spec_diff.size)

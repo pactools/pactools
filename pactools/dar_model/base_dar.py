@@ -9,7 +9,6 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
-from ..utils.spectrum import phase_amplitude
 
 EPSILON = np.finfo(np.float32).eps
 
@@ -169,6 +168,7 @@ class BaseDAR(object):
 
     def _fit(self):
         # -------- estimate a single model
+        self.ordriv_ = self.ordriv
         self.make_basis()
         self.estimate_ar()
         self.estimate_error(recompute=self.test_mask is not None)
@@ -186,7 +186,7 @@ class BaseDAR(object):
         self.n_basis = len(power_list_re)
         return power_list_re, power_list_im, self.n_basis
 
-    def make_basis(self, sigdriv=None, sigdriv_imag=None):
+    def make_basis(self, sigdriv=None, sigdriv_imag=None, ordriv=None):
         """Creates a basis from the driving signal, with the successive
         powers of sigdriv and sigdriv_imag.
 
@@ -233,10 +233,11 @@ class BaseDAR(object):
             ortho, normalize = False, False
 
         n_epochs, n_points = sigdriv.shape
-        ordriv = self.ordriv
+        if ordriv is None:
+            ordriv = self.ordriv
         if sigdriv_imag is None:
-            power_list_re = np.arange(1, ordriv + 1)
-            power_list_im = np.zeros_like(ordriv)
+            power_list_re = np.arange(ordriv + 1)
+            power_list_im = np.zeros(ordriv + 1)
             n_basis = ordriv + 1
         else:
             power_list_re, power_list_im, n_basis = self.compute_cross_orders(
@@ -251,7 +252,6 @@ class BaseDAR(object):
         # -------- create successive components
         for k, (power_real,
                 power_imag) in enumerate(zip(power_list_re, power_list_im)):
-            k += 1
             if power_imag == 0 and power_real == 0:
                 basis[k] = 1.0
             elif power_imag > 0 and power_real == 0:
@@ -474,6 +474,7 @@ class BaseDAR(object):
         for ordriv in range(ordriv + 1):
             model = self.copy()
             model.ordriv = ordriv
+            model.ordriv_ = ordriv
             _, _, n_basis = model.compute_cross_orders(ordriv)
             model.basis_ = self.basis_[:n_basis]
 
@@ -498,6 +499,7 @@ class BaseDAR(object):
                     best_criterion = this_criterion
                     self.AR_ = np.copy(model.AR_)
                     self.G_ = np.copy(model.G_)
+                    self.ordriv_ = model.ordriv_
 
         # store all criterions
         self.model_selection_criterions_ = \
@@ -506,9 +508,10 @@ class BaseDAR(object):
         self.criterions_ = best_criterion
 
         # select the corresponding basis
-        ordriv_ = self.AR_.shape[1]
-        self.n_basis = ordriv_
-        self.basis_ = self.basis_[:ordriv_]
+        _, _, n_basis = self.compute_cross_orders(self.ordriv_)
+        assert self.AR_.shape[1] == n_basis
+        self.basis_ = self.basis_[:n_basis]
+        self.alpha_ = self.alpha_[:n_basis, :n_basis]
 
     @property
     def ordar_(self):
@@ -520,17 +523,6 @@ class BaseDAR(object):
             raise NotFittedError('%s is not fitted.' % self)
         else:
             return self.AR_.shape[0]
-
-    @property
-    def ordriv_(self):
-        """Polynomial order of the model, different from self.ordriv if a model
-        selection has been performed
-        """
-        AR_ = getattr(self, 'AR_', None)
-        if AR_ is None:
-            raise NotFittedError('%s is not fitted.' % self)
-        else:
-            return self.AR_.shape[1]
 
     def estimate_fixed_gain(self):
         """Estimates a fixed gain from the predicton error self.residual_.
@@ -694,7 +686,8 @@ class BaseDAR(object):
         self.reset_criterions()
         self.check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
         self.basis_ = self.make_basis(sigdriv=sigdriv,
-                                      sigdriv_imag=sigdriv_imag)
+                                      sigdriv_imag=sigdriv_imag,
+                                      ordriv=self.ordriv_)
 
         self.estimate_error(recompute=True)
         return self.residual_
@@ -749,7 +742,7 @@ class BaseDAR(object):
         ar0 : model representing the null hypothesis
 
         returns:
-        p_value : the p-value for the test (1-F(chi2(ratio)))
+        p_value : the p-value for the test (1-  F(chi2(ratio)))
         """
         # -------- verify that the models have been fitted
         ordar_1 = self.ordar_
@@ -821,9 +814,10 @@ class BaseDAR(object):
             try:
                 basis = self.basis_
             except:
-                basis = self.make_basis()
+                basis = self.make_basis(ordriv=self.ordriv_)
         else:
-            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
+            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
+                                    ordriv=self.ordriv_)
 
         AR_cols, G_cols = self.develop(basis=basis)
 
@@ -840,18 +834,9 @@ class BaseDAR(object):
         factorisation of the code of methods plot_time_freq and
         plot_drive_freq
         """
-        # -------- distinguish estimated or target model
         ordar_ = self.ordar_
 
-        # -------- Compute the AR models and gains for every instant of sigdriv
-        if sigdriv is None:
-            sigdriv = self.sigdriv
-            basis = self.basis_
-        else:
-            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag)
-
-        AR_cols, G_cols = self.develop(basis=basis)
-
+        AR_cols, G_cols, _, sigdriv = self.develop_all(sigdriv, sigdriv_imag)
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]
         G_cols = G_cols[:1, :]
@@ -893,9 +878,11 @@ class BaseDAR(object):
 
         """
         xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim)
+        sigdriv = np.atleast_2d(sigdriv)
+        sigdriv_imag = np.atleast_2d(sigdriv_imag)
 
         # -------- compute spectra
-        spec = self._basis2spec(sigdriv[None, :], sigdriv_imag=sigdriv_imag,
+        spec = self._basis2spec(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
                                 frange=frange)
 
         # -------- normalize
@@ -911,16 +898,10 @@ class BaseDAR(object):
         if xlim is None:
             xlim = self._get_sigdriv_bounds()
 
-        if self.ordriv_ > 0:
-            # full oscillation for derivative
-            phase = np.linspace(0, 2 * np.pi, nbcols, endpoint=False)
-            sigdriv = xlim[1] * np.cos(phase)
-            sigdriv_imag = xlim[1] * np.sin(phase)
-        else:
-            # simple ramp
-            eps = 0.0
-            sigdriv = np.linspace(xlim[0] + eps, xlim[1] - eps, nbcols)
-            sigdriv_imag = None
+        # full oscillation for derivative
+        phase = np.linspace(0, 2 * np.pi, nbcols, endpoint=False)
+        sigdriv = xlim[1] * np.cos(phase)
+        sigdriv_imag = xlim[1] * np.sin(phase)
 
         return xlim, sigdriv, sigdriv_imag
 
