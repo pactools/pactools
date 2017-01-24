@@ -887,9 +887,9 @@ class BaseDAR(object):
 
         # -------- normalize
         if 'c' in mode:
-            spec -= np.mean(spec, axis=1)
+            spec -= np.mean(spec, axis=1)[:, None]
         if 'v' in mode:
-            spec /= np.std(spec, axis=1)
+            spec /= np.std(spec, axis=1)[:, None]
 
         return spec, xlim, sigdriv, sigdriv_imag
 
@@ -925,7 +925,7 @@ class BaseDAR(object):
                 bound_min = min(-bounds[0], bounds[1])
             else:
                 squared_abs = sigdriv ** 2 + sigdriv_imag ** 2
-                bound_min = np.sqrt(np.percentile(squared_abs, [95]))
+                bound_min = np.sqrt(np.median(squared_abs))
 
         bounds = (-bound_min, bound_min)
         return bounds

@@ -1,6 +1,6 @@
 import numpy as np
+import matplotlib as matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 
 
 def compute_ticks(vmin, vmax, unit=''):
@@ -14,7 +14,12 @@ def compute_ticks(vmin, vmax, unit=''):
         vmin = np.ceil(vmin / scale) * scale
 
         range_scale = int((vmax - vmin) / scale)
-        step = np.ceil(range_scale / 7.) * scale
+        n_steps = 6
+        for i in [6, 5, 7, 4]:
+            if range_scale % i == 0:
+                n_steps = i
+                break
+        step = np.ceil(range_scale / float(n_steps)) * scale
 
         tick_labels = '%%.%df' % max(0, -int(log_scale))
         tick_labels += ' ' + unit
@@ -36,6 +41,8 @@ def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
     else:
         cbar_ax = None
     cbar = fig.colorbar(cax, ax=ax, cax=cbar_ax, ticks=ticks)
+    if unit != '':
+        unit = ' ' + unit
     cbar.ax.set_yticklabels([tick_labels % t for t in ticks])
 
 
@@ -46,7 +53,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     vmin = min(0, comodulogram.min()) if vmin is None else vmin
     vmax = comodulogram.max() if vmax is None else vmax
     fig = plt.figure(figsize=(15, 11))
-    gs = gridspec.GridSpec(9, 9)
+    gs = matplotlib.gridspec.GridSpec(9, 9)
     ax_vert = plt.subplot(gs[:-2, :2])
     ax_hori = plt.subplot(gs[-2:, 2:-1])
     ax_main = plt.subplot(gs[:-2, 2:-1])
