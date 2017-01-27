@@ -52,7 +52,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
                                 save_name=None):
     vmin = min(0, comodulogram.min()) if vmin is None else vmin
     vmax = comodulogram.max() if vmax is None else vmax
-    fig = plt.figure(figsize=(15, 11))
+    fig = plt.figure(figsize=(9,9))
     gs = matplotlib.gridspec.GridSpec(9, 9)
     ax_vert = plt.subplot(gs[:-2, :2])
     ax_hori = plt.subplot(gs[-2:, 2:-1])
@@ -64,6 +64,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     cax = ax_main.imshow(comodulogram.T, cmap=plt.cm.viridis,
                          aspect='auto', origin='lower', extent=extent,
                          interpolation='none', vmax=vmax, vmin=vmin)
+    ax_main.tick_params(labelbottom='off', labelleft='off') # remove x,y label from main plot
 
     fig.colorbar(cax, cax=ax_cbar, ticks=np.linspace(vmin, vmax, 6))
     ax_hori.set_xlabel('Phase frequency (Hz) (w=%.1f)' % low_fq_width)
@@ -77,6 +78,19 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     ax_hori.plot(low_fq_range, np.mean(comodulogram.T, axis=0))
     ax_hori.set_xlim(extent[:2])
 
+    vmx = np.max([np.mean(comodulogram.T, axis=1).max(),np.mean(comodulogram.T, axis=0).max()])
+    vmx = vmax + vmax/10
+    ax_hori.set_ylim([0,vmx]) # same limits than in vert plot
+    ax_vert.set_xlim([0,vmx]) # same limits than in hori plot
+    ax_vert.spines['right'].set_visible(False)
+    ax_vert.spines['top'].set_visible(False)
+    ax_vert.yaxis.set_ticks_position('left')
+    ax_vert.xaxis.set_ticks_position('bottom')
+    ax_hori.spines['right'].set_visible(False)
+    ax_hori.spines['top'].set_visible(False)
+    ax_hori.yaxis.set_ticks_position('left')
+    ax_hori.xaxis.set_ticks_position('bottom')    
+    
     if save_name is None:
         save_name = ('%s_wlo%.2f_whi%.1f'
                      % (method, low_fq_width, high_fq_width))
