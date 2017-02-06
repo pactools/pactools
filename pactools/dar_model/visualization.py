@@ -8,7 +8,7 @@ from ..plot_comodulogram import add_colorbar
 
 
 def plot_dar(model, title='', frange=None, mode='', vmin=None, vmax=None,
-             fig=None, xlim=None, cmap=plt.get_cmap('RdBu_r'), colorbar=True):
+             fig=None, xlim=None, cmap=None, colorbar=True):
     """
     represent the power spectral density as a function of
     the amplitude of the driving signal
@@ -26,6 +26,11 @@ def plot_dar(model, title='', frange=None, mode='', vmin=None, vmax=None,
     # -------- get amplitude-frequency spectrum from model
     spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(mode=mode,
                                                                   xlim=xlim)
+    if cmap is None:
+        if 'c' in mode:
+            cmap = plt.get_cmap('RdBu_r')
+        else:
+            cmap = plt.get_cmap('inferno')
 
     if frange is None:
         frange = [0, model.fs / 2.0]
@@ -46,7 +51,10 @@ def plot_dar(model, title='', frange=None, mode='', vmin=None, vmax=None,
         extent = (xlim[0], xlim[1], frange[0], frange[-1])
 
     # -------- plot spectrum
-    vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, tick=1, percentile=1)
+    vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, tick=1, percentile=0)
+    if 'c' in mode:
+        vmax = max(vmax, -vmin)
+        vmin = -vmax
     cax = ax.imshow(spec, cmap=cmap, vmin=vmin, vmax=vmax, aspect='auto',
                     origin='lower', extent=extent, interpolation='none')
 
