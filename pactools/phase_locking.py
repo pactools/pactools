@@ -11,7 +11,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
                                 low_fq_width=2.0,
                                 high_fq_width=8.0,
                                 t_plot=1.0,
-                                method=1,
+                                filter_method=1,
                                 save_name=None,
                                 peak_or_trough='peak',
                                 draw_peaks=True):
@@ -50,7 +50,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     t_plot : float
         Time to plot around the troughs (in second)
 
-    method : in {0, 1}
+    filter_method : in {0, 1}
         Choose band pass filtering method (in multiple_band_pass)
 
     save_name : string or None
@@ -80,7 +80,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     # n_epochs, n_points = filtered_high.shape
     filtered_low = multiple_band_pass(low_sig, fs,
                                       low_fq, low_fq_width,
-                                      method=method)
+                                      filter_method=filter_method)
     filtered_low = filtered_low[0]
     filtered_low_real = np.real(filtered_low)
 
@@ -120,7 +120,8 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     # n_frequencies, n_epochs, n_points = filtered_high.shape
     filtered_high = multiple_band_pass(high_sig, fs,
                                        high_fq_range, high_fq_width,
-                                       n_cycles=n_cycles, method=method)
+                                       n_cycles=n_cycles,
+                                       filter_method=filter_method)
 
     fig, axs = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
     axs = axs.ravel()
@@ -138,7 +139,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     # save the figure
     if save_name is None:
         save_name = ('%s_wlo%.2f_whi%.1f'
-                     % (method, low_fq_width, high_fq_width))
+                     % (filter_method, low_fq_width, high_fq_width))
     if save_name:
         fig.savefig(save_name + '.png')
 
