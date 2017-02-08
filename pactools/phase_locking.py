@@ -11,7 +11,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
                                 low_fq_width=2.0,
                                 high_fq_width=8.0,
                                 t_plot=1.0,
-                                filter_method=1,
+                                filter_method='mne',
                                 save_name=None,
                                 peak_or_trough='peak',
                                 draw_peaks=True):
@@ -50,8 +50,10 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     t_plot : float
         Time to plot around the troughs (in second)
 
-    filter_method : in {0, 1}
+    filter_method : in {'mne', 'carrier'} 
         Choose band pass filtering method (in multiple_band_pass)
+        'mne': with mne.filter.band_pass_filter (default)
+        'carrier': with pactools.Carrier
 
     save_name : string or None
         Name to use for saving the plot.
