@@ -113,7 +113,7 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
         if method == 'tort':
             n_bins = N_BINS_TORT
             phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
-            # get the indices of the bins to which each value in input belongs
+            # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
         elif method == 'penny':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
@@ -148,7 +148,7 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
                           shift, draw_phase):
-    # shift for the surrogate analysis
+    # shift for the surrogate analysis
     if shift != 0:
         phase_preprocessed = np.roll(phase_preprocessed, shift)
 
@@ -159,7 +159,7 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method,
 
     # Modulation index as in [Penny & al 2008] or [van Wijk & al 2015]
     elif method in ('penny', 'vanwijk', ):
-        # solve a linear regression problem:
+        # solve a linear regression problem:
         # amplitude = np.dot(phase_preprocessed) * beta
         PtP = np.dot(phase_preprocessed.T, phase_preprocessed)
         PtA = np.dot(phase_preprocessed.T, amplitude[:, None])
@@ -311,7 +311,7 @@ def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
     if shift != 0:
         low_sig = np.roll(low_sig, shift)
 
-    # the actual frequency resolution is computed here
+    # the actual frequency resolution is computed here
     delta_freq = fs / coherence_params['fft_length']
 
     estimator = Coherence(**coherence_params)
@@ -331,7 +331,7 @@ def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
         product = coherence[:, 1:] * np.conjugate(coherence[:, :-1])
 
         # we use a kernel of (ker * 2) with respect to the product,
-        # i.e. a kernel of (ker * 2 + 1) with respect to the coherence.
+        # i.e. a kernel of (ker * 2 +1) with respect to the coherence.
         ker = 2
         kernel = np.ones(2 * ker) / (2 * ker)
         phase_slope_index = np.zeros((n_high, n_freq - (2 * ker)),
@@ -341,7 +341,7 @@ def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
         phase_slope_index = np.imag(phase_slope_index)
         frequencies = frequencies[ker:-ker]
 
-        # transform the phase slope index into an approximated delay
+        # transform the phase slope index into an approximated delay
         delay = phase_slope_index / (2. * np.pi * delta_freq)
 
         comod = _interpolate(np.arange(n_high), frequencies, delay,
@@ -757,7 +757,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
 def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
                                  method, high_fq_range, shift):
 
-    # shift for the surrogate analysis
+    # shift for the surrogate analysis
     if shift != 0:
         sigdriv = np.roll(sigdriv, shift)
 
@@ -871,7 +871,7 @@ def get_maximum_pac(comodulograms, low_fq_range, high_fq_range):
         comodulograms = comodulograms[None, :, :]
         return_array = False
 
-    # check that the sizes match
+    # check that the sizes match
     n_comod, n_low, n_high = comodulograms.shape
     n_low_2, n_high_2 = len(low_fq_range), len(high_fq_range)
     if n_low_2 != n_low or n_high_2 != n_high:

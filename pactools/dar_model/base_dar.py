@@ -65,7 +65,7 @@ class BaseDAR(object):
         self.ordriv = ordriv
         self.compute_cross_orders(ordriv)
 
-        # left-out system
+        # left-out system
         self.train_mask = None
         self.test_mask = None
 
@@ -93,7 +93,7 @@ class BaseDAR(object):
             else:
                 both_masks = np.logical_and(test_mask, train_mask)
 
-            # we remove far masked data (by both masks)
+            # we remove far masked data (by both masks)
             train_mask, test_mask, sigin, sigdriv, sigdriv_imag = \
                 self._remove_far_masked_data(
                     both_masks,
@@ -444,7 +444,7 @@ class BaseDAR(object):
         self.ordriv, and select the model with the best criterion
         self.criterion (negative log_likelihood, AIC or BIC)
         """
-        # compute the basis once and for all
+        # compute the basis once and for all
         self.make_basis()
 
         criterion = self.criterion
