@@ -326,7 +326,7 @@ def plot_trough_locked_time(sig, fs, trough_loc, t_plot,
     # percentiles = [5, 'mean', 95]
     # percentiles = ['mean']
     percentiles = ['std+', 'mean', 'std-']
-    lines = 'gbg'
+    lines = ['k--', 'k-', 'k--'] # 'gbg'
 
     labels = {'std+': r'$\mu+\sigma$',
               'std-': r'$\mu-\sigma$',
@@ -361,5 +361,6 @@ def plot_trough_locked_time(sig, fs, trough_loc, t_plot,
         ylim = ax.get_ylim()
         ylim = (ylim[0] - (ylim[1] - ylim[0]) * 0.2, ylim[1])
     ax.set_ylim(ylim)
+    ax.set_xlim([t[0],t[-1]])
 
     return ylim
