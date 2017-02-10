@@ -14,7 +14,9 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
                                 filter_method='mne',
                                 save_name=None,
                                 peak_or_trough='peak',
-                                draw_peaks=True):
+                                draw_peaks=True,
+                                vmin=None,
+                                vmax=None):
     """
     Plot the theta-trough locked Time-frequency plot of mean power
     modulation time-locked to the theta trough
@@ -65,6 +67,9 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
 
     draw_peaks : boolean
         If True, plot the first peaks/troughs in the phase signal
+
+    vmin, vmax: 
+        Min and max value for the colorbar.
 
     Return
     ------
@@ -131,7 +136,7 @@ def time_frequency_peak_locking(fs, low_sig, high_sig=None, mask=None,
     # plot the higher part
     plot_trough_locked_time_frequency(
         filtered_high, fs, high_fq_range, trough_loc=trough_loc, t_plot=t_plot,
-        mask=mask, fig=fig, ax=axs[0], vmin=None, vmax=None)
+        mask=mask, fig=fig, ax=axs[0], vmin=vmin, vmax=vmax)
 
     # plot the lower part
     plot_trough_locked_time(
