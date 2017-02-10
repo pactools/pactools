@@ -29,14 +29,13 @@ class DAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        train_mask, sigin = self.get_train_data(self.sigin)
-        _, basis = self.get_train_data(self.basis_)
-        train_select = ~train_mask if train_mask is not None else None
+        sigin, basis, mask = self.get_train_data([self.sigin, self.basis_])
+        selection = ~mask if mask is not None else None
 
         # mask the signal
-        if train_select is not None:
-            masked_basis = train_select * basis
-            masked_sigin = train_select * sigin
+        if selection is not None:
+            masked_basis = selection * basis
+            masked_sigin = selection * sigin
         else:
             masked_basis = basis
             masked_sigin = sigin

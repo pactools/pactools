@@ -275,12 +275,11 @@ class BaseLattice(BaseDAR):
                              self.__class__.__name__)
 
         # --------  get the training data
-        train_mask, sigin = self.get_train_data(self.sigin)
-        _, basis = self.get_train_data(self.basis_)
+        sigin, basis, mask = self.get_train_data([self.sigin, self.basis_])
 
-        train_select = ~train_mask if train_mask is not None else None
-        if train_select is not None:
-            masked_basis = basis * train_select
+        selection = ~mask if mask is not None else None
+        if selection is not None:
+            masked_basis = basis * selection
         else:
             masked_basis = basis
 
@@ -305,10 +304,10 @@ class BaseLattice(BaseDAR):
         # -------- loop on successive orders
         for k in range(0, ordar_):
             # -------- prepare initial estimation (driven parcor)
-            if train_select is not None:
+            if selection is not None:
                 # the mask and basis are not delay as backward_res /!\
-                forward_res = train_select[:, k + 1:] * forward_res[:, k + 1:]
-                backward_res = train_select[:, k + 1:] * backward_res[:, k:-1]
+                forward_res = selection[:, k + 1:] * forward_res[:, k + 1:]
+                backward_res = selection[:, k + 1:] * backward_res[:, k:-1]
             else:
                 forward_res = forward_res[:, k + 1:]
                 backward_res = backward_res[:, k:-1]
@@ -335,8 +334,8 @@ class BaseLattice(BaseDAR):
             parcor_list = self.develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
-            if train_select is not None:
-                parcor_list *= train_select
+            if selection is not None:
+                parcor_list *= selection
 
             R = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
                                masked_basis[:, :, k:].reshape(n_basis, -1).T)

@@ -347,18 +347,25 @@ class BaseDAR(object):
 
         return output_signals
 
-    def get_train_data(self, sig):
+    def get_train_data(self, sig_list):
+        if not isinstance(sig_list, list):
+            sig_list = list(sig_list)
+
         train_mask = self.train_mask
-        train_mask, sig = self._remove_far_masked_data(train_mask,
-                                                       [train_mask, sig])
+        sig_list.append(train_mask)
+        sig_list = self._remove_far_masked_data(train_mask, sig_list)
 
-        return train_mask, sig
+        return sig_list
 
-    def get_test_data(self, sig):
+    def get_test_data(self, sig_list):
+        if not isinstance(sig_list, list):
+            sig_list = list(sig_list)
+
         test_mask = self.test_mask
         if test_mask is None:
             test_mask = self.train_mask
-        return test_mask, sig
+        sig_list.append(test_mask)
+        return sig_list
 
     def degrees_of_freedom(self):
         return ((self.ordar_ + 1) * self.n_basis)
@@ -528,9 +535,16 @@ class BaseDAR(object):
         """Estimates a fixed gain from the predicton error self.residual_.
         """
         # -------- get the training data
-        _, residual = self.get_train_data(self.residual_)
+        residual, mask = self.get_train_data([self.residual_])
+
         # -------- crop the ordar first values
         residual = residual[:, self.ordar_:]
+        if mask is not None:
+            mask = mask[:, self.ordar_:]
+
+        # -------- apply the mask
+        if mask is not None:
+            residual = residual[~mask]
 
         # -------- estimate an initial (fixed) model of the residual
         self.G_ = np.zeros((1, self.n_basis))
@@ -562,30 +576,28 @@ class BaseDAR(object):
         ordar_ = self.ordar_
 
         # -------- get the training data
-        _, basis = self.get_train_data(self.basis_)
-        train_mask, residual = self.get_train_data(self.residual_)
-        train_selection = ~train_mask if train_mask is not None else None
+        basis, residual, mask = self.get_train_data([self.basis_,
+                                                     self.residual_])
+        selection = ~mask if mask is not None else None
 
         residual += EPSILON
 
         # -------- crop the ordar first values
         residual = residual[:, ordar_:]
         basis = basis[:, :, ordar_:]
-        if train_selection is not None:
-            train_selection = train_selection[:, ordar_:]
+        if selection is not None:
+            selection = selection[:, ordar_:]
 
         # concatenate the epochs since it does not change the computations
         # as in estimating the AR coefficients
-        if train_selection is not None:
-            residual = residual[train_selection]
-            basis = basis[:, train_selection]
-            train_selection = train_selection[train_selection].reshape(1, -1)
+        if selection is not None:
+            residual = residual[selection]
+            basis = basis[:, selection]
         residual = residual.reshape(1, -1)
         basis = basis.reshape(basis.shape[0], -1)
 
         residual2 = residual ** 2
         n_points = residual.size
-        resreg = basis * residual
         self.G_ = np.zeros((1, self.n_basis))
 
         # -------- prepare an initial estimation
@@ -613,14 +625,9 @@ class BaseDAR(object):
         for k, (this_min, this_max) in enumerate(zip(kmin, kmax)):
             e[k] = np.mean(residual2[0, index[this_min:this_max]])
 
-        if train_selection is not None:
-            masked_basis = basis * train_selection
-        else:
-            masked_basis = basis
-
         e = 0.5 * np.log(e)
-        R = np.dot(basis[:, index[kmid]], masked_basis[:, index[kmid]].T)
-        r = np.dot(e, masked_basis[:, index[kmid]].T)
+        R = np.dot(basis[:, index[kmid]], basis[:, index[kmid]].T)
+        r = np.dot(e, basis[:, index[kmid]].T)
 
         # -------- regularize matrix R
         v = np.resize(linalg.eigvalsh(R), (1, self.n_basis))
@@ -637,13 +644,12 @@ class BaseDAR(object):
         loglike = np.zeros(iter_gain + 1)
         loglike.fill(np.nan)
 
+        if iter_gain > 0:
+            resreg = basis * residual
         # -------- refine this model (iteratively maximise the likelihood)
         for itnum in range(iter_gain):
             sigma2 = self._compute_sigma2(basis)
-
-            train_mask = (~train_selection
-                          if train_selection is not None else None)
-            loglike[itnum] = wgn_log_likelihood(residual, sigma2, train_mask)
+            loglike[itnum] = wgn_log_likelihood(residual, sigma2, mask=None)
 
             gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
             hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
@@ -710,23 +716,29 @@ class BaseDAR(object):
         skip : how many initial samples to skip
         """
         if train:
-            mask, basis = self.get_train_data(self.basis_)
-            mask, residual = self.get_train_data(self.residual_)
+            basis, residual, mask = self.get_train_data([self.basis_,
+                                                         self.residual_])
         else:
-            mask, basis = self.get_test_data(self.basis_)
-            mask, residual = self.get_test_data(self.residual_)
+            basis, residual, mask = self.get_test_data([self.basis_,
+                                                        self.residual_])
 
         # skip first samples
+        residual = residual[:, skip:]
+        basis = basis[:, :, skip:]
         if mask is not None:
             mask = mask[:, skip:]
-        residual = residual[:, skip:]
+
+        # apply mask
+        if mask is not None:
+            basis = basis[:, ~mask][:, None, :]
+            residual = residual[~mask]
 
         # -------- estimate the gain
-        gain2 = self.develop_gain(basis[:, :, skip:], squared=True)
+        gain2 = self.develop_gain(basis, squared=True)
         gain2 += EPSILON
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(residual, gain2, mask)
+        logL = wgn_log_likelihood(residual, gain2, mask=None)
 
         tmax = gain2.size
 
