@@ -107,7 +107,7 @@ def example_phase_plot():
 
 if __name__ == '__main__':
 
-    # example_comodulogram()
+    # example_comodulogram()
     example_comodulogram_with_mask()
     # example_phase_plot()
     pass

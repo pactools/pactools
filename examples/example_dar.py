@@ -67,7 +67,7 @@ def example_compare_comodulogram():
 
     fig, axs = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(16, 12))
 
-    # The model is given to the 'method' parameter.
+    # The model is given to the 'method' parameter.
     for i, method in enumerate(['tort', 'ozkurt', 'canolty', dar_model]):
 
         comod = comodulogram(

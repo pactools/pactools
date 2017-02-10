@@ -44,7 +44,7 @@ def example_phase_locking_with_mask():
     low_fq = 3.4  # Hz
     high_fq_range = np.linspace(2.0, 160.0, 40)  # Hz
 
-    tmin = 0.0  # the loaded epoch start at tmin=0, i.e. the CS event
+    tmin = 0.0  # the loaded epoch start at tmin=0, i.e. the CS event
     for t_start, t_stop in [[1, 10], [10, 19], [19, 28]]:
         mask = np.ones(sig.shape)
         start = int((t_start - tmin) * fs)
@@ -66,4 +66,4 @@ def example_phase_locking_with_mask():
 if __name__ == '__main__':
 
     example_phase_locking()
-    # example_phase_locking_with_mask()
+    # example_phase_locking_with_mask()
