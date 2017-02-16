@@ -228,7 +228,7 @@ def _bicoherence(fs, sig, mask, method, low_fq_range,
 
     n_epochs, n_points = sig.shape
 
-    coherence_params = _define_default_params(fs, low_fq_width, True,
+    coherence_params = _define_default_params(fs, low_fq_width, method,
                                               **coherence_params)
 
     estimator = Bicoherence(**coherence_params)
@@ -246,7 +246,12 @@ def _bicoherence(fs, sig, mask, method, low_fq_range,
     return comod
 
 
-def _define_default_params(fs, low_fq_width, is_bicoherence, **user_params):
+def _is_bicoherence(method):
+    """Returns True if the method is a bicoherence method"""
+    return method in ['sigl', 'nagashima', 'hagihira', 'bispectrum']
+
+
+def _define_default_params(fs, low_fq_width, method, **user_params):
     """Define default values for Coherence and Bicoherence classes,
     if not defined in user_params dictionary."""
 
@@ -256,8 +261,11 @@ def _define_default_params(fs, low_fq_width, is_bicoherence, **user_params):
     fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
 
     # smoothing for bicoherence methods
-    if is_bicoherence:
+    if _is_bicoherence(method):
         fft_length /= 4
+    # not smoothed for because we convolve after
+    if method == 'jiang':
+        fft_length *= 2
 
     # the block length is chosen to avoid zero-padding
     block_length = fft_length
@@ -290,7 +298,7 @@ def _coherence(fs, low_sig, filtered_high, mask, method, low_fq_range,
     # amplitude of the high frequency signals
     filtered_high = np.real(np.abs(filtered_high))
 
-    coherence_params = _define_default_params(fs, low_fq_width, False,
+    coherence_params = _define_default_params(fs, low_fq_width, method,
                                               **coherence_params)
 
     n_epochs, n_points = low_sig.shape

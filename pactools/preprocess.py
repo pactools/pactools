@@ -30,7 +30,7 @@ def _decimate(x, q):
         The down-sampled signal.
     """
     if not isinstance(q, int):
-        raise(TypeError, "q must be an integer")
+        raise (TypeError, "q must be an integer")
 
     b, a = signal.filter_design.cheby1(16, 0.025, 0.98 / q)
 
@@ -57,14 +57,18 @@ def decimate(sig, fs, decimation_factor):
     # -------- resample
     # decimation could be performed in two steps for better performance
     # 0 in the following array means no decimation
-    dec_1st = [0, 0, 2, 3, 4, 5, 6, 7, 2, 3, 2, 0, 3, 0, 2, 3, 4, 0, 3, 0, 4,
-               3, 0, 0, 4, 5, 0, 3, 4, 0, 5]
-    dec_2nd = [0, 0, 0, 0, 0, 0, 0, 0, 4, 3, 5, 0, 4, 0, 7, 5, 4, 0, 6, 0, 5,
-               7, 0, 0, 6, 5, 0, 9, 7, 0, 6]
+    dec_1st = [
+        0, 0, 2, 3, 4, 5, 6, 7, 2, 3, 2, 0, 3, 0, 2, 3, 4, 0, 3, 0, 4, 3, 0, 0,
+        4, 5, 0, 3, 4, 0, 5
+    ]
+    dec_2nd = [
+        0, 0, 0, 0, 0, 0, 0, 0, 4, 3, 5, 0, 4, 0, 7, 5, 4, 0, 6, 0, 5, 7, 0, 0,
+        6, 5, 0, 9, 7, 0, 6
+    ]
 
     d1 = dec_1st[decimation_factor]
     if d1 == 0:
-        raise(ValueError, 'cannot decimate by %d' % decimation_factor)
+        raise (ValueError, 'cannot decimate by %d' % decimation_factor)
 
     sig = _decimate(sig, d1)
     sig = sig.astype(np.float32)
@@ -81,7 +85,7 @@ def decimate(sig, fs, decimation_factor):
 
 def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                      draw='', ordar=8, enf=50.0, whiten_fill4=True,
-                     random_noise=None, extract_complex=False):
+                     random_noise=None, extract_complex=False, low_pass=False):
     """Creates a FIR filter that extracts a carrier,
     applies this filter to signal
 
@@ -100,6 +104,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
     draw       : list of plots
     ordar      : for the whitening with option fill=4
     extract_complex : use a complex wavelet
+    low_pass   : use a low pass filter at fc instead of a bandpass at fc
 
     returns carrier signal and processed full band signal
 
@@ -107,10 +112,17 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
     if random_noise is None:
         random_noise = np.random.randn(len(sig))
 
-    filt = Carrier(extract_complex=extract_complex)
-    filt.design(fs, fc, n_cycles, bandwidth, zero_mean=False)
-    if 'c' in draw or 'z' in draw:
-        filt.plot(fscale='lin', print_width=False)
+    if low_pass:
+        filt = LowPass().design(fs=fs, fc=fc)
+        if extract_complex:
+            raise NotImplementedError('extract_complex incompatible with '
+                                      'low_pass filter.')
+    else:
+        filt = Carrier(extract_complex=extract_complex)
+        filt.design(fs, fc, n_cycles, bandwidth, zero_mean=False)
+        if 'c' in draw or 'z' in draw:
+            filt.plot(fscale='lin', print_width=True)
+
     if extract_complex:
         low_sig, low_sig_imag = filt.direct(sig)
     else:
@@ -121,9 +133,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
-                [sig, low_sig, high_sig],
-                labels=None, fs=fs, colors='bggck')
+            plot_multiple_spectrum([sig, low_sig, high_sig], labels=None,
+                                   fs=fs, colors='bggck')
             plt.legend(['signal', 'driver', 'high_frequencies'], loc=0)
 
     elif fill == 1:
@@ -131,11 +142,11 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig - low_sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig, high_sig],
-                labels=None, fs=fs, colors='bggck')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'high_frequencies'], loc=0)
+            plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
+                                   labels=None, fs=fs, colors='bggck')
+            plt.legend(
+                ['signal', 'driver', 'signal-driver',
+                 'high_frequencies'], loc=0)
 
     elif fill == 2:
         # replacing driver by a white noise
@@ -150,10 +161,12 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig, fill_sig, high_sig],
-                labels=None, fs=fs, colors='bggck')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'noise', 'high_frequencies'], loc=0)
+                [sig, low_sig, sig - low_sig, fill_sig, high_sig], labels=None,
+                fs=fs, colors='bggck')
+            plt.legend([
+                'signal', 'driver', 'signal-driver', 'noise',
+                'high_frequencies'
+            ], loc=0)
 
     elif fill == 3:
         # 'replacing with driver[::-1]
@@ -163,10 +176,12 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig, fill_sig, high_sig],
-                labels=None, fs=fs, colors='bggck')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'driver[::-1]', 'high_frequencies'], loc=0)
+                [sig, low_sig, sig - low_sig, fill_sig, high_sig], labels=None,
+                fs=fs, colors='bggck')
+            plt.legend([
+                'signal', 'driver', 'signal-driver', 'driver[::-1]',
+                'high_frequencies'
+            ], loc=0)
 
     elif fill == 4:
         # replacing driver by a wide-band white noise
@@ -186,16 +201,18 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         wide_low_sig, high_sig = extract_and_fill(
             sig=white_sig, fs=fs, fc=fc, n_cycles=n_cycles,
             bandwidth=bandwidth, fill=2, draw=draw, enf=enf,
-            random_noise=random_noise, extract_complex=False)
+            random_noise=random_noise, extract_complex=False,
+            low_pass=low_pass)
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig,
-                 white_sig, wide_low_sig, white_sig - wide_low_sig, high_sig],
-                labels=None, fs=fs, colors='bggcrrk')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'white_signal', 'wide_driver',
-                        'white_signal-wide_driver', 'high_frequencies'], loc=0)
+            plot_multiple_spectrum([
+                sig, low_sig, sig - low_sig, white_sig, wide_low_sig,
+                white_sig - wide_low_sig, high_sig
+            ], labels=None, fs=fs, colors='bggcrrk')
+            plt.legend([
+                'signal', 'driver', 'signal-driver', 'white_signal',
+                'wide_driver', 'white_signal-wide_driver', 'high_frequencies'
+            ], loc=0)
     elif fill == 5:
         high_sig = sig - low_sig
 
@@ -209,13 +226,13 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                             fill_sig=fill_sig)
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig, high_sig],
-                labels=None, fs=fs, colors='bgcr')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'high_frequencies'], loc=0)
+            plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
+                                   labels=None, fs=fs, colors='bgcr')
+            plt.legend(
+                ['signal', 'driver', 'signal-driver',
+                 'high_frequencies'], loc=0)
     else:
-        raise(ValueError, 'Invalid fill parameter: %s' % str(fill))
+        raise (ValueError, 'Invalid fill parameter: %s' % str(fill))
 
     if extract_complex:
         return low_sig, high_sig, low_sig_imag
@@ -224,7 +241,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
 
 def low_pass_and_fill(sig, fs, fc=1.0, draw=''):
-    low_sig, high_sig = extract(sig, fs, fc, fill=1, low_pass=True)
+    low_sig, high_sig = extract_and_fill(sig, fs, fc, fill=1, low_pass=True)
 
     random_noise = np.random.randn(*sig.shape)
     filt = LowPass().design(fs=fs, fc=fc)
@@ -245,8 +262,8 @@ def plot_multiple_spectrum(signals, fs, labels, colors):
     s.plot(labels=labels, colors=colors, fscale='lin')
 
 
-def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
-           zero_phase=True, **kwargs):
+def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0, zero_phase=True,
+           **kwargs):
     """Use an AR model to whiten a signal
     The whitening filter is not estimated around multiples of
     the electric network frequency (up to d_enf Hz)
@@ -309,11 +326,10 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0,
     if 'w' in draw or 'z' in draw:
         ar.arma2psd(hold=True)
         ar.periodogram(sigout, hold=True)
-        ar.plot('periodogram before/after whitening',
-                labels=['with electric network',
-                        'without electric network',
-                        'model AR', 'whitened'],
-                fscale='lin')
+        ar.plot('periodogram before/after whitening', labels=[
+            'with electric network', 'without electric network', 'model AR',
+            'whitened'
+        ], fscale='lin')
         plt.legend(loc='lower left')
 
     return sigout
@@ -372,16 +388,15 @@ def show_plot(draw):
         plt.show()
 
 
-def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
-               stop=None, enf=50.0, block_length=2048, draw='',
-               custom_func=None):
+def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
+               enf=50.0, block_length=2048, draw='', custom_func=None):
     """Chains the successive steps of the process """
     # ------ read raw signal
     extension = os.path.splitext(raw_file)[1]
     if extension == '.smr':
         sigs, fs, events = smr2sig(raw_file)
     else:
-        raise(ValueError, 'invalid extension %s' % extension)
+        raise (ValueError, 'invalid extension %s' % extension)
 
     # ------ remove the beginning or the end of the signal
     if start is not None:
@@ -398,15 +413,19 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None,
     # -------- decimation
     if decimation_factor is not None:
         fs = fs / decimation_factor
-        sigs = [decimate(sig, fs, decimation_factor=decimation_factor)[0]
-                for sig in sigs]
+        sigs = [
+            decimate(sig, fs, decimation_factor=decimation_factor)[0]
+            for sig in sigs
+        ]
         show_plot(draw)
 
     # -------- reduce noise at 50 or 60 Hz
     if enf is not None:
         hmax = int(0.5 * fs / enf)
-        sigs = [dehummer(sig, fs, enf=enf, hmax=hmax,
-                         block_length=block_length, draw=draw) for sig in sigs]
+        sigs = [
+            dehummer(sig, fs, enf=enf, hmax=hmax, block_length=block_length,
+                     draw=draw) for sig in sigs
+        ]
         show_plot(draw)
 
     # -------- lowpass at 1 Hz
@@ -437,40 +456,60 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     low_fq_range = np.atleast_1d(low_fq_range)
     sigs = np.atleast_2d(sigs)
 
-    # -------- apply whitening filter
     if whitening == 'before':
         sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
         show_plot(draw)
 
-    if fill in [2, 4]:
+    if fill in [2, 4, 5]:
         random_noise = np.random.randn(len(sigs[0]))
     else:
         random_noise = None
 
-    # extract_and_fill the driver
+    ############ extract the high frequencies independently of the driver
+    whiten_fill4 = whitening == 'after'
+    low_and_high = [
+        extract_and_fill(
+            sig, fs=fs, fc=low_fq_range[-1], fill=fill, ordar=ordar, enf=enf,
+            whiten_fill4=whiten_fill4, random_noise=random_noise,
+            draw=draw, extract_complex=False, low_pass=True) for sig in sigs
+    ]
+    high_sigs = [both[1] for both in low_and_high]
+
+    if whitening == 'after' and fill != 4:
+        high_sigs = [
+            whiten(high_sig, fs=fs, ordar=ordar, draw=draw)
+            for high_sig in high_sigs
+        ]
+
+    if normalize:
+        scales = [1.0 / np.std(high_sig) for high_sig in high_sigs]
+        high_sigs = [high * s for (high, s) in zip(high_sigs, scales)]
+
+    # as high_sigs is now fixed, we don't need the following
+    fill = 0
+    random_noise = None
+    whiten_fill4 = False
+
+    ############ extract_and_fill the driver
     for fc in low_fq_range:
-        low_and_high = [extract_and_fill(
-            sig, fs=fs, fc=fc, n_cycles=n_cycles, bandwidth=bandwidth,
-            fill=fill, ordar=ordar, enf=enf, whiten_fill4=whitening == 'after',
-            random_noise=random_noise, draw=draw,
-            extract_complex=extract_complex) for sig in sigs]
+        low_and_high = [
+            extract_and_fill(sig, fs=fs, fc=fc, n_cycles=n_cycles,
+                             bandwidth=bandwidth, fill=fill, ordar=ordar,
+                             enf=enf, whiten_fill4=whiten_fill4,
+                             random_noise=random_noise, draw=draw,
+                             extract_complex=extract_complex) for sig in sigs
+        ]
         low_sigs = [both[0] for both in low_and_high]
-        high_sigs = [both[1] for both in low_and_high]
         if extract_complex:
             low_sigs_imag = [both[2] for both in low_and_high]
 
-        if whitening == 'after' and fill != 4:
-            high_sigs = [whiten(high_sig, fs=fs, ordar=ordar, draw=draw)
-                         for high_sig in high_sigs]
-
-        # -------- normalize variances
+        # normalize variances
         if normalize:
-            scales = [1.0 / np.std(high_sig) for high_sig in high_sigs]
-            high_sigs = [high * s for (high, s) in zip(high_sigs, scales)]
             low_sigs = [low * s for (low, s) in zip(low_sigs, scales)]
             if extract_complex:
-                low_sigs_imag = [low * s for (low, s) in zip(low_sigs_imag,
-                                                             scales)]
+                low_sigs_imag = [
+                    low * s for (low, s) in zip(low_sigs_imag, scales)
+                ]
 
         show_plot(draw)
 
