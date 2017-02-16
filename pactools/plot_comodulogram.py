@@ -39,8 +39,8 @@ def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
     ticks, tick_labels = compute_ticks(vmin, vmax, unit)
 
     if ax is None:
-        fig.subplots_adjust(right=0.85)
-        cbar_ax = fig.add_axes([0.90, 0.10, 0.03, 0.8])
+        fig.subplots_adjust(right=0.81)
+        cbar_ax = fig.add_axes([0.86, 0.10, 0.03, 0.8])
     else:
         cbar_ax = None
     cbar = fig.colorbar(cax, ax=ax, cax=cbar_ax, ticks=ticks)
