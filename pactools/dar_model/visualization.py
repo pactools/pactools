@@ -24,8 +24,9 @@ def plot_dar(model, title='', frange=None, mode='', vmin=None, vmax=None,
     xlim  : force xlim to these values if defined
     """
     # -------- get amplitude-frequency spectrum from model
-    spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(mode=mode,
-                                                                  xlim=xlim)
+    spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(
+        mode=mode, xlim=xlim, frange=frange)
+
     if cmap is None:
         if 'c' in mode:
             cmap = plt.get_cmap('RdBu_r')
@@ -97,8 +98,8 @@ def plot_dar_lines(model, title='', frange=None, mode='', fig=None, xlim=None,
         frange = [0, model.fs / 2.0]
 
     # -------- get amplitude-frequency spectrum from model
-    spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(mode=mode,
-                                                                  xlim=xlim)
+    spec, xlim, sigdriv, sigdriv_imag = model.amplitude_frequency(
+        mode=mode, xlim=xlim, frange=frange)
 
     if fig is None:
         fig = plt.figure(title)

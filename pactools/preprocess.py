@@ -119,7 +119,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                                       'low_pass filter.')
     else:
         filt = Carrier(extract_complex=extract_complex)
-        filt.design(fs, fc, n_cycles, bandwidth, zero_mean=False)
+        filt.design(fs, fc, n_cycles, bandwidth, zero_mean=True)
         if 'c' in draw or 'z' in draw:
             filt.plot(fscale='lin', print_width=True)
 
