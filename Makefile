@@ -2,10 +2,9 @@
 
 PYTHON ?= python
 NOSETESTS ?= nosetests
-CTAGS ?= ctags
 
 test:
-	#$(NOSETESTS) -s -v
+	$(NOSETESTS) -s -v
 
 trailing-spaces:
 	find . -name "*.py" -exec perl -pi -e 's/[ \t]*$$//' {} \;
@@ -20,3 +19,5 @@ ascii:
 	do \
 		iconv -f utf-8 -t ascii//translit $$file -o $$file; \
 	done;
+
+fix: trailing-spaces ascii code-analysis

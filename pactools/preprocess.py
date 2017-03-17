@@ -15,7 +15,7 @@ from .utils.arma import Arma
 
 def _decimate(x, q):
     """
-    Downsample the signal by using a filter.
+    Downsample the signal after low-pass filtering to avoid aliasing.
     An order 16 Chebyshev type I filter is used.
 
     Parameters
@@ -24,6 +24,7 @@ def _decimate(x, q):
         The signal to be downsampled, as an N-dimensional array.
     q : int
         The downsampling factor.
+
     Returns
     -------
     y : ndarray
@@ -42,13 +43,24 @@ def _decimate(x, q):
 
 
 def decimate(sig, fs, decimation_factor):
-    """Decimates the signal
+    """Decimates the signal:
+    Downsampling after low-pass filtering to avoid aliasing
 
-    sig               : raw input signal
-    fs                : sampling frequency of raw input signal
-    decimation_factor : ratio of sampling frequencies (old/new)
+    Parameters
+    ----------
+    sig : array
+        Raw input signal
+    fs : float
+        Sampling frequency of the input
+    decimation_factor : int > 0
+        Ratio of sampling frequencies (old/new)
 
-    returns the new signal and its sampling frequency
+    Returns
+    -------
+    sig : array
+        Decimated signal
+    fs : float
+        Sampling frequency of the output
 
     """
     # -------- center the signal
@@ -79,34 +91,53 @@ def decimate(sig, fs, decimation_factor):
 
     fs = fs / decimation_factor
 
-    # -------- return decimated signal
     return sig, fs
 
 
 def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                      draw='', ordar=8, enf=50.0, whiten_fill4=True,
                      random_noise=None, extract_complex=False, low_pass=False):
-    """Creates a FIR filter that extracts a carrier,
-    applies this filter to signal
+    """Creates a FIR bandpass filter, applies this filter to a signal to obtain
+    the filtered signal low_sig and its complement high_sig.
+    Also fills the frequency gap in high_sig.
 
-    sig        : input signal
-    fs         : sampling frequency
-    fc         : carrier frequency
-    n_cycles   : number of cycles in the wavelet
-    bandwidth  : bandwidth of the FIR wavelet filter
-                 (used when: bandwidth is not None and n_cycles is None)
-    fill       : what to do with the full band signal:
-                    0 : keep unchanged
-                    1 : filter out the carrier
-                    2 : replace the carrier with a white noise
-                    3 : replacing with driver[::-1]
-                    4 : removing a wide-band around carrier and then use fill=2
-    draw       : list of plots
-    ordar      : for the whitening with option fill=4
-    extract_complex : use a complex wavelet
-    low_pass   : use a low pass filter at fc instead of a bandpass at fc
+    sig : array
+        Input signal
+    fs : float
+        Sampling frequency
+    fc : float
+        Center frequency of the bandpass filter
+    n_cycles : float
+        Number of cycles in the bandpass filter
+        Should be None if bandwidth is not None
+    bandwidth : float
+        Bandwidth of the bandpass filter
+        Should be None if n_cycles is not None
+    fill : int in {0, 1, 2, 3, 4, 5}
+        Filling strategy for in high_sig
+        0 : keep the signal unchanged: high_sig = sig
+        1 : remove (the bandpass filtered signal): high_sig = sig - low_sig
+        2 : remove and replace by bandpass filtered Gaussian white noise
+        3 : remove and replace by low_sig[::-1]
+        4 : removing a wide-band around carrier and then use fill=2
+        5 : remove and replace by low_sig[::-1]
+    draw : string
+        List of plots to draw
+    ordar : int > 0
+        AR order for the whitening (only used when fill=4)
+    extract_complex : boolean
+        Use a complex wavelet
+    low_pass : boolean
+        Use a lowpass filter at fc instead of a bandpass filter centered at fc
 
-    returns carrier signal and processed full band signal
+    Returns
+    -------
+    low_sig : array
+        Bandpass filtered signal
+    high_sig : array
+        Processed fullband signal
+    low_sig_imag : array (returned only if extract_complex is True)
+        Imaginary part of the bandpass filtered signal
 
     """
     if random_noise is None:
@@ -144,9 +175,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
                                    labels=None, fs=fs, colors='bggck')
-            plt.legend(
-                ['signal', 'driver', 'signal-driver',
-                 'high_frequencies'], loc=0)
+            plt.legend(['signal', 'driver', 'signal-driver',
+                        'high_frequencies'], loc=0)
 
     elif fill == 2:
         # replacing driver by a white noise
