@@ -9,6 +9,8 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
+from ..utils.validation import check_array, check_consistent_shape
+
 
 EPSILON = np.finfo(np.float32).eps
 
@@ -928,9 +930,9 @@ class BaseDAR(object):
                 sigdriv_imag = self.sigdriv_imag
 
             if self.train_mask is not None:
-                sigdriv = sigdriv[self.train_mask != 0]
+                sigdriv = sigdriv[~self.train_mask]
                 if sigdriv_imag is not None:
-                    sigdriv_imag = sigdriv_imag[self.train_mask != 0]
+                    sigdriv_imag = sigdriv_imag[~self.train_mask]
 
             if sigdriv_imag is None:
                 bounds = np.percentile(sigdriv, [5, 95])
@@ -999,19 +1001,3 @@ def wgn_log_likelihood(eps, sigma2, mask=None):
 
 class NotFittedError(ValueError, AttributeError):
     """Exception class to raise if estimator is used before fitting."""
-
-
-def check_array(sig, dtype='float64', accept_none=False):
-    if accept_none and sig is None:
-        return None
-    elif not accept_none and sig is None:
-        raise ValueError("This array should not be None.")
-
-    return np.atleast_2d(np.array(sig, dtype=dtype))
-
-
-def check_consistent_shape(*args):
-    for array in args:
-        if array.shape != args[0].shape:
-            raise ValueError('Incompatible shapes. Got '
-                             '(%s != %s)' % (array.shape, args[0].shape))

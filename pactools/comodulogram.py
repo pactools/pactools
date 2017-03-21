@@ -11,6 +11,7 @@ from .utils.progress_bar import ProgressBar
 from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
 from .utils.maths import norm, argmax_2d, check_random_state
+from .utils.validation import check_array
 from .plot_comodulogram import plot_comodulogram
 from .preprocess import extract
 
@@ -111,10 +112,10 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
     """
     # The modulation index is only computed where mask is True
     if mask is not None:
-        filtered_low = filtered_low[:, mask == 0]
-        filtered_high = filtered_high[:, mask == 0]
+        filtered_low = filtered_low[:, ~mask]
+        filtered_high = filtered_high[:, ~mask]
         if method == 'vanwijk':
-            filtered_low_2 = filtered_low_2[:, mask == 0]
+            filtered_low_2 = filtered_low_2[:, ~mask]
     else:
         filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
         filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
@@ -158,7 +159,7 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
         elif method == 'vanwijk':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
                 filtered_low[i]), np.sin(filtered_low[i]), filtered_low_2[i]]
-        elif method == 'canolty':
+        elif method in ('canolty', 'ozkurt', ):
             phase_preprocessed = np.exp(1j * filtered_low[i])
         else:
             raise ValueError('Unknown method %s.' % method)
@@ -259,7 +260,7 @@ def _same_mask_on_all_epochs(sig, mask, method):
                           method,
                           mask.shape, ), UserWarning)
         mask = mask[0, :]
-    sig = sig[..., mask == 0]
+    sig = sig[..., ~mask]
     return sig
 
 
@@ -538,6 +539,9 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
     random_state = check_random_state(random_state)
     if isinstance(method, str):
         method = method.lower()
+    fs = float(fs)
+    low_sig = check_array(low_sig)
+    high_sig = check_array(high_sig, accept_none=True)
 
     # convert to numpy array
     low_fq_range = np.asarray(low_fq_range)
@@ -547,6 +551,7 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
                       (isinstance(mask, np.ndarray) and mask.ndim == 3))
     if not multiple_masks:
         mask = [mask]
+    mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
     n_masks = len(mask)
 
     if method in STANDARD_PAC_METRICS:
@@ -727,6 +732,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
     comod : array, shape (len(low_fq_range), len(high_fq_range))
         Comodulogram for each couple of frequencies
     """
+    random_state = check_random_state(random_state)
     sigdriv_imag = None
     low_sig = np.atleast_2d(low_sig)
     if high_sig is None:
@@ -743,6 +749,7 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                       (isinstance(mask, np.ndarray) and mask.ndim == 3))
     if not multiple_masks:
         mask = [mask]
+    mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
 
     extract_complex = True
 
@@ -756,7 +763,8 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
                     bandwidth=low_fq_width, fill=fill, ordar=ordar, enf=enf,
                     random_noise=random_noise, normalize=normalize,
                     whitening=whitening, draw='',
-                    extract_complex=extract_complex)):
+                    extract_complex=extract_complex,
+                    random_state=random_state)):
 
         if extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals

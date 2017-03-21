@@ -11,6 +11,7 @@ from .utils.spectrum import Spectrum
 from .utils.carrier import Carrier, LowPass
 from .utils.dehumming import dehummer
 from .utils.arma import Arma
+from .utils.maths import check_random_state
 
 
 def _decimate(x, q):
@@ -96,7 +97,8 @@ def decimate(sig, fs, decimation_factor):
 
 def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                      draw='', ordar=8, enf=50.0, whiten_fill4=True,
-                     random_noise=None, extract_complex=False, low_pass=False):
+                     random_noise=None, extract_complex=False, low_pass=False,
+                     random_state=None):
     """Creates a FIR bandpass filter, applies this filter to a signal to obtain
     the filtered signal low_sig and its complement high_sig.
     Also fills the frequency gap in high_sig.
@@ -129,6 +131,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         Use a complex wavelet
     low_pass : boolean
         Use a lowpass filter at fc instead of a bandpass filter centered at fc
+    random_state : None, int or np.random.RandomState instance
+        Seed or random number generator for the surrogate analysis
 
     Returns
     -------
@@ -140,8 +144,9 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         Imaginary part of the bandpass filtered signal
 
     """
+    rng = check_random_state(random_state)
     if random_noise is None:
-        random_noise = np.random.randn(len(sig))
+        random_noise = rng.randn(len(sig))
 
     if low_pass:
         filt = LowPass().design(fs=fs, fc=fc)
@@ -175,8 +180,9 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
                                    labels=None, fs=fs, colors='bggck')
-            plt.legend(['signal', 'driver', 'signal-driver',
-                        'high_frequencies'], loc=0)
+            plt.legend(
+                ['signal', 'driver', 'signal-driver',
+                 'high_frequencies'], loc=0)
 
     elif fill == 2:
         # replacing driver by a white noise
@@ -232,7 +238,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
             sig=white_sig, fs=fs, fc=fc, n_cycles=n_cycles,
             bandwidth=bandwidth, fill=2, draw=draw, enf=enf,
             random_noise=random_noise, extract_complex=False,
-            low_pass=low_pass)
+            low_pass=low_pass, random_state=rng)
 
         if 'z' in draw or 'c' in draw:
             plot_multiple_spectrum([
@@ -270,10 +276,13 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         return low_sig, high_sig
 
 
-def low_pass_and_fill(sig, fs, fc=1.0, draw=''):
-    low_sig, high_sig = extract_and_fill(sig, fs, fc, fill=1, low_pass=True)
+def low_pass_and_fill(sig, fs, fc=1.0, draw='', random_state=None):
+    low_sig, high_sig = extract_and_fill(sig, fs, fc, fill=1, low_pass=True,
+                                         random_state=random_state)
 
-    random_noise = np.random.randn(*sig.shape)
+    rng = check_random_state(random_state)
+    random_noise = rng.randn(*sig.shape)
+
     filt = LowPass().design(fs=fs, fc=fc)
     fill_sig = filt.direct(random_noise)
     filled_sig = fill_gap(sig=high_sig, fs=fs, fa=fc / 2., dfa=fc / 2.,
@@ -365,9 +374,12 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0, zero_phase=True,
     return sigout
 
 
-def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None):
+def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
+             random_state=None):
     """Fill a gap with white noise.
     """
+    rng = check_random_state(random_state)
+
     # -------- get the amplitude of the gap
     sp = Spectrum(block_length=min(2048, sig.size), fs=fs, wfunc=np.blackman)
     fft_length, _ = sp.check_params()
@@ -396,7 +408,7 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None):
         n_cycles = 1.65 * fa / dfa
         fir = Carrier()
         fir.design(fs, fa, n_cycles, None, zero_mean=False)
-        fill_sig = fir.direct(np.random.randn(*sig.shape))
+        fill_sig = fir.direct(rng.randn(*sig.shape))
 
     # -------- compute the scale parameter
     sp.periodogram(fill_sig, hold=True)
@@ -419,7 +431,8 @@ def show_plot(draw):
 
 
 def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
-               enf=50.0, block_length=2048, draw='', custom_func=None):
+               enf=50.0, block_length=2048, draw='', custom_func=None,
+               random_state=None):
     """Chains the successive steps of the process """
     # ------ read raw signal
     extension = os.path.splitext(raw_file)[1]
@@ -459,11 +472,17 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
         show_plot(draw)
 
     # -------- lowpass at 1 Hz
-    sigs = [low_pass_and_fill(sig=sig, fs=fs, draw=draw) for sig in sigs]
+    sigs = [
+        low_pass_and_fill(sig=sig, fs=fs, draw=draw, random_state=random_state)
+        for sig in sigs
+    ]
     show_plot(draw)
 
     if custom_func is not None:
-        sigs = [custom_func(sig=sig, fs=fs, draw=draw) for sig in sigs]
+        sigs = [
+            custom_func(sig=sig, fs=fs, draw=draw, random_state=random_state)
+            for sig in sigs
+        ]
         show_plot(draw)
 
     return sigs, fs, events
@@ -471,7 +490,7 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
 
 def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
             draw='', ordar=8, enf=50.0, random_noise=None, normalize=False,
-            whitening='after', extract_complex=False):
+            whitening='after', extract_complex=False, random_state=None):
     """
     Do fast preprocessing for several values of fc (the driver frequency).
 
@@ -485,13 +504,14 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     """
     low_fq_range = np.atleast_1d(low_fq_range)
     sigs = np.atleast_2d(sigs)
+    rng = check_random_state(random_state)
 
     if whitening == 'before':
         sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
         show_plot(draw)
 
     if fill in [2, 4, 5]:
-        random_noise = np.random.randn(len(sigs[0]))
+        random_noise = rng.randn(len(sigs[0]))
     else:
         random_noise = None
 
@@ -501,8 +521,9 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     low_and_high = [
         extract_and_fill(
             sig, fs=fs, fc=fc_low_pass, fill=fill, ordar=ordar, enf=enf,
-            whiten_fill4=whiten_fill4, random_noise=random_noise,
-            draw=draw, extract_complex=False, low_pass=True) for sig in sigs
+            whiten_fill4=whiten_fill4, random_noise=random_noise, draw=draw,
+            extract_complex=False, low_pass=True, random_state=random_state)
+        for sig in sigs
     ]
     high_sigs = [both[1] for both in low_and_high]
 
@@ -524,11 +545,12 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     ############ extract_and_fill the driver
     for fc in low_fq_range:
         low_and_high = [
-            extract_and_fill(sig, fs=fs, fc=fc, n_cycles=n_cycles,
-                             bandwidth=bandwidth, fill=fill, ordar=ordar,
-                             enf=enf, whiten_fill4=whiten_fill4,
-                             random_noise=random_noise, draw=draw,
-                             extract_complex=extract_complex) for sig in sigs
+            extract_and_fill(
+                sig, fs=fs, fc=fc, n_cycles=n_cycles, bandwidth=bandwidth,
+                fill=fill, ordar=ordar, enf=enf, whiten_fill4=whiten_fill4,
+                random_noise=random_noise, draw=draw,
+                extract_complex=extract_complex, random_state=random_state)
+            for sig in sigs
         ]
         low_sigs = [both[0] for both in low_and_high]
         if extract_complex:

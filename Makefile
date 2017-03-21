@@ -17,21 +17,21 @@ develop:
 clean:
 	rm -f `find pactools -name "*.so"`
 	rm -f `find pactools -name "*.pyc"`
-	rm -rf __pycache__
+	rm -rf `find pactools -name "*__pycache__*"`
 	rm -rf pactools.egg-info
 	rm -rf .tags
 	rm -rf .tags1
 
 ############
 test:
-	$(PYTEST) --pyargs pactools
+	$(PYTEST) --pyargs pactools -v
 
 test-coverage:
 	rm -rf coverage .coverage
 	rm -rf dist
 	rm -f `find pactools -name "*.so"`
 	$(PYTHON) setup.py build_ext -i
-	$(PYTEST) --pyargs --cov=pactools pactools --cov-config=.coveragerc
+	$(PYTEST) --pyargs --cov=pactools pactools -v --cov-config=.coveragerc
 
 ############
 trailing-spaces:
