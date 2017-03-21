@@ -1,0 +1,23 @@
+# make it explicit that we favor the new container-based travis workers
+sudo: false
+
+language: python
+
+env:
+  global:
+    # Directory where tests are run from
+    - TEST_DIR=/tmp/pactools
+  matrix:
+    - DISTRIB="ubuntu" PYTHON_VERSION="2.7"
+
+    - DISTRIB="conda" PYTHON_VERSION="3.6" INSTALL_MKL="true"
+      NUMPY_VERSION="1.11.2" SCIPY_VERSION="0.18.1" COVERAGE="true"
+
+
+install: source continuous_integration/install.sh
+before_script: source continuous_integration/before_script.sh
+script: source continuous_integration/test_script.sh
+after_success: source continuous_integration/after_success.sh
+
+notifications:
+  email: false

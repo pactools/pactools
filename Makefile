@@ -1,15 +1,43 @@
 # simple makefile to simplify repetetive build env management tasks
 
 PYTHON ?= python
-NOSETESTS ?= nosetests
+PYTEST ?= py.test --pyargs
 
+in: inplace
+
+inplace:
+	$(PYTHON) setup.py build_ext -i
+
+install:
+	$(PYTHON) setup.py install
+
+develop:
+	$(PYTHON) setup.py develop
+
+clean:
+	rm -f `find pactools -name "*.so"`
+	rm -f `find pactools -name "*.pyc"`
+	rm -rf __pycache__
+	rm -rf pactools.egg-info
+	rm -rf .tags
+	rm -rf .tags1
+
+############
 test:
-	$(NOSETESTS) -s -v
+	$(PYTEST) --pyargs pactools
 
+test-coverage:
+	rm -rf coverage .coverage
+	rm -rf dist
+	rm -f `find pactools -name "*.so"`
+	$(PYTHON) setup.py build_ext -i
+	$(PYTEST) --pyargs --cov=pactools pactools --cov-config=.coveragerc
+
+############
 trailing-spaces:
 	find . -name "*.py" -exec perl -pi -e 's/[ \t]*$$//' {} \;
 
-code-analysis:
+flake8:
 	flake8 . --ignore=E266,W503,E265
 
 ascii:
@@ -20,4 +48,4 @@ ascii:
 		iconv -f utf-8 -t ascii//translit $$file -o $$file; \
 	done;
 
-fix: trailing-spaces ascii code-analysis
+fix: trailing-spaces ascii flake8
