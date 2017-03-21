@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 
 def compute_ticks(vmin, vmax, unit=''):
+    """Compute the ticks in a colorbar."""
     centered = vmin == -vmax
 
     if vmax == vmin:
@@ -32,7 +33,7 @@ def compute_ticks(vmin, vmax, unit=''):
 
 
 def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
-    """Add a colorbar only once in a multiple subplot figure"""
+    """Add a colorbar only once in a multiple subplot figure."""
     if vmin == vmax:
         vmin = 0.
 
@@ -53,6 +54,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
                                 high_fq_range, high_fq_width,
                                 method, vmin=None, vmax=None,
                                 save_name=None):
+    """Plot one comodulogram with histograms."""
     vmin = min(0, comodulogram.min()) if vmin is None else vmin
     vmax = comodulogram.max() if vmax is None else vmax
     fig = plt.figure(figsize=(9, 9))

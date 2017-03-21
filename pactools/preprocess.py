@@ -497,7 +497,7 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
 
     ############ extract the high frequencies independently of the driver
     whiten_fill4 = whitening == 'after'
-    fc_low_pass = low_fq_range[-1] + low_fq_range[0] + bandwidth  # hack
+    fc_low_pass = low_fq_range[-1] + low_fq_range[0] + bandwidth  # hack
     low_and_high = [
         extract_and_fill(
             sig, fs=fs, fc=fc_low_pass, fill=fill, ordar=ordar, enf=enf,
