@@ -1,7 +1,7 @@
 
 import sys
 
-DEPENDENCIES = ['numpy', 'scipy', 'matplotlib', 'mne', 'neo']
+DEPENDENCIES = ['numpy', 'scipy', 'matplotlib', 'mne']
 
 
 def print_package_version(package_name, indent='  '):
