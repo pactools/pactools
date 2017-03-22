@@ -21,6 +21,7 @@ clean:
 	rm -rf pactools.egg-info
 	rm -rf .tags
 	rm -rf .tags1
+	rm -rf .coverage
 
 ############
 test:
