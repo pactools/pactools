@@ -6,7 +6,7 @@ This package provides tools to estimate **phase-amplitude coupling (PAC)** in ne
 
 ## Install
 
-Dependencies_**_
+**Dependencies**
 
 The code is not fully tested. It is supposed to be working with:
 
