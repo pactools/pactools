@@ -14,9 +14,10 @@ high_fq_range = [25., 50., 75.]
 n_low = len(low_fq_range)
 n_high = len(high_fq_range)
 n_points = 1024
+fs = 200.
 
-fs, signal, _, _ = create_signal(
-    n_points=n_points, fs=200., high_fq=high_fq_range[1],
+signal = create_signal(
+    n_points=n_points, fs=fs, high_fq=high_fq_range[1],
     low_fq=low_fq_range[1], low_fq_width=1., noise_level=0.1, random_state=0)
 
 

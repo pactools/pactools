@@ -54,17 +54,9 @@ def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     Returns
     -------
-    fs : float
-        Sampling frequency
-
     signal : array, shape (n_points, )
         Signal with artifical PAC
 
-    theta : array, shape (n_points, )
-        Signal with the slow oscillation
-
-    gamma : array, shape (n_points, )
-        Signal with the fast oscillation modulated
     """
     n_points = int(n_points)
     fs = float(fs)
@@ -79,7 +71,8 @@ def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     fir.design(fs, low_fq, n_cycles=None, bandwidth=low_fq_width)
     driver_real, driver_imag = fir.direct(rng.randn(n_points))
     driver = driver_real + 1j * driver_imag
-    driver *= low_fq_amp / driver.std()
+    # We scale by sqrt(2) to have correct amplitude in the real-valued driver
+    driver *= low_fq_amp / driver.std() * np.sqrt(2)
 
     # decay of sigdriv for continuity after np.roll
     if delay != 0:
@@ -112,4 +105,4 @@ def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     # add all oscillations
     signal = gamma + theta + noise
 
-    return fs, signal, theta, gamma
+    return signal
