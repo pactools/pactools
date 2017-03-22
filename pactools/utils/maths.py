@@ -25,6 +25,7 @@ def squared_norm(x):
     Returns the Euclidean norm when x is a vector, the Frobenius norm when x
     is a matrix (2-d array). Faster than norm(x) ** 2.
     """
+    x = np.asarray(x)
     x = x.ravel(order='K')
     return np.dot(x, np.conj(x))
 

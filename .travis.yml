@@ -10,7 +10,7 @@ install:
     - source activate testenv
     - conda install --yes --quiet numpy scipy matplotlib
     - conda install --yes --quiet pytest pytest-cov
-    - pip install -q flake8
+    - pip install -q flake8 mne
     - python setup.py install
 script:
     - pytest --cov=pactools pactools -v

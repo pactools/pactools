@@ -2,10 +2,11 @@ from functools import partial
 
 import numpy as np
 
-from pactools.utils.maths import argmax_2d
+from pactools.dar_model import AR, DAR, HAR, StableDAR
+from pactools.utils.testing import assert_equal
 from pactools.utils.testing import assert_raises, assert_array_equal
 from pactools.utils.testing import assert_true, assert_array_almost_equal
-from pactools.comodulogram import comodulogram
+from pactools.comodulogram import comodulogram, get_maximum_pac
 from pactools.comodulogram import ALL_PAC_METRICS, BICOHERENCE_PAC_METRICS
 from pactools.create_signal import create_signal
 
@@ -13,12 +14,14 @@ low_fq_range = [1., 3., 5., 7.]
 high_fq_range = [25., 50., 75.]
 n_low = len(low_fq_range)
 n_high = len(high_fq_range)
+high_fq = high_fq_range[1]
+low_fq = low_fq_range[1]
 n_points = 1024
 fs = 200.
 
-signal = create_signal(
-    n_points=n_points, fs=fs, high_fq=high_fq_range[1],
-    low_fq=low_fq_range[1], low_fq_width=1., noise_level=0.1, random_state=0)
+signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
+                       low_fq=low_fq, low_fq_width=1., noise_level=0.1,
+                       random_state=0)
 
 
 def fast_comod(**kwargs):
@@ -69,17 +72,21 @@ def test_high_sig_identical():
         assert_array_equal(comod_0, comod_1)
 
 
-def test_comod_maximum():
+def test_comod_correct_maximum():
     # Test that the PAC is maximum at the correct location in the comodulogram
     for method in ALL_PAC_METRICS:
-        comod = fast_comod(method=method)
+        comod = fast_comod(method=method, progress_bar=True)
         # test the shape of the comodulogram
         assert_array_equal(comod.shape, (n_low, n_high))
 
         # the bicoherence metrics fail this test with current parameters
         if method in BICOHERENCE_PAC_METRICS or method == 'jiang':
             continue
-        assert_array_equal(argmax_2d(comod), (1, 1))
+
+        low_fq_0, high_fq_0, _ = get_maximum_pac(comod, low_fq_range,
+                                                 high_fq_range)
+        assert_equal(low_fq_0, low_fq)
+        assert_equal(high_fq_0, high_fq)
         assert_true(np.all(comod > 0))
 
 
@@ -91,3 +98,11 @@ def test_empty_mask():
         comod_0 = fast_comod(mask=mask, method=method)
         comod_1 = fast_comod(low_sig=signal[~mask], method=method)
         assert_array_almost_equal(comod_0, comod_1, decimal=7)
+
+
+def test_comodulogram_dar_models():
+    # Smoke test with DAR models
+    for klass in (AR, DAR, HAR, StableDAR):
+        model = klass(ordar=10, ordriv=2)
+        comod = fast_comod(method=model)
+        assert_true(~np.any(np.isnan(comod)))

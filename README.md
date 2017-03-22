@@ -2,7 +2,9 @@
 
 [![Build Status](https://travis-ci.org/pactools/pactools.svg?branch=master)](https://travis-ci.org/pactools/pactools) [![codecov](https://codecov.io/gh/pactools/pactools/branch/master/graph/badge.svg)](https://codecov.io/gh/pactools/pactools)
 
-This package provides tools to estimate **phase-amplitude coupling (PAC)** in neural time series. In particular, it implements the **driven auto-regressive (DAR)** models presented in the reference below.
+This package provides tools to estimate **phase-amplitude coupling (PAC)** in neural time series.
+
+In particular, it implements the **driven auto-regressive (DAR)** models presented in the reference below.
 
 ## Install
 
