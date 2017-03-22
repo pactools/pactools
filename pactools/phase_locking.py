@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from .comodulogram import multiple_band_pass
+from .utils.peak_finder import peak_finder
 from .viz.plot_phase_locking import plot_trough_locked_time
 from .viz.plot_phase_locking import plot_trough_locked_time_frequency
 
@@ -150,7 +151,6 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
     Also remove the peaks that are too close to the start or the end
     of each epoch, and the peaks that are masked by the mask.
     """
-    from mne.preprocessing.peak_finder import peak_finder
     n_epochs, n_points = x0.shape
 
     peak_inds_list = []

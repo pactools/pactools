@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.signal import hilbert
-from mne.filter import band_pass_filter
 
 from .utils.spectrum import compute_n_fft
 from .utils.carrier import Carrier
@@ -65,6 +64,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
 
             # --------- with mne.filter.band_pass_filter
             if filter_method == 'mne':
+                from mne.filter import band_pass_filter
                 low_sig = band_pass_filter(
                     sigs[ii, :], Fs=fs, Fp1=frequency - bandwidth / 2.0,
                     Fp2=frequency + bandwidth / 2.0,

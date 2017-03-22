@@ -15,7 +15,7 @@ Python >= 3.5
 NumPy >= 1.10
 SciPy >= 0.17
 Matplotlib >= 1.5
-MNE-Python >= 0.11
+MNE-Python >= 0.11 (optional)
 PYTEST >= 3.0 (optional, used for testing)
 ```
 
