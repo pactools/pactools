@@ -76,10 +76,6 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
                     best_energy = energy
             f0 = best_f
 
-        # if np.abs(best_f - enf) > 0.8:
-        #     warnings.warn('found invalid enf (%.3f) between %d and %d'
-        #                   % (best_f, tstart, tstop))
-
         # -------- this block has been processed, save it
         result[tstart:tstop] += best_sigout * window[wstart:wstop]
 
@@ -116,17 +112,6 @@ def single_estimate(sigin, f, fs, hmax):
 
     return the estimated signal
     """
-    # same output, 15% slower
-    # X = np.zeros((len(sigin), 2 * hmax))
-    # for k in range(hmax):
-    #     p = ((2.0 * np.pi * f * (k + 1) / fs)
-    #          * np.arange(len(sigin)))
-    #     X[:, 2 * k] = np.cos(p)
-    #     X[:, 2 * k + 1] = np.sin(p)
-    # XX = np.dot(X.T, X)
-    # Xy = np.dot(X.T, sigin)
-    # theta = linalg.solve(XX, Xy)
-
     X = np.empty((len(sigin), hmax))
     fact = 2.0 * np.pi * f / fs * np.arange(1, hmax + 1)[:, None]
     p = np.arange(len(sigin))[:, None]
@@ -137,11 +122,3 @@ def single_estimate(sigin, f, fs, hmax):
     Xy = np.dot(X.T, sigin)
     theta = linalg.solve(XX, Xy)
     return np.dot(X, theta)
-
-
-def example():
-    # create a signal
-    sig = np.random.randn(50000)
-
-    # remove electric network frequency
-    dehummer(sig, fs=400.0, enf=50.0, block_length=2048, draw='z')

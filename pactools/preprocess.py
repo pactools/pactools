@@ -4,7 +4,6 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 
-from .io.smr2mne import smr2sig
 from .utils.spectrum import Spectrum
 from .utils.carrier import Carrier, LowPass
 from .utils.dehumming import dehummer
@@ -426,64 +425,6 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
 def _show_plot(draw):
     if draw:
         plt.show()
-
-
-def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
-               enf=50.0, block_length=2048, draw='', custom_func=None,
-               random_state=None):
-    """Chains the successive steps of the process """
-    # ------ read raw signal
-    extension = os.path.splitext(raw_file)[1]
-    if extension == '.smr':
-        sigs, fs, events = smr2sig(raw_file)
-    else:
-        raise (ValueError, 'invalid extension %s' % extension)
-
-    # ------ remove the beginning or the end of the signal
-    if start is not None:
-        nmin = max(int(start * fs), 0)
-        sigs = [sig[nmin:] for sig in sigs]
-
-        events = {key: value - start for key, value in events.items()}
-        if stop is not None:
-            stop = stop - start
-    if stop is not None:
-        nmax = min(int(stop * fs), sigs[0].size)
-        sigs = [sig[:nmax] for sig in sigs]
-
-    # -------- decimation
-    if decimation_factor is not None:
-        fs = fs / decimation_factor
-        sigs = [
-            decimate(sig, fs, decimation_factor=decimation_factor)[0]
-            for sig in sigs
-        ]
-        _show_plot(draw)
-
-    # -------- reduce noise at 50 or 60 Hz
-    if enf is not None:
-        hmax = int(0.5 * fs / enf)
-        sigs = [
-            dehummer(sig, fs, enf=enf, hmax=hmax, block_length=block_length,
-                     draw=draw) for sig in sigs
-        ]
-        _show_plot(draw)
-
-    # -------- lowpass at 1 Hz
-    sigs = [
-        low_pass_and_fill(sig=sig, fs=fs, draw=draw, random_state=random_state)
-        for sig in sigs
-    ]
-    _show_plot(draw)
-
-    if custom_func is not None:
-        sigs = [
-            custom_func(sig=sig, fs=fs, draw=draw, random_state=random_state)
-            for sig in sigs
-        ]
-        _show_plot(draw)
-
-    return sigs, fs, events
 
 
 def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,

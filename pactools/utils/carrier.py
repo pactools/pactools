@@ -157,25 +157,3 @@ class LowPass:
         filtered = low_pass_filter(
             sigin.astype(np.float64), Fs=self.fs, Fp=self.fc, method='iir')
         return filtered
-
-
-def test1():
-    print('testing carrier with constant n_cycles')
-    fs = 33.83
-
-    fig = None
-    carrier = Carrier()
-    for f in np.linspace(1.0, 15.0, 10):
-        carrier.design(fs, f, n_cycles=7.0)
-        fig = carrier.plot(fig=fig, fscale='lin', print_width=True)
-
-    plt.show()
-
-    print('testing carrier with constant bandwidth')
-    fig = None
-    carrier = Carrier()
-    for f in np.linspace(1.0, 15.0, 10):
-        carrier.design(fs, f, n_cycles=None, bandwidth=1.1785, zero_mean=True)
-        fig = carrier.plot(fig=fig, fscale='lin', print_width=True)
-
-    plt.show()

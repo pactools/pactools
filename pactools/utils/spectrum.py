@@ -1,12 +1,11 @@
-from itertools import chain
-
 import numpy as np
 import scipy as sp
 from scipy.linalg import hankel
 from scipy.signal import hilbert
 import matplotlib.pyplot as plt
 
-from .maths import square
+from .maths import square, is_power2, prime_factors, compute_n_fft
+from ..viz.utils import compute_vmin_vmax
 
 
 class Spectrum(object):
@@ -440,8 +439,8 @@ class Bicoherence(Spectrum):
         ax.set_title('Bicoherence (%s)' % self.method)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Frequency (Hz)')
-        add_colorbar(fig, cax, vmin, vmax, unit='', ax=ax)
-        return fig
+        #add_colorbar(fig, cax, vmin, vmax, unit='', ax=ax)
+        return ax
 
     def main_frequency(self):
         pass
@@ -496,108 +495,3 @@ def crop_for_fast_hilbert(signals):
         while prime_factors(tmax)[-1] > 20:
             tmax -= 1
         return signals[:, :tmax]
-
-
-def compute_n_fft(signals):
-    """
-    Compute the number of element in the FFT to have a good prime
-    decomposition, for hilbert filter.
-    """
-    n_fft = signals.shape[-1]
-    while prime_factors(n_fft)[-1] > 20:
-        n_fft += 1
-    return n_fft
-
-
-def prime_factors(num):
-    """
-    Decomposition in prime factor.
-    Used to find signal length that speed up Hilbert transform.
-
-    Parameters
-    ----------
-    num : int
-        Number.
-
-    Returns
-    -------
-    decomposition : list of int
-        List of prime factors sorted by ascending order
-    """
-    assert num > 0
-    assert isinstance(num, int)
-
-    decomposition = []
-    for i in chain([2], range(3, int(np.sqrt(num)) + 1, 2)):
-        while num % i == 0:
-            num = num // i
-            decomposition.append(i)
-        if num == 1:
-            break
-    if num != 1:
-        decomposition.append(num)
-    return decomposition
-
-
-def is_power2(num):
-    """Test if number is a power of 2
-
-    Parameters
-    ----------
-    num : int
-        Number.
-
-    Returns
-    -------
-    b : bool
-        True if is power of 2.
-
-    Examples
-    --------
-    >>> is_power2(2 ** 3)
-    True
-    >>> is_power2(5)
-    False
-    """
-    num = int(num)
-    return num != 0 and ((num & (num - 1)) == 0)
-
-
-def compute_vmin_vmax(spec, vmin=None, vmax=None, tick=0.01, percentile=1):
-    """compute automatic scale for plotting `spec`"""
-    if percentile > 100:
-        percentile = 100
-    if percentile < 0:
-        percentile = 0
-
-    if vmin is None:
-        vmin = np.floor(np.percentile(spec, percentile) / tick) * tick
-    if vmax is None:
-        vmax = np.ceil(np.percentile(spec, 100 - percentile) / tick) * tick
-
-    return vmin, vmax
-
-
-def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
-    """Add a colorbar only once in a multiple subplot figure"""
-    if vmin == vmax:
-        vmin = 0.
-    log_scale = np.floor(np.log10((vmax - vmin) / 3.0))
-    scale = 10. ** log_scale
-    vmax = np.floor(vmax / scale) * scale
-    vmin = np.ceil(vmin / scale) * scale
-
-    range_scale = int((vmax - vmin) / scale)
-    step = np.ceil(range_scale / 7.) * scale
-
-    ticks_str = '%%.%df' % max(0, -int(log_scale))
-    ticks = np.arange(vmin, vmax + step, step)
-    ticks_str += ' ' + unit
-
-    fig.subplots_adjust(right=0.85)
-    if ax is None:
-        cbar_ax = fig.add_axes([0.90, 0.10, 0.03, 0.8])
-    else:
-        cbar_ax = None
-    cbar = fig.colorbar(cax, ax=ax, cax=cbar_ax, ticks=ticks)
-    cbar.ax.set_yticklabels([ticks_str % t for t in ticks])

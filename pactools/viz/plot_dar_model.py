@@ -2,11 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..utils.spectrum import Spectrum
-from ..plot_comodulogram import add_colorbar
+from .viz.utils import add_colorbar, compute_vmin_vmax
 
 
-def plot_dar(model, title='', frange=None, mode='', vmin=None, vmax=None,
-             fig=None, xlim=None, cmap=None, colorbar=True):
+def plot_dar_model(model, title='', frange=None, mode='', vmin=None, vmax=None,
+                   fig=None, xlim=None, cmap=None, colorbar=True):
     """
     represent the power spectral density as a function of
     the amplitude of the driving signal
@@ -160,21 +160,6 @@ def plot_dar_lines(model, title='', frange=None, mode='', fig=None, xlim=None,
     ax.grid('on')
 
     return fig
-
-
-def compute_vmin_vmax(spec, vmin=None, vmax=None, tick=0.01, percentile=1):
-    """compute automatic scale for plotting `spec`"""
-    if percentile > 100:
-        percentile = 100
-    if percentile < 0:
-        percentile = 0
-
-    if vmin is None:
-        vmin = np.floor(np.percentile(spec, percentile) / tick) * tick
-    if vmax is None:
-        vmax = np.ceil(np.percentile(spec, 100 - percentile) / tick) * tick
-
-    return vmin, vmax
 
 
 def phase_string(sig):

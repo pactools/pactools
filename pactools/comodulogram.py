@@ -2,18 +2,17 @@ import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import hilbert
 from scipy.interpolate import interp1d, interp2d
 
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
-from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
-from .utils.carrier import Carrier
+from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d
 from .utils.validation import check_array, check_random_state
 from .viz.plot_comodulogram import plot_comodulogram
 from .preprocess import extract
+from .bandpass_filter import multiple_band_pass
 
 N_BINS_TORT = 18
 
@@ -24,418 +23,6 @@ BICOHERENCE_PAC_METRICS = ['sigl', 'nagashima', 'hagihira', 'bispectrum']
 
 ALL_PAC_METRICS = (STANDARD_PAC_METRICS + MODEL_BASED_PAC_METRICS +
                    COHERENCE_PAC_METRICS + BICOHERENCE_PAC_METRICS)
-
-
-def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
-                       filter_method='carrier'):
-    """
-    Band-pass filter the signal at multiple frequencies
-
-    Parameters
-    ----------
-    sigs : array, shape (n_epochs, n_points)
-        Input array to filter
-
-    fs : float
-        Sampling frequency
-
-    frequency_range : float, list, or array, shape (n_frequencies, )
-        List of center frequency of bandpass filters.
-
-    bandwidth : float
-        Bandwidth of the bandpass filters.
-        Use it to have a constant bandwidth for all filters.
-        Should be None if n_cycles is not None.
-
-    n_cycles : float
-        Number of cycles of the bandpass filters.
-        Use it to have a bandwidth proportional to the center frequency.
-        Should be None if bandwidth is not None.
-
-    filter_method : string, in {'mne', 'carrier'}
-        Method to bandpass filter.
-        - 'carrier' uses internal wavelet-based bandpass filter. (default)
-        - 'mne' uses mne.filter.band_pass_filter in MNE-python package
-
-
-    Return
-    ------
-    filtered : array, shape (n_frequencies, n_epochs, n_points)
-        Bandpass filtered version of the input signals
-    """
-    fixed_n_cycles = n_cycles
-
-    sigs = np.atleast_2d(sigs)
-    n_fft = compute_n_fft(sigs)
-    n_epochs, n_points = sigs.shape
-
-    frequency_range = np.atleast_1d(frequency_range)
-    n_frequencies = frequency_range.shape[0]
-
-    if filter_method == 'carrier':
-        fir = Carrier()
-
-    filtered = np.zeros((n_frequencies, n_epochs, n_points),
-                        dtype=np.complex128)
-    for ii in range(n_epochs):
-        for jj, frequency in enumerate(frequency_range):
-            # evaluate the number of cycle for this bandwidth and frequency
-            if fixed_n_cycles is None:
-                n_cycles = 1.65 * frequency / bandwidth
-
-            # --------- with mne.filter.band_pass_filter
-            if filter_method == 'mne':
-                from mne.filter import band_pass_filter
-                low_sig = band_pass_filter(
-                    sigs[ii, :], Fs=fs, Fp1=frequency - bandwidth / 2.0,
-                    Fp2=frequency + bandwidth / 2.0,
-                    l_trans_bandwidth=bandwidth / 4.0,
-                    h_trans_bandwidth=bandwidth / 4.0, n_jobs=1, method='iir')
-
-            # --------- with pactools.Carrier
-            if filter_method == 'carrier':
-                fir.design(fs, frequency, n_cycles, None, zero_mean=True)
-                low_sig = fir.direct(sigs[ii, :])
-
-            # common to the two methods
-            filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
-
-    return filtered
-
-
-def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
-                  progress_bar, draw_phase, minimum_shift, random_state,
-                  filtered_low_2):
-    """
-    Helper function to compute the comodulogram.
-    Used by PAC method in STANDARD_PAC_METRICS.
-    """
-    # The modulation index is only computed where mask is True
-    if mask is not None:
-        filtered_low = filtered_low[:, ~mask]
-        filtered_high = filtered_high[:, ~mask]
-        if method == 'vanwijk':
-            filtered_low_2 = filtered_low_2[:, ~mask]
-    else:
-        filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
-        filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
-        if method == 'vanwijk':
-            filtered_low_2 = filtered_low_2.reshape(filtered_low_2.shape[0],
-                                                    -1)
-
-    n_low, n_points = filtered_low.shape
-    n_high, _ = filtered_high.shape
-
-    # phase of the low frequency signals
-    for i in range(n_low):
-        filtered_low[i] = np.angle(filtered_low[i])
-    filtered_low = np.real(filtered_low)
-
-    # amplitude of the high frequency signals
-    filtered_high = np.real(np.abs(filtered_high))
-    norm_a = np.zeros(n_high)
-    if method == 'ozkurt':
-        for j in range(n_high):
-            norm_a[j] = norm(filtered_high[j])
-
-    # amplitude of the low frequency signals
-    if method == 'vanwijk':
-        for i in range(n_low):
-            filtered_low_2[i] = np.abs(filtered_low_2[i])
-        filtered_low_2 = np.real(filtered_low_2)
-
-    # Calculate the modulation index for each couple
-    comod = np.zeros((n_low, n_high))
-    for i in range(n_low):
-        # preproces the phase array
-        if method == 'tort':
-            n_bins = N_BINS_TORT
-            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
-            # get the indices of the bins to which each value in input belongs
-            phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
-        elif method == 'penny':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
-                filtered_low[i]), np.sin(filtered_low[i])]
-        elif method == 'vanwijk':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
-                filtered_low[i]), np.sin(filtered_low[i]), filtered_low_2[i]]
-        elif method in (
-                'canolty',
-                'ozkurt', ):
-            phase_preprocessed = np.exp(1j * filtered_low[i])
-        else:
-            raise ValueError('Unknown method %s.' % method)
-
-        for j in range(n_high):
-
-            def comod_function(shift):
-                return _one_modulation_index(
-                    amplitude=filtered_high[j],
-                    phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
-                    method=method, shift=shift, draw_phase=draw_phase)
-
-            comod[i, j] = _surrogate_analysis(comod_function, fs, n_points,
-                                              minimum_shift, random_state,
-                                              n_surrogates)
-
-        if progress_bar:
-            progress_bar.update_with_increment_value(1)
-
-    return comod
-
-
-def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
-                          draw_phase):
-    """
-    Compute one modulation index.
-    Used by PAC method in STANDARD_PAC_METRICS.
-    """
-    # shift for the surrogate analysis
-    if shift != 0:
-        phase_preprocessed = np.roll(phase_preprocessed, shift)
-
-    # Modulation index as in [Ozkurt & al 2011]
-    if method == 'ozkurt':
-        MI = np.abs(np.mean(amplitude * phase_preprocessed))
-        MI *= np.sqrt(amplitude.size) / norm_a
-
-    # Generalized linear models as in [Penny & al 2008] or [van Wijk & al 2015]
-    elif method in ('penny', 'vanwijk'):
-        # solve a linear regression problem:
-        # amplitude = np.dot(phase_preprocessed) * beta
-        PtP = np.dot(phase_preprocessed.T, phase_preprocessed)
-        PtA = np.dot(phase_preprocessed.T, amplitude[:, None])
-        beta = np.linalg.solve(PtP, PtA)
-        residual = amplitude - np.dot(phase_preprocessed, beta).ravel()
-        variance_amplitude = np.var(amplitude)
-        variance_residual = np.var(residual)
-        MI = (variance_amplitude - variance_residual) / variance_amplitude
-
-    # Modulation index as in [Canolty & al 2006]
-    elif method == 'canolty':
-        MI = np.abs(np.mean(amplitude * phase_preprocessed))
-
-    # Modulation index as in [Tort & al 2010]
-    elif method == 'tort':
-        # mean amplitude distribution along phase bins
-        n_bins = N_BINS_TORT
-        amplitude_dist = np.ones(n_bins)  # default is 1 to avoid log(0)
-        for b in np.unique(phase_preprocessed):
-            selection = amplitude[phase_preprocessed == b]
-            amplitude_dist[b] = np.mean(selection)
-
-        # Kullback-Leibler divergence of the distribution vs uniform
-        amplitude_dist /= np.sum(amplitude_dist)
-        divergence_kl = np.sum(amplitude_dist *
-                               np.log(amplitude_dist * n_bins))
-
-        MI = divergence_kl / np.log(n_bins)
-
-        if draw_phase and shift == 0:
-            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
-            phase_bins = 0.5 * (phase_bins[:-1] + phase_bins[1:]) / np.pi * 180
-            plt.plot(phase_bins, amplitude_dist, '.-')
-            plt.plot(phase_bins, np.ones(n_bins) / n_bins, '--')
-            plt.ylim((0, 2. / n_bins))
-            plt.xlim((-180, 180))
-            plt.ylabel('Normalized mean amplitude')
-            plt.xlabel('Phase (in degree)')
-            plt.title('Tort index: %.3f' % MI)
-
-    else:
-        raise ValueError("Unknown method: %s" % (method, ))
-
-    return MI
-
-
-def _same_mask_on_all_epochs(sig, mask, method):
-    """
-    PAC metrics based on coherence or bicoherence,
-    the same mask is applied on all epochs.
-    """
-    mask = np.squeeze(mask)
-    if mask.ndim > 1:
-        warnings.warn("For coherence methods (e.g. %s) the mask has "
-                      "to be unidimensional, and the same mask is "
-                      "applied on all epochs. Got shape %s, so only the "
-                      "first row of the mask is used." % (
-                          method,
-                          mask.shape, ), UserWarning)
-        mask = mask[0, :]
-    sig = sig[..., ~mask]
-    return sig
-
-
-def _bicoherence(fs, sig, mask, method, low_fq_range, low_fq_width,
-                 high_fq_range, coherence_params):
-    """
-    Helper function for the comodulogram.
-    Used by PAC method in BICOHERENCE_PAC_METRICS.
-    """
-    # The modulation index is only computed where mask is True
-    if mask is not None:
-        sig = _same_mask_on_all_epochs(sig, mask, method)
-
-    n_epochs, n_points = sig.shape
-
-    coherence_params = _define_default_params(fs, low_fq_width, method,
-                                              **coherence_params)
-
-    estimator = Bicoherence(**coherence_params)
-    bicoh = estimator.fit(sigs=sig, method=method)
-
-    # remove the redundant part
-    n_freq = bicoh.shape[0]
-    np.flipud(bicoh)[np.triu_indices(n_freq, 1)] = 0
-    bicoh[np.triu_indices(n_freq, 1)] = 0
-
-    frequencies = np.linspace(0, fs / 2., n_freq)
-    comod = _interpolate(frequencies, frequencies, bicoh, high_fq_range,
-                         low_fq_range)
-
-    return comod
-
-
-def _define_default_params(fs, low_fq_width, method, **user_params):
-    """
-    Define default values for Coherence and Bicoherence classes,
-    if not defined in user_params dictionary.
-    """
-
-    # the FFT length is chosen to have a frequency resolution of low_fq_width
-    fft_length = fs / low_fq_width
-    # but it is faster if it is a power of 2
-    fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
-
-    # smoothing for bicoherence methods
-    if method in BICOHERENCE_PAC_METRICS:
-        fft_length /= 4
-    # not smoothed for because we convolve after
-    if method == 'jiang':
-        fft_length *= 2
-
-    # the block length is chosen to avoid zero-padding
-    block_length = fft_length
-
-    if 'block_length' not in user_params and 'fft_length' not in user_params:
-        user_params['block_length'] = block_length
-        user_params['fft_length'] = fft_length
-    elif 'block_length' in user_params and 'fft_length' not in user_params:
-        user_params['fft_length'] = user_params['block_length']
-    elif 'block_length' not in user_params and 'fft_length' in user_params:
-        user_params['block_length'] = user_params['fft_length']
-
-    if 'fs' not in user_params:
-        user_params['fs'] = fs
-    if 'step' not in user_params:
-        user_params['step'] = None
-
-    return user_params
-
-
-def _coherence(fs, low_sig, filtered_high, mask, method, low_fq_range,
-               low_fq_width, n_surrogates, minimum_shift, random_state,
-               progress_bar, coherence_params):
-    """
-    Helper function to compute the comodulogram.
-    Used by PAC method in COHERENCE_PAC_METRICS.
-    """
-    if mask is not None:
-        low_sig = _same_mask_on_all_epochs(low_sig, mask, method)
-        filtered_high = _same_mask_on_all_epochs(filtered_high, mask, method)
-
-    # amplitude of the high frequency signals
-    filtered_high = np.real(np.abs(filtered_high))
-
-    coherence_params = _define_default_params(fs, low_fq_width, method,
-                                              **coherence_params)
-
-    n_epochs, n_points = low_sig.shape
-
-    def comod_function(shift):
-        return _one_coherence_modulation_index(fs, low_sig, filtered_high,
-                                               method, low_fq_range,
-                                               coherence_params, shift)
-
-    comod = _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
-                                random_state, n_surrogates)
-
-    return comod
-
-
-def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
-                                    low_fq_range, coherence_params, shift):
-    """
-    Compute one modulation index.
-    Used by PAC method in COHERENCE_PAC_METRICS.
-    """
-    if shift != 0:
-        low_sig = np.roll(low_sig, shift)
-
-    # the actual frequency resolution is computed here
-    delta_freq = fs / coherence_params['fft_length']
-
-    estimator = Coherence(**coherence_params)
-    coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
-    n_high, n_freq = coherence.shape
-    frequencies = np.linspace(0, fs / 2., n_freq)
-
-    # Coherence as in [Colgin & al 2009]
-    if method == 'colgin':
-        coherence = np.real(np.abs(coherence))
-
-        comod = _interpolate(
-            np.arange(n_high), frequencies, coherence,
-            np.arange(n_high), low_fq_range)
-
-    # Phase slope index as in [Jiang & al 2015]
-    elif method == 'jiang':
-        product = coherence[:, 1:] * np.conjugate(coherence[:, :-1])
-
-        # we use a kernel of (ker * 2) with respect to the product,
-        # i.e. a kernel of (ker * 2 +1) with respect to the coherence.
-        ker = 2
-        kernel = np.ones(2 * ker) / (2 * ker)
-        phase_slope_index = np.zeros((n_high, n_freq - (2 * ker)),
-                                     dtype=np.complex128)
-        for i in range(n_high):
-            phase_slope_index[i] = np.convolve(product[i], kernel, 'valid')
-        phase_slope_index = np.imag(phase_slope_index)
-        frequencies = frequencies[ker:-ker]
-
-        # transform the phase slope index into an approximated delay
-        delay = phase_slope_index / (2. * np.pi * delta_freq)
-
-        comod = _interpolate(
-            np.arange(n_high), frequencies, delay,
-            np.arange(n_high), low_fq_range)
-
-    else:
-        raise ValueError('Unknown method %s' % (method, ))
-
-    return comod
-
-
-def _interpolate(x1, y1, z1, x2, y2):
-    """Helper to interpolate in 1d or 2d
-
-    We interpolate to get the same shape than with other methods.
-    """
-    if x1.size > 1 and y1.size > 1:
-        func = interp2d(x1, y1, z1.T, kind='linear', bounds_error=False)
-        z2 = func(x2, y2)
-    elif x1.size == 1 and y1.size > 1:
-        func = interp1d(y1, z1.ravel(), kind='linear', bounds_error=False)
-        z2 = func(y2)
-    elif y1.size == 1 and x1.size > 1:
-        func = interp1d(x1, z1.ravel(), kind='linear', bounds_error=False)
-        z2 = func(x2)
-    else:
-        raise ValueError("Can't interpolate a scalar.")
-
-    # interp2d is not intuitive and return this shape:
-    z2.shape = (y2.size, x2.size)
-    return z2
 
 
 def comodulogram(fs, low_sig, high_sig=None, mask=None,
@@ -813,6 +400,339 @@ def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
         return comod_list[0]
     else:
         return comod_list
+
+
+def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
+                  progress_bar, draw_phase, minimum_shift, random_state,
+                  filtered_low_2):
+    """
+    Helper function to compute the comodulogram.
+    Used by PAC method in STANDARD_PAC_METRICS.
+    """
+    # The modulation index is only computed where mask is True
+    if mask is not None:
+        filtered_low = filtered_low[:, ~mask]
+        filtered_high = filtered_high[:, ~mask]
+        if method == 'vanwijk':
+            filtered_low_2 = filtered_low_2[:, ~mask]
+    else:
+        filtered_low = filtered_low.reshape(filtered_low.shape[0], -1)
+        filtered_high = filtered_high.reshape(filtered_high.shape[0], -1)
+        if method == 'vanwijk':
+            filtered_low_2 = filtered_low_2.reshape(filtered_low_2.shape[0],
+                                                    -1)
+
+    n_low, n_points = filtered_low.shape
+    n_high, _ = filtered_high.shape
+
+    # phase of the low frequency signals
+    for i in range(n_low):
+        filtered_low[i] = np.angle(filtered_low[i])
+    filtered_low = np.real(filtered_low)
+
+    # amplitude of the high frequency signals
+    filtered_high = np.real(np.abs(filtered_high))
+    norm_a = np.zeros(n_high)
+    if method == 'ozkurt':
+        for j in range(n_high):
+            norm_a[j] = norm(filtered_high[j])
+
+    # amplitude of the low frequency signals
+    if method == 'vanwijk':
+        for i in range(n_low):
+            filtered_low_2[i] = np.abs(filtered_low_2[i])
+        filtered_low_2 = np.real(filtered_low_2)
+
+    # Calculate the modulation index for each couple
+    comod = np.zeros((n_low, n_high))
+    for i in range(n_low):
+        # preproces the phase array
+        if method == 'tort':
+            n_bins = N_BINS_TORT
+            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+            # get the indices of the bins to which each value in input belongs
+            phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
+        elif method == 'penny':
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
+                filtered_low[i]), np.sin(filtered_low[i])]
+        elif method == 'vanwijk':
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
+                filtered_low[i]), np.sin(filtered_low[i]), filtered_low_2[i]]
+        elif method in ('canolty', 'ozkurt'):
+            phase_preprocessed = np.exp(1j * filtered_low[i])
+        else:
+            raise ValueError('Unknown method %s.' % method)
+
+        for j in range(n_high):
+
+            def comod_function(shift):
+                return _one_modulation_index(
+                    amplitude=filtered_high[j],
+                    phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
+                    method=method, shift=shift, draw_phase=draw_phase)
+
+            comod[i, j] = _surrogate_analysis(comod_function, fs, n_points,
+                                              minimum_shift, random_state,
+                                              n_surrogates)
+
+        if progress_bar:
+            progress_bar.update_with_increment_value(1)
+
+    return comod
+
+
+def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
+                          draw_phase):
+    """
+    Compute one modulation index.
+    Used by PAC method in STANDARD_PAC_METRICS.
+    """
+    # shift for the surrogate analysis
+    if shift != 0:
+        phase_preprocessed = np.roll(phase_preprocessed, shift)
+
+    # Modulation index as in [Ozkurt & al 2011]
+    if method == 'ozkurt':
+        MI = np.abs(np.mean(amplitude * phase_preprocessed))
+        MI *= np.sqrt(amplitude.size) / norm_a
+
+    # Generalized linear models as in [Penny & al 2008] or [van Wijk & al 2015]
+    elif method in ('penny', 'vanwijk'):
+        # solve a linear regression problem:
+        # amplitude = np.dot(phase_preprocessed) * beta
+        PtP = np.dot(phase_preprocessed.T, phase_preprocessed)
+        PtA = np.dot(phase_preprocessed.T, amplitude[:, None])
+        beta = np.linalg.solve(PtP, PtA)
+        residual = amplitude - np.dot(phase_preprocessed, beta).ravel()
+        variance_amplitude = np.var(amplitude)
+        variance_residual = np.var(residual)
+        MI = (variance_amplitude - variance_residual) / variance_amplitude
+
+    # Modulation index as in [Canolty & al 2006]
+    elif method == 'canolty':
+        MI = np.abs(np.mean(amplitude * phase_preprocessed))
+
+    # Modulation index as in [Tort & al 2010]
+    elif method == 'tort':
+        # mean amplitude distribution along phase bins
+        n_bins = N_BINS_TORT
+        amplitude_dist = np.ones(n_bins)  # default is 1 to avoid log(0)
+        for b in np.unique(phase_preprocessed):
+            selection = amplitude[phase_preprocessed == b]
+            amplitude_dist[b] = np.mean(selection)
+
+        # Kullback-Leibler divergence of the distribution vs uniform
+        amplitude_dist /= np.sum(amplitude_dist)
+        divergence_kl = np.sum(amplitude_dist *
+                               np.log(amplitude_dist * n_bins))
+
+        MI = divergence_kl / np.log(n_bins)
+
+        if draw_phase and shift == 0:
+            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+            phase_bins = 0.5 * (phase_bins[:-1] + phase_bins[1:]) / np.pi * 180
+            plt.plot(phase_bins, amplitude_dist, '.-')
+            plt.plot(phase_bins, np.ones(n_bins) / n_bins, '--')
+            plt.ylim((0, 2. / n_bins))
+            plt.xlim((-180, 180))
+            plt.ylabel('Normalized mean amplitude')
+            plt.xlabel('Phase (in degree)')
+            plt.title('Tort index: %.3f' % MI)
+
+    else:
+        raise ValueError("Unknown method: %s" % (method, ))
+
+    return MI
+
+
+def _same_mask_on_all_epochs(sig, mask, method):
+    """
+    PAC metrics based on coherence or bicoherence,
+    the same mask is applied on all epochs.
+    """
+    mask = np.squeeze(mask)
+    if mask.ndim > 1:
+        warnings.warn("For coherence methods (e.g. %s) the mask has "
+                      "to be unidimensional, and the same mask is "
+                      "applied on all epochs. Got shape %s, so only the "
+                      "first row of the mask is used." % (
+                          method,
+                          mask.shape, ), UserWarning)
+        mask = mask[0, :]
+    sig = sig[..., ~mask]
+    return sig
+
+
+def _bicoherence(fs, sig, mask, method, low_fq_range, low_fq_width,
+                 high_fq_range, coherence_params):
+    """
+    Helper function for the comodulogram.
+    Used by PAC method in BICOHERENCE_PAC_METRICS.
+    """
+    # The modulation index is only computed where mask is True
+    if mask is not None:
+        sig = _same_mask_on_all_epochs(sig, mask, method)
+
+    n_epochs, n_points = sig.shape
+
+    coherence_params = _define_default_params(fs, low_fq_width, method,
+                                              **coherence_params)
+
+    estimator = Bicoherence(**coherence_params)
+    bicoh = estimator.fit(sigs=sig, method=method)
+
+    # remove the redundant part
+    n_freq = bicoh.shape[0]
+    np.flipud(bicoh)[np.triu_indices(n_freq, 1)] = 0
+    bicoh[np.triu_indices(n_freq, 1)] = 0
+
+    frequencies = np.linspace(0, fs / 2., n_freq)
+    comod = _interpolate(frequencies, frequencies, bicoh, high_fq_range,
+                         low_fq_range)
+
+    return comod
+
+
+def _define_default_params(fs, low_fq_width, method, **user_params):
+    """
+    Define default values for Coherence and Bicoherence classes,
+    if not defined in user_params dictionary.
+    """
+
+    # the FFT length is chosen to have a frequency resolution of low_fq_width
+    fft_length = fs / low_fq_width
+    # but it is faster if it is a power of 2
+    fft_length = 2 ** int(np.ceil(np.log2(fft_length)))
+
+    # smoothing for bicoherence methods
+    if method in BICOHERENCE_PAC_METRICS:
+        fft_length /= 4
+    # not smoothed for because we convolve after
+    if method == 'jiang':
+        fft_length *= 2
+
+    # the block length is chosen to avoid zero-padding
+    block_length = fft_length
+
+    if 'block_length' not in user_params and 'fft_length' not in user_params:
+        user_params['block_length'] = block_length
+        user_params['fft_length'] = fft_length
+    elif 'block_length' in user_params and 'fft_length' not in user_params:
+        user_params['fft_length'] = user_params['block_length']
+    elif 'block_length' not in user_params and 'fft_length' in user_params:
+        user_params['block_length'] = user_params['fft_length']
+
+    if 'fs' not in user_params:
+        user_params['fs'] = fs
+    if 'step' not in user_params:
+        user_params['step'] = None
+
+    return user_params
+
+
+def _coherence(fs, low_sig, filtered_high, mask, method, low_fq_range,
+               low_fq_width, n_surrogates, minimum_shift, random_state,
+               progress_bar, coherence_params):
+    """
+    Helper function to compute the comodulogram.
+    Used by PAC method in COHERENCE_PAC_METRICS.
+    """
+    if mask is not None:
+        low_sig = _same_mask_on_all_epochs(low_sig, mask, method)
+        filtered_high = _same_mask_on_all_epochs(filtered_high, mask, method)
+
+    # amplitude of the high frequency signals
+    filtered_high = np.real(np.abs(filtered_high))
+
+    coherence_params = _define_default_params(fs, low_fq_width, method,
+                                              **coherence_params)
+
+    n_epochs, n_points = low_sig.shape
+
+    def comod_function(shift):
+        return _one_coherence_modulation_index(fs, low_sig, filtered_high,
+                                               method, low_fq_range,
+                                               coherence_params, shift)
+
+    comod = _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
+                                random_state, n_surrogates)
+
+    return comod
+
+
+def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
+                                    low_fq_range, coherence_params, shift):
+    """
+    Compute one modulation index.
+    Used by PAC method in COHERENCE_PAC_METRICS.
+    """
+    if shift != 0:
+        low_sig = np.roll(low_sig, shift)
+
+    # the actual frequency resolution is computed here
+    delta_freq = fs / coherence_params['fft_length']
+
+    estimator = Coherence(**coherence_params)
+    coherence = estimator.fit(low_sig[None, :, :], filtered_high)[0]
+    n_high, n_freq = coherence.shape
+    frequencies = np.linspace(0, fs / 2., n_freq)
+
+    # Coherence as in [Colgin & al 2009]
+    if method == 'colgin':
+        coherence = np.real(np.abs(coherence))
+
+        comod = _interpolate(
+            np.arange(n_high), frequencies, coherence,
+            np.arange(n_high), low_fq_range)
+
+    # Phase slope index as in [Jiang & al 2015]
+    elif method == 'jiang':
+        product = coherence[:, 1:] * np.conjugate(coherence[:, :-1])
+
+        # we use a kernel of (ker * 2) with respect to the product,
+        # i.e. a kernel of (ker * 2 +1) with respect to the coherence.
+        ker = 2
+        kernel = np.ones(2 * ker) / (2 * ker)
+        phase_slope_index = np.zeros((n_high, n_freq - (2 * ker)),
+                                     dtype=np.complex128)
+        for i in range(n_high):
+            phase_slope_index[i] = np.convolve(product[i], kernel, 'valid')
+        phase_slope_index = np.imag(phase_slope_index)
+        frequencies = frequencies[ker:-ker]
+
+        # transform the phase slope index into an approximated delay
+        delay = phase_slope_index / (2. * np.pi * delta_freq)
+
+        comod = _interpolate(
+            np.arange(n_high), frequencies, delay,
+            np.arange(n_high), low_fq_range)
+
+    else:
+        raise ValueError('Unknown method %s' % (method, ))
+
+    return comod
+
+
+def _interpolate(x1, y1, z1, x2, y2):
+    """Helper to interpolate in 1d or 2d
+
+    We interpolate to get the same shape than with other methods.
+    """
+    if x1.size > 1 and y1.size > 1:
+        func = interp2d(x1, y1, z1.T, kind='linear', bounds_error=False)
+        z2 = func(x2, y2)
+    elif x1.size == 1 and y1.size > 1:
+        func = interp1d(y1, z1.ravel(), kind='linear', bounds_error=False)
+        z2 = func(y2)
+    elif y1.size == 1 and x1.size > 1:
+        func = interp1d(x1, z1.ravel(), kind='linear', bounds_error=False)
+        z2 = func(x2)
+    else:
+        raise ValueError("Can't interpolate a scalar.")
+
+    # interp2d is not intuitive and return this shape:
+    z2.shape = (y2.size, x2.size)
+    return z2
 
 
 def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,

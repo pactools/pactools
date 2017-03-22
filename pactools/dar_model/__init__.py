@@ -1,12 +1,9 @@
 from .stable_dar import StableDAR
-from .dar import DAR, SimpleAR
+from .dar import DAR, AR
 from .har import HAR
-from .visualization import plot_dar_lines, plot_dar
 
 __all__ = ['DAR',
            'HAR',
-           'SimpleAR',
+           'AR',
            'StableDAR',
-           'plot_dar_lines',
-           'plot_dar',
            ]

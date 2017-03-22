@@ -118,7 +118,7 @@ class DAR(BaseDAR):
         return (AR_cols, G_cols)
 
 
-class SimpleAR(DAR):
+class AR(DAR):
     def __init__(self, ordar=1, ordriv=0, *args, **kwargs):
-        super(SimpleAR, self).__init__(
+        super(AR, self).__init__(
             ordar=ordar, ordriv=0, *args, **kwargs)
