@@ -1,9 +1,3 @@
-#!/usr/bin/python
-"""
-filter that extracts a low frequency carrier
-"""
-from __future__ import print_function
-
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
@@ -75,12 +69,8 @@ class Carrier:
         """
         # compute periodogram
         fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
-        s = Spectrum(fft_length=fft_length,
-                     block_length=self.fir.size,
-                     step=None,
-                     fs=self.fs,
-                     wfunc=np.ones,
-                     donorm=False)
+        s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
+                     step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
         s.plot('Transfer function of FIR filter "Carrier"', fscale=fscale)
 
@@ -97,8 +87,8 @@ class Carrier:
             f_high = freq[over_3db[-1]]
             df = f_high - f_low
             f0 = freq[i0]
-            print('f0 = %.3f Hz, df_3db = %.3f Hz [%.3f, %.3f], df/f = %.3f'
-                  % (f0, df, f_low, f_high, df / f0))
+            print('f0 = %.3f Hz, df_3db = %.3f Hz [%.3f, %.3f], df/f = %.3f' %
+                  (f0, df, f_low, f_high, df / f0))
 
         # plots
         if fig is None:
@@ -164,8 +154,8 @@ class LowPass:
         returns the filtered signal (ndarray)
         """
         from mne.filter import low_pass_filter
-        filtered = low_pass_filter(sigin.astype(np.float64),
-                                   Fs=self.fs, Fp=self.fc, method='iir')
+        filtered = low_pass_filter(
+            sigin.astype(np.float64), Fs=self.fs, Fp=self.fc, method='iir')
         return filtered
 
 

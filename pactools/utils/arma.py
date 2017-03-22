@@ -1,19 +1,3 @@
-#!/usr/bin/python
-"""
-Estimation of ARMA model
-
-The class Arma is derived from the class Spectrum:
-the class Spectrum allows the estimation of a power spectral
-density, from which the class Arma allows the estimation of the
-correlation function and then the parameters of the model
-
-This module also contains functions that process AR models:
-ai2ki : convert AR coefficients to partial correlations
-ki2ai : convert parcor coefficients to autoregressive ones
-
-"""
-from __future__ import print_function
-
 import numpy as np
 from scipy import signal, linalg, fftpack
 

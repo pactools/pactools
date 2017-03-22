@@ -5,6 +5,7 @@ class Spliter(object):
     """
     Split a signal into several blocks
     """
+
     def __init__(self, n_samples, fs, t_split, t_step=None):
         self.n_samples = n_samples
         self.fs = float(fs)

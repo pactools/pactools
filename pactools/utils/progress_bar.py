@@ -77,11 +77,9 @@ class ProgressBar():
         # than starting a new line.  This allows us to have a progressbar-style
         # display in the console window.
         bar = self.template.format(self.progress_character * num_chars,
-                                   ' ' * num_left,
-                                   progress * 100,
+                                   ' ' * num_left, progress * 100,
                                    self.spinner_symbols[self.spinner_index],
-                                   duration,
-                                   self.title)
+                                   duration, self.title)
         # Force a flush because sometimes when using bash scripts and pipes,
         # the output is not printed until after the program exits.
         if self._do_print:

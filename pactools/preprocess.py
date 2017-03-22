@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 
 import numpy as np
@@ -11,7 +9,7 @@ from .utils.spectrum import Spectrum
 from .utils.carrier import Carrier, LowPass
 from .utils.dehumming import dehummer
 from .utils.arma import Arma
-from .utils.maths import check_random_state
+from .utils.validation import check_random_state
 
 
 def _decimate(x, q):
@@ -169,8 +167,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum([sig, low_sig, high_sig], labels=None,
-                                   fs=fs, colors='bggck')
+            _plot_multiple_spectrum([sig, low_sig, high_sig], labels=None,
+                                    fs=fs, colors='bggck')
             plt.legend(['signal', 'driver', 'high_frequencies'], loc=0)
 
     elif fill == 1:
@@ -178,8 +176,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig - low_sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
-                                   labels=None, fs=fs, colors='bggck')
+            _plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
+                                    labels=None, fs=fs, colors='bggck')
             plt.legend(
                 ['signal', 'driver', 'signal-driver',
                  'high_frequencies'], loc=0)
@@ -196,7 +194,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig - low_sig + fill_sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
+            _plot_multiple_spectrum(
                 [sig, low_sig, sig - low_sig, fill_sig, high_sig], labels=None,
                 fs=fs, colors='bggck')
             plt.legend([
@@ -211,7 +209,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig - low_sig + fill_sig
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum(
+            _plot_multiple_spectrum(
                 [sig, low_sig, sig - low_sig, fill_sig, high_sig], labels=None,
                 fs=fs, colors='bggck')
             plt.legend([
@@ -241,7 +239,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
             low_pass=low_pass, random_state=rng)
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum([
+            _plot_multiple_spectrum([
                 sig, low_sig, sig - low_sig, white_sig, wide_low_sig,
                 white_sig - wide_low_sig, high_sig
             ], labels=None, fs=fs, colors='bggcrrk')
@@ -262,8 +260,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                             fill_sig=fill_sig)
 
         if 'z' in draw or 'c' in draw:
-            plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
-                                   labels=None, fs=fs, colors='bgcr')
+            _plot_multiple_spectrum([sig, low_sig, sig - low_sig, high_sig],
+                                    labels=None, fs=fs, colors='bgcr')
             plt.legend(
                 ['signal', 'driver', 'signal-driver',
                  'high_frequencies'], loc=0)
@@ -290,7 +288,7 @@ def low_pass_and_fill(sig, fs, fc=1.0, draw='', random_state=None):
     return filled_sig
 
 
-def plot_multiple_spectrum(signals, fs, labels, colors):
+def _plot_multiple_spectrum(signals, fs, labels, colors):
     """
     plot the signals spectrum
     """
@@ -425,7 +423,7 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
     return sig
 
 
-def show_plot(draw):
+def _show_plot(draw):
     if draw:
         plt.show()
 
@@ -460,7 +458,7 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
             decimate(sig, fs, decimation_factor=decimation_factor)[0]
             for sig in sigs
         ]
-        show_plot(draw)
+        _show_plot(draw)
 
     # -------- reduce noise at 50 or 60 Hz
     if enf is not None:
@@ -469,21 +467,21 @@ def preprocess(raw_file, fs=1.0, decimation_factor=4, start=None, stop=None,
             dehummer(sig, fs, enf=enf, hmax=hmax, block_length=block_length,
                      draw=draw) for sig in sigs
         ]
-        show_plot(draw)
+        _show_plot(draw)
 
     # -------- lowpass at 1 Hz
     sigs = [
         low_pass_and_fill(sig=sig, fs=fs, draw=draw, random_state=random_state)
         for sig in sigs
     ]
-    show_plot(draw)
+    _show_plot(draw)
 
     if custom_func is not None:
         sigs = [
             custom_func(sig=sig, fs=fs, draw=draw, random_state=random_state)
             for sig in sigs
         ]
-        show_plot(draw)
+        _show_plot(draw)
 
     return sigs, fs, events
 
@@ -508,7 +506,7 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
 
     if whitening == 'before':
         sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
-        show_plot(draw)
+        _show_plot(draw)
 
     if fill in [2, 4, 5]:
         random_noise = rng.randn(len(sigs[0]))
@@ -564,7 +562,7 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
                     low * s for (low, s) in zip(low_sigs_imag, scales)
                 ]
 
-        show_plot(draw)
+        _show_plot(draw)
 
         if extract_complex:
             yield low_sigs, high_sigs, low_sigs_imag

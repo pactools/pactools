@@ -1,15 +1,6 @@
-#!/usr/bin/python
-"""
-Removing electrical network frequency and multiples.
-
-"""
-from __future__ import print_function
-# import warnings
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import linalg
-# from scipy import fftpack, signal
 
 from .spectrum import Spectrum
 from .progress_bar import ProgressBar
@@ -32,8 +23,8 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
     block_length_o2 = block_length // 2
     # -------- the window and its shift by block_length/2 must sum to 1.0
     window = np.hamming(block_length)
-    window[0:block_length_o2] /= (window[0:block_length_o2] +
-                                  window[block_length_o2:block_length])
+    window[0:block_length_o2] /= (
+        window[0:block_length_o2] + window[block_length_o2:block_length])
     window[block_length_o2:block_length] = np.flipud(window[0:block_length_o2])
 
     if hmax == 0:
@@ -114,8 +105,7 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
         sp = Spectrum(block_length=2048, fs=fs, donorm=True, wfunc=np.blackman)
         sp.periodogram(sig)
         sp.periodogram(result, hold=True)
-        sp.plot('Power spectral density before/after dehumming',
-                fscale='lin')
+        sp.plot('Power spectral density before/after dehumming', fscale='lin')
 
     return result
 

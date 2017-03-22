@@ -1,7 +1,7 @@
 import numpy as np
 
 from .utils.carrier import Carrier
-from .utils.maths import check_random_state
+from .utils.validation import check_random_state
 
 
 def sigmoid(array, sharpness):

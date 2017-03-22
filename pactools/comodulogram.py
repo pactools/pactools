@@ -6,13 +6,13 @@ from scipy.signal import hilbert
 from scipy.interpolate import interp1d, interp2d
 
 from .dar_model.base_dar import BaseDAR
-from .dar_model import DAR
+from .dar_model.dar import DAR
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import compute_n_fft, Bicoherence, Coherence
 from .utils.carrier import Carrier
-from .utils.maths import norm, argmax_2d, check_random_state
-from .utils.validation import check_array
-from .plot_comodulogram import plot_comodulogram
+from .utils.maths import norm, argmax_2d
+from .utils.validation import check_array, check_random_state
+from .viz.plot_comodulogram import plot_comodulogram
 from .preprocess import extract
 
 N_BINS_TORT = 18
@@ -159,7 +159,9 @@ def _comodulogram(fs, filtered_low, filtered_high, mask, method, n_surrogates,
         elif method == 'vanwijk':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
                 filtered_low[i]), np.sin(filtered_low[i]), filtered_low_2[i]]
-        elif method in ('canolty', 'ozkurt', ):
+        elif method in (
+                'canolty',
+                'ozkurt', ):
             phase_preprocessed = np.exp(1j * filtered_low[i])
         else:
             raise ValueError('Unknown method %s.' % method)

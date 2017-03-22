@@ -1,7 +1,3 @@
-"""
-Estimator of power spectral densities
-"""
-from __future__ import print_function
 from itertools import chain
 
 import numpy as np
@@ -9,6 +5,8 @@ import scipy as sp
 from scipy.linalg import hankel
 from scipy.signal import hilbert
 import matplotlib.pyplot as plt
+
+from .maths import square
 
 
 class Spectrum(object):
@@ -111,8 +109,8 @@ class Spectrum(object):
             # iterate on blocks
             count = 0
             while block[-1] < sig.size:
-                psd[i] += np.abs(sp.fft(window * sig[block],
-                                 fft_length, 0))[:n_freq] ** 2
+                psd[i] += np.abs(sp.fft(window * sig[block], fft_length,
+                                        0))[:n_freq] ** 2
                 count = count + 1
                 block = block + step
             if count == 0:
@@ -182,8 +180,8 @@ class Spectrum(object):
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
-                fig.plot(freq + i * fmax, psd.T[::(-1) ** i],
-                         label=label, color=color)
+                fig.plot(freq + i * fmax, psd.T[::(-1) ** i], label=label,
+                         color=color)
 
         fig.grid(True)
         fig.set_title(title)
@@ -231,9 +229,9 @@ class Coherence(Spectrum):
         donorm : boolean
             If True, the amplitude is normalized
         """
-        super(Coherence, self).__init__(
-            block_length=block_length, fft_length=fft_length, step=step,
-            wfunc=wfunc, fs=fs)
+        super(Coherence, self).__init__(block_length=block_length,
+                                        fft_length=fft_length, step=step,
+                                        wfunc=wfunc, fs=fs)
 
         self.coherence = None
 
@@ -343,9 +341,9 @@ class Bicoherence(Spectrum):
         donorm : boolean
             If True, the amplitude is normalized
         """
-        super(Bicoherence, self).__init__(
-            block_length=block_length, fft_length=fft_length, step=step,
-            wfunc=wfunc, fs=fs)
+        super(Bicoherence, self).__init__(block_length=block_length,
+                                          fft_length=fft_length, step=step,
+                                          wfunc=wfunc, fs=fs)
 
     def fit(self, sigs, method='hagihira'):
         """
@@ -381,8 +379,8 @@ class Bicoherence(Spectrum):
         for i_epoch in range(n_epochs):
             block = np.arange(self.block_length)
             while block[-1] < n_points:
-                F = sp.fft(window * sigs[i_epoch, block],
-                           fft_length, 0)[:n_freq]
+                F = sp.fft(window * sigs[i_epoch, block], fft_length,
+                           0)[:n_freq]
                 F1 = F[None, :]
                 F2 = F1.T
                 mask = hankel(np.arange(n_freq))
@@ -399,7 +397,7 @@ class Bicoherence(Spectrum):
                 elif method == 'bispectrum':
                     pass
                 else:
-                    raise(ValueError("Method '%s' unkown." % method))
+                    raise (ValueError("Method '%s' unkown." % method))
 
                 count = count + 1
                 block = block + step
@@ -436,11 +434,9 @@ class Bicoherence(Spectrum):
         bicoherence = bicoherence[:, :n_freq // 2 + 1]
 
         vmin, vmax = compute_vmin_vmax(bicoherence, tick=1e-15, percentile=1)
-        cax = ax.imshow(
-            bicoherence, cmap=plt.cm.viridis, aspect='auto',
-            vmin=vmin, vmax=vmax,
-            origin='lower', extent=(0, fmax // 2, 0, fmax),
-            interpolation='none')
+        cax = ax.imshow(bicoherence, cmap=plt.cm.viridis, aspect='auto',
+                        vmin=vmin, vmax=vmax, origin='lower',
+                        extent=(0, fmax // 2, 0, fmax), interpolation='none')
         ax.set_title('Bicoherence (%s)' % self.method)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Frequency (Hz)')
@@ -484,11 +480,6 @@ def phase_amplitude(signals, phase=True, amplitude=True):
             sig_amplitude = sig_amplitude[0]
 
     return sig_phase, sig_amplitude
-
-
-def square(c):
-    """square a complex array"""
-    return np.real(c * np.conjugate(c))
 
 
 def crop_for_fast_hilbert(signals):
