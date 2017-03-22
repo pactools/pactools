@@ -103,6 +103,9 @@ def test_empty_mask():
 def test_comodulogram_dar_models():
     # Smoke test with DAR models
     for klass in (AR, DAR, HAR, StableDAR):
-        model = klass(ordar=10, ordriv=2)
+        if klass is StableDAR:
+            model = klass(ordar=10, ordriv=2, iter_newton=10)
+        else:
+            model = klass(ordar=10, ordriv=2)
         comod = fast_comod(method=model)
         assert_true(~np.any(np.isnan(comod)))
