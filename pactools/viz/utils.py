@@ -48,7 +48,6 @@ def add_colorbar(fig, cax, vmin, vmax, unit='', ax=None):
     cbar.ax.set_yticklabels([tick_labels % t for t in ticks])
 
 
-
 def compute_vmin_vmax(spec, vmin=None, vmax=None, tick=0.01, percentile=1):
     """compute automatic scale for plotting `spec`"""
     if percentile > 100:

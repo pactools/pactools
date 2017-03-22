@@ -1,12 +1,9 @@
-import os
-
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 
 from .utils.spectrum import Spectrum
 from .utils.carrier import Carrier, LowPass
-from .utils.dehumming import dehummer
 from .utils.arma import Arma
 from .utils.validation import check_random_state
 
@@ -454,7 +451,7 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     else:
         random_noise = None
 
-    ############ extract the high frequencies independently of the driver
+    # extract the high frequencies independently of the driver
     whiten_fill4 = whitening == 'after'
     fc_low_pass = low_fq_range[-1] + low_fq_range[0] + bandwidth  # hack
     low_and_high = [
@@ -481,7 +478,7 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     random_noise = None
     whiten_fill4 = False
 
-    ############ extract_and_fill the driver
+    # extract_and_fill the driver
     for fc in low_fq_range:
         low_and_high = [
             extract_and_fill(

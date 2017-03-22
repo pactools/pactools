@@ -11,6 +11,7 @@ def plot_comodulogram_histogram(comodulogram, low_fq_range, low_fq_width,
     """Plot one comodulogram with histograms."""
     vmin = min(0, comodulogram.min()) if vmin is None else vmin
     vmax = comodulogram.max() if vmax is None else vmax
+
     fig = plt.figure(figsize=(9, 9))
     gs = matplotlib.gridspec.GridSpec(9, 9)
     ax_vert = plt.subplot(gs[:-2, :2])

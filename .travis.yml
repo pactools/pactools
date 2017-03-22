@@ -1,6 +1,6 @@
 language: python
 before_install:
-    - wget -q http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+    - wget -q http://repo.continuum.io/miniconda/Miniconda-3.6.0-Linux-x86_64.sh -O miniconda.sh
     - chmod +x miniconda.sh
     - ./miniconda.sh -b -p /home/travis/miniconda
     - export PATH=/home/travis/miniconda/bin:$PATH
@@ -8,9 +8,9 @@ before_install:
 install:
     - conda create -n testenv --yes pip python=3.6
     - source activate testenv
-    - conda install --yes --quiet numpy=1.10 scipy=0.17 matplotlib=1.5 mne=0.11
+    - conda install --yes --quiet numpy scipy matplotlib
     - conda install --yes --quiet pytest pytest-cov
-    - pip install -q flake8
+    - pip install -q flake8 mne
     - python setup.py install
 script:
     - python pactools/utils/print_package_versions.py

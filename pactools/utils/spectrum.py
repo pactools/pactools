@@ -433,13 +433,13 @@ class Bicoherence(Spectrum):
         bicoherence = bicoherence[:, :n_freq // 2 + 1]
 
         vmin, vmax = compute_vmin_vmax(bicoherence, tick=1e-15, percentile=1)
-        cax = ax.imshow(bicoherence, cmap=plt.cm.viridis, aspect='auto',
-                        vmin=vmin, vmax=vmax, origin='lower',
-                        extent=(0, fmax // 2, 0, fmax), interpolation='none')
+        ax.imshow(bicoherence, cmap=plt.cm.viridis, aspect='auto', vmin=vmin,
+                  vmax=vmax, origin='lower', extent=(0, fmax // 2, 0, fmax),
+                  interpolation='none')
         ax.set_title('Bicoherence (%s)' % self.method)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Frequency (Hz)')
-        #add_colorbar(fig, cax, vmin, vmax, unit='', ax=ax)
+        # add_colorbar(fig, cax, vmin, vmax, unit='', ax=ax)
         return ax
 
     def main_frequency(self):
