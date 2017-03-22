@@ -8,7 +8,7 @@ from .spectrum import Spectrum
 class Carrier:
     def __init__(self, fir=np.ones(1), fs=1., extract_complex=False):
         """
-        initializes a filter with coefficient in a (ndarray)
+        Initializes a filter with coefficient in a (ndarray).
         """
         self.fir = fir
         self.fs = fs
@@ -16,7 +16,7 @@ class Carrier:
 
     def design(self, fs, fc, n_cycles=7.0, bandwidth=None, zero_mean=True):
         """
-        designs a FIR filter that is a band-pass filter centered
+        Designs a FIR filter that is a band-pass filter centered
         on frequency fc.
         fs         : sampling frequency (Hz)
         fc         : frequency of the carrier (Hz)
@@ -65,7 +65,7 @@ class Carrier:
 
     def plot(self, fig=None, fscale='log', print_width=False):
         """
-        plots the impulse response and the transfer function of the filter
+        Plots the impulse response and the transfer function of the filter.
         """
         # compute periodogram
         fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
@@ -125,35 +125,28 @@ class Carrier:
             return filtered
 
 
-class LowPass:
+class LowPass(Carrier):
     def __init__(self, fs=1.):
         self.fir = np.ones(1)
         self.fs = fs
+        self.extract_complex = False
 
     def design(self, fs, fc):
         """
-        No design, just match the API of Carrier
-        fs         : sampling frequency (Hz)
-        fc         : frequency of the carrier (Hz)
+        Designs a FIR filter that is a low-pass filter.
+        fs : sampling frequency (Hz)
+        fc : cut-off frequency (Hz)
         """
+        half_order = int(1.65 * fs / fc / 2) // 2
+        order = half_order * 2 + 1
+
+        fir = np.blackman(order)
+
+        # the filter must be odd and symmetric, in order to be zero-phase
+        assert fir.size % 2 == 1
+        assert np.all(np.abs(fir - fir[::-1]) < 1e-15)
+
+        self.fir = fir / np.sum(fir)
         self.fs = fs
-        self.fc = fc
+
         return self
-
-    def plot(self, fig=None, fscale='log', print_width=False):
-        """
-        plots the impulse response and the transfer function of the filter
-        """
-        # Not Implemented
-        return fig
-
-    def direct(self, sigin):
-        """
-        apply this filter to a signal
-        sigin : input signal (ndarray)
-        returns the filtered signal (ndarray)
-        """
-        from mne.filter import low_pass_filter
-        filtered = low_pass_filter(
-            sigin.astype(np.float64), Fs=self.fs, Fp=self.fc, method='iir')
-        return filtered
