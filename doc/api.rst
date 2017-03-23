@@ -20,8 +20,6 @@ DAR models
 
 .. currentmodule:: pactools.dar_model
 
-Classes
-
 .. autosummary::
    :toctree: generated/
 
@@ -31,19 +29,17 @@ Classes
 Visualization
 =============
 
-Functions
-
 .. currentmodule:: pactools.viz
 
 .. autosummary::
    :toctree: generated/
 
    plot_comodulogram
+   plot_dar_models
+   plot_trough_locked_time_frequency
 
 Utilities
 =========
-
-Functions
 
 .. currentmodule:: pactools.utils
 

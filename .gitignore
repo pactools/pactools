@@ -19,6 +19,7 @@ build/
 dist/
 doc/auto_examples
 doc/modules
+doc/generated
 
 .nfs*
 

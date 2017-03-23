@@ -8,35 +8,22 @@ In particular, it implements the **driven auto-regressive (DAR)** models present
 
 ## Install
 
-**Dependencies**
+We recommend the `Anaconda Python distribution <https://www.continuum.io/downloads>`_. To install ``pactools``, you first need to install its dependencies::
 
-The code is not fully tested. It is supposed to be working with:
+	$ pip install numpy matplotlib scipy
 
-```
-Python >= 3.5
-NumPy >= 1.10
-SciPy >= 0.17
-Matplotlib >= 1.5
-MNE-Python >= 0.11 (optional)
-PYTEST >= 3.0 (optional, used for testing)
-```
+Then install pactools::
 
-It might work with previous versions also, yet nothing is guaranteed.
+	$ pip install git+https://github.com/pactools/pactools.git#egg=pactools
 
-**Install**
+If you do not have admin privileges on the computer, use the ``--user`` flag
+with `pip`. To upgrade, use the ``--upgrade`` flag provided by `pip`.
 
-```
-git clone https://github.com/pactools/pactools.git
-cd pactools
-make install
-```
+To check if everything worked fine, you can do::
 
-**Update**
+	$ python -c 'import pactools'
 
-```
-git pull origin master
-make in
-```
+and it should not give any error messages.
 
 ## Cite
 
