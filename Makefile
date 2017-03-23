@@ -18,12 +18,9 @@ clean:
 	rm -f `find pactools -name "*.so"`
 	rm -f `find pactools -name "*.pyc"`
 	rm -rf `find pactools -name "*__pycache__*"`
-	rm -rf pactools.egg-info
-	rm -rf build
-	rm -rf dist
-	rm -rf .tags
-	rm -rf .tags1
-	rm -rf .coverage
+	rm -rf build dist
+	rm -rf doc/auto_examples doc/modules doc/build
+	rm -rf .tags .tags1 .coverage
 
 ############
 test:

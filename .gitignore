@@ -17,6 +17,8 @@ tags
 .coverage
 build/
 dist/
+doc/auto_examples
+doc/modules
 
 .nfs*
 
