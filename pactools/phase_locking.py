@@ -3,16 +3,13 @@ import matplotlib.pyplot as plt
 
 from .comodulogram import multiple_band_pass
 from .utils.peak_finder import peak_finder
-from .viz.plot_phase_locking import plot_trough_locked_time
-from .viz.plot_phase_locking import plot_trough_locked_time_frequency
 
 
 def time_frequency_peak_locking(
         fs, low_sig, high_sig=None, mask=None, low_fq=6.0,
         high_fq_range=np.linspace(10.0, 150.0, 50), low_fq_width=2.0,
         high_fq_width=20.0, t_plot=1.0, filter_method='carrier',
-        save_name=None, peak_or_trough='peak', draw_peaks=True, vmin=None,
-        vmax=None):
+        peak_or_trough='peak', draw_peaks=True):
     """
     Plot the theta-trough locked Time-frequency plot of mean power
     modulation time-locked to the theta trough
@@ -53,26 +50,17 @@ def time_frequency_peak_locking(
         'mne': with mne.filter.band_pass_filter
         'carrier': with pactools.Carrier (default)
 
-    save_name : string or None
-        Name to use for saving the plot.
-        If None, a name is generated based on some parameters.
-        If False, the figure is not saved
-
     peak_or_trough: in {'peak', 'trough'}
         Lock to the maximum (peak) of minimum (trough) of the slow oscillation
 
     draw_peaks : boolean
         If True, plot the first peaks/troughs in the phase signal
 
-    vmin, vmax:
-        Min and max value for the colorbar.
-
     Return
     ------
     fig : matplotlib.figure.Figure
         Figure instance containing the plot.
     """
-    n_cycles = None
     low_fq = np.atleast_1d(low_fq)
 
     low_sig = np.atleast_2d(low_sig)
@@ -80,21 +68,21 @@ def time_frequency_peak_locking(
         high_sig = low_sig
 
     # compute the slow oscillation
-    # n_epochs, n_points = filtered_high.shape
+    # n_epochs, n_points = filtered_low.shape
     filtered_low = multiple_band_pass(low_sig, fs, low_fq, low_fq_width,
                                       filter_method=filter_method)
     filtered_low = filtered_low[0]
     filtered_low_real = np.real(filtered_low)
 
     if False:
+        # find the trough in the filtered_low_real
         extrema = 1 if peak_or_trough == 'peak' else -1
-        # find the trough in the filtered_low_real with a peak finder
         thresh = (filtered_low_real.max() - filtered_low_real.min()) / 10.
         trough_loc, trough_mag = peak_finder_multi_epochs(
             filtered_low_real, fs=fs, t_plot=t_plot, mask=mask, thresh=thresh,
             extrema=extrema)
     else:
-        # find the trough in the phase
+        # find the trough in the phase of filtered_low
         phase = np.angle(filtered_low)
         if peak_or_trough == 'peak':
             phase = (phase + 2 * np.pi) % (2 * np.pi)
@@ -119,29 +107,24 @@ def time_frequency_peak_locking(
     # extract several signals with band-pass filters
     # n_frequencies, n_epochs, n_points = filtered_high.shape
     filtered_high = multiple_band_pass(high_sig, fs, high_fq_range,
-                                       high_fq_width, n_cycles=n_cycles,
+                                       high_fq_width, n_cycles=None,
                                        filter_method=filter_method)
 
-    fig, axs = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
-    axs = axs.ravel()
-
-    # plot the higher part
-    plot_trough_locked_time_frequency(
+    # compute the trough locked time-frequency representation
+    evoked_time_frequency = trough_locked_time_frequency(
         filtered_high, fs, high_fq_range, trough_loc=trough_loc, t_plot=t_plot,
-        mask=mask, fig=fig, ax=axs[0], vmin=vmin, vmax=vmax)
+        mask=mask)
 
-    # plot the lower part
-    plot_trough_locked_time(low_sig, fs, trough_loc=trough_loc, t_plot=t_plot,
-                            fig=fig, ax=axs[1], ylim=None)
+    # compute the trough locked time representation
+    percentiles = ['std+', 'mean', 'std-']
+    # we don't need the mask here, since only the valid trough locations are
+    # kept in peak_finder_multi_epochs
+    evoked_time = trough_locked_percentile(low_sig[None, :], fs, trough_loc,
+                                           t_plot, percentiles)
 
-    # save the figure
-    if save_name is None:
-        save_name = ('%s_wlo%.2f_whi%.1f' %
-                     (filter_method, low_fq_width, high_fq_width))
-    if save_name:
-        fig.savefig(save_name + '.png')
-
-    return fig
+    plot_time_frequency_peak_locking(fs, evoked_time_frequency, evoked_time,
+                                     t_plot, high_fq_range, percentiles,
+                                     axs=None, vmin=None, vmax=None, ylim=None)
 
 
 def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
@@ -183,3 +166,104 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
                          ["trough", "peak"][(extrema + 1) // 2])
 
     return np.array(peak_inds_list), np.array(peak_mags_list)
+
+
+def trough_locked_time_frequency(filtered_high, fs, high_fq_range, trough_loc,
+                                 t_plot, mask=None):
+    """
+    Compute the theta-trough locked Time-frequency
+    """
+    # normalize each signal independently
+    n_frequencies, n_epochs, n_points = filtered_high.shape
+
+    # normalization is done everywhere, but mean is computed
+    #  only where mask == 1
+    if mask is not None:
+        masked_filtered_high = filtered_high[:, mask == 0]
+    else:
+        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+
+    mean = masked_filtered_high.mean(axis=1)[:, None, None]
+    std = masked_filtered_high.std(axis=1)[:, None, None]
+
+    filtered_high -= mean
+    filtered_high /= std
+
+    # get the power (np.abs(filtered_high) ** 2)
+    filtered_high *= np.conj(filtered_high)
+    filtered_high = np.real(filtered_high)
+
+    # subtract the mean power.
+    if mask is not None:
+        masked_filtered_high = filtered_high[:, mask == 0]
+    else:
+        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+    mean = masked_filtered_high.mean(axis=1)[:, None, None]
+    filtered_high -= mean
+
+    # compute the evoked signals (trough-locked mean)
+    evoked_signals = trough_locked_percentile(filtered_high, fs, trough_loc,
+                                              t_plot)
+    evoked_signals = evoked_signals[:, 0, :]
+
+    return evoked_signals
+
+
+def trough_locked_percentile(signals, fs, trough_loc, t_plot,
+                             percentiles=['mean']):
+    """
+    Compute the mean of each signal in signals, locked to the troughs
+
+    Parameters
+    ----------
+    signals    : shape (n_signals, n_epochs, n_points)
+    fs         : sampling frequency
+    trough_loc : indices of the trough locations
+    t_plot     : in second, time to plot around the troughs
+    percentiles: list of precentile to compute. It can also include c,
+                 'std' or 'ste' (mean, standard deviation or standard error).
+
+    Returns
+    -------
+    evoked_signals :
+    """
+    n_signals, n_epochs, n_points = signals.shape
+    n_window = int(fs * t_plot / 2.) * 2 + 1
+    n_percentiles = len(percentiles)
+
+    # build indices matrix: each line is a index range around trough locations
+    indices = np.tile(trough_loc, (n_window, 1)).T
+    indices = indices + np.arange(n_window) - n_window // 2
+
+    # ravel the epochs since we now have isolated events
+    signals = signals.reshape(n_signals, -1)
+
+    n_troughs = indices.shape[0]
+    assert n_troughs > 0
+
+    # compute the evoked signals (trough-locked mean)
+    evoked_signals = np.zeros((n_signals, n_percentiles, n_window))
+    for i_s in range(n_signals):
+        for i_p, p in enumerate(percentiles):
+            if isinstance(p, int):
+                evoked_signals[i_s, i_p] = np.percentile(signals[i_s][indices],
+                                                         p, axis=0)
+                continue
+
+            mean = np.mean(signals[i_s][indices], axis=0)
+            if p == 'mean':
+                evoked_signals[i_s, i_p] = mean
+            else:
+                std = np.std(signals[i_s][indices], axis=0)
+                if p == 'std+':
+                    evoked_signals[i_s, i_p] = mean + std
+                elif p == 'std-':
+                    evoked_signals[i_s, i_p] = mean - std
+                elif p == 'ste+':
+                    evoked_signals[i_s, i_p] = mean + std / np.sqrt(n_troughs)
+                elif p == 'ste-':
+                    evoked_signals[i_s, i_p] = mean - std / np.sqrt(n_troughs)
+                else:
+                    raise (ValueError, 'wrong percentile string: %s' % p)
+
+    return evoked_signals
