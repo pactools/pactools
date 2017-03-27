@@ -35,8 +35,7 @@ Visualization
    :toctree: generated/
 
    plot_comodulogram
-   plot_dar_models
-   plot_trough_locked_time_frequency
+   plot_dar_model
 
 Utilities
 =========
@@ -46,4 +45,4 @@ Utilities
 .. autosummary::
    :toctree: generated/
 
-   norm
+   peak_finder.peak_finder

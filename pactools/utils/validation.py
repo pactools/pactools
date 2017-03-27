@@ -17,7 +17,7 @@ def check_array(sig, dtype='float64', accept_none=False):
 
 def check_consistent_shape(*args):
     for array in args:
-        if array.shape != args[0].shape:
+        if array is not None and array.shape != args[0].shape:
             raise ValueError('Incompatible shapes. Got '
                              '(%s != %s)' % (array.shape, args[0].shape))
 

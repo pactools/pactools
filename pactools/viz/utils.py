@@ -1,3 +1,5 @@
+import itertools
+import matplotlib as mpl
 import numpy as np
 
 
@@ -61,3 +63,67 @@ def compute_vmin_vmax(spec, vmin=None, vmax=None, tick=0.01, percentile=1):
         vmax = np.ceil(np.percentile(spec, 100 - percentile) / tick) * tick
 
     return vmin, vmax
+
+
+SEABORN_PALETTES = dict(
+    deep=["#4C72B0", "#55A868", "#C44E52",
+          "#8172B2", "#CCB974", "#64B5CD"],
+    muted=["#4878CF", "#6ACC65", "#D65F5F",
+           "#B47CC7", "#C4AD66", "#77BEDB"],
+    pastel=["#92C6FF", "#97F0AA", "#FF9F9A",
+            "#D0BBFF", "#FFFEA3", "#B0E0E6"],
+    bright=["#003FFF", "#03ED3A", "#E8000B",
+            "#8A2BE2", "#FFC400", "#00D7FF"],
+    dark=["#001C7F", "#017517", "#8C0900",
+          "#7600A1", "#B8860B", "#006374"],
+    colorblind=["#0072B2", "#009E73", "#D55E00",
+                "#CC79A7", "#F0E442", "#56B4E9"]
+    )
+
+
+# inspired by seaborn
+def mpl_palette(name, n_colors=6, extrema=False, cycle=False):
+    """Return discrete colors from a matplotlib palette.
+    Note that this handles the qualitative colorbrewer palettes
+    properly, although if you ask for more colors than a particular
+    qualitative palette can provide you will get fewer than you are
+    expecting.
+
+    Parameters
+    ----------
+    name : string
+        Name of the palette. This should be a named matplotlib colormap.
+    n_colors : int
+        Number of discrete colors in the palette.
+    extrema : boolean
+        If True, include the extrema of the palette.
+    cycle : boolean
+        If True, return a itertools.cycle.
+
+    Returns
+    -------
+    palette : colormap or itertools.cycle
+        List-like object of colors as RGB tuples
+    """
+    if name in SEABORN_PALETTES:
+        palette = SEABORN_PALETTES[name]
+        # Always return as many colors as we asked for
+        pal_cycle = itertools.cycle(palette)
+        palette = [next(pal_cycle) for _ in range(n_colors)]
+
+    elif name in dir(mpl.cm) or name[:-2] in dir(mpl.cm):
+        cmap = getattr(mpl.cm, name)
+
+        if extrema:
+            bins = np.linspace(0, 1, n_colors)
+        else:
+            bins = np.linspace(0, 1, n_colors * 2 - 1 + 2)[1:-1:2]
+        palette = list(map(tuple, cmap(bins)[:, :3]))
+
+    else:
+        raise ValueError("%s is not a valid palette name" % name)
+
+    if cycle:
+        return itertools.cycle(palette)
+    else:
+        return palette

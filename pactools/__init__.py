@@ -2,8 +2,7 @@ from .comodulogram import comodulogram, driven_comodulogram, get_maximum_pac
 
 from .create_signal import create_signal, sigmoid
 
-from .peak_locking import peak_locking
-from .peak_locking import peak_finder_multi_epochs
+from .peak_locking import PeakLocking
 
 from .preprocess import decimate, extract_and_fill
 from .preprocess import low_pass_and_fill, whiten, fill_gap
@@ -18,8 +17,7 @@ __all__ = ['comodulogram',
            'fill_gap',
            'get_maximum_pac',
            'low_pass_and_fill',
-           'peak_finder_multi_epochs',
-           'peak_locking',
+           'PeakLocking',
            'sigmoid',
            'whiten',
            ]

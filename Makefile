@@ -38,7 +38,7 @@ trailing-spaces:
 	find . -name "*.py" -exec perl -pi -e 's/[ \t]*$$//' {} \;
 
 flake8:
-	flake8 . --ignore=E266,W503,E265
+	flake8 . --ignore=E266,W503,E265,E123 --exclude=setup.py
 
 ascii:
 	# find every file that contains non-ASCII characters

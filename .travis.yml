@@ -11,10 +11,10 @@ install:
     - conda install --yes --quiet numpy scipy matplotlib
     - conda install --yes --quiet pytest pytest-cov
     - pip install -q flake8 mne
-    - python setup.py install
+    - make install
 script:
-    - pytest --cov=pactools pactools -v
-    - flake8 --count pactools
+    - make test-coverage
+    - make flake8
 after_success:
     - bash <(curl -s https://codecov.io/bash)
 

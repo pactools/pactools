@@ -1,136 +1,248 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
 from .comodulogram import multiple_band_pass
 from .utils.peak_finder import peak_finder
+from .utils.validation import check_consistent_shape, check_array
+from .viz.utils import add_colorbar, mpl_palette
 
 
-def peak_locking(fs, low_sig, high_sig=None, mask=None, low_fq=6.0,
-                 high_fq_range=np.linspace(10.0, 150.0, 50), low_fq_width=2.0,
-                 high_fq_width=20.0, t_plot=1.0, filter_method='carrier',
-                 peak_or_trough='peak', draw_peaks=True,
+class PeakLocking(object):
+    def __init__(self, fs, low_fq, low_fq_width=1.0, high_fq_range='auto',
+                 high_fq_width='auto', t_plot=1.0,
+                 filter_method='carrier', peak_or_trough='peak',
                  percentiles=['std+', 'mean', 'std-']):
-    """
-    Plot the theta-trough locked Time-frequency plot of mean power
-    modulation time-locked to the theta trough
+        """
+        Parameters
+        ----------
+        fs : float
+            Sampling frequency
 
-    Parameters
-    ----------
-    fs : float,
-        Sampling frequency
+        low_fq : float
+            Filtering frequency (phase signal)
 
-    low_sig : array, shape (n_epochs, n_points)
-        Input data for the phase signal
+        low_fq_width : float
+            Bandwidth of the band-pass filter (phase signal)
 
-    high_sig : array or None, shape (n_epochs, n_points)
-        Input data for the amplitude signal.
-        If None, we use low_sig for both signals
+        high_fq_range : array or list, shape (n_high, ), or 'auto'
+            List of filtering frequencies (amplitude signal)
+            If 'auto', it uses np.linspace(low_fq, fs / 2, 40).
 
-    mask : array or None, shape (n_epochs, n_points)
-        The locking is only evaluated where the mask is False.
-        Masking is done after filtering and Hilbert transform.
+        high_fq_width : float or 'auto'
+            Bandwidth of the band-pass filter (amplitude signal)
+            If 'auto', it uses 2 * low_fq.
 
-    low_fq : float
-        Filtering frequency (phase signal)
+        t_plot : float
+            Time to plot around the peaks (in second)
 
-    high_fq_range : array or list
-        List of filtering frequencies (amplitude signal)
+        filter_method : in {'mne', 'carrier'}
+            Choose band pass filtering method (in multiple_band_pass)
+            'mne': with mne.filter.band_pass_filter
+            'carrier': with pactools.Carrier (default)
 
-    low_fq_width : float
-        Bandwidth of the band-pass filter (phase signal)
+        peak_or_trough: in {'peak', 'trough'}
+            Lock to the maximum (peak) of minimum (trough) of the slow
+            oscillation.
 
-    high_fq_width : float
-        Bandwidth of the band-pass filter (amplitude signal)
+        percentiles : list of float or string, shape (n_percentiles, )
+            Percentile to compute for the time representation.
+            It can also include 'mean', 'std' or 'ste'
+            (resp. mean, standard deviation or standard error).
+        """
+        self.fs = fs
+        self.low_fq = low_fq
+        self.high_fq_range = high_fq_range
+        self.low_fq_width = low_fq_width
+        self.high_fq_width = high_fq_width
+        self.t_plot = t_plot
+        self.filter_method = filter_method
+        self.peak_or_trough = peak_or_trough
+        self.percentiles = percentiles
 
-    t_plot : float
-        Time to plot around the troughs (in second)
+    def fit(self, low_sig, high_sig=None, mask=None):
+        """
+        Compute peak-locked time-averaged and time-frequency representations.
 
-    filter_method : in {'mne', 'carrier'}
-        Choose band pass filtering method (in multiple_band_pass)
-        'mne': with mne.filter.band_pass_filter
-        'carrier': with pactools.Carrier (default)
+        Parameters
+        ----------
+        low_sig : array, shape (n_epochs, n_points)
+            Input data for the phase signal
 
-    peak_or_trough: in {'peak', 'trough'}
-        Lock to the maximum (peak) of minimum (trough) of the slow oscillation
+        high_sig : array or None, shape (n_epochs, n_points)
+            Input data for the amplitude signal.
+            If None, we use low_sig for both signals
 
-    draw_peaks : boolean
-        If True, plot the first peaks/troughs in the phase signal
+        mask : array or None, shape (n_epochs, n_points)
+            The locking is only evaluated where the mask is False.
+            Masking is done after filtering and Hilbert transform.
 
-    percentiles : list of float or string
-        Percentile to compute for the time representation.
-        It can also include 'mean', 'std' or 'ste'
-        (resp. mean, standard deviation or standard error).
+        ax_draw_peaks : boolean or matplotlib.axes.Axes instance
+            If True, plot the first peaks/troughs in the phase signal
+            Plot on the matplotlib.axes.Axes instance if given, or on a
+            new figure.
 
-    Return
-    ------
-    fig : matplotlib.figure.Figure
-        Figure instance containing the plot.
-    """
-    low_fq = np.atleast_1d(low_fq)
+        Return
+        ------
+        time_frequency : array, shape (n_high, n_window)
+            Time-frequency representation, averaged with peak-locking.
+            (n_window is the number of point in t_plot seconds)
 
-    low_sig = np.atleast_2d(low_sig)
-    if high_sig is None:
-        high_sig = low_sig
+        time_average : array, shape (n_percentiles, n_window)
+            Time representation, averaged with peak-locking.
+            (n_window is the number of point in t_plot seconds)
+        """
+        self.low_fq = np.atleast_1d(self.low_fq)
+        if self.high_fq_range == 'auto':
+            self.high_fq_range = np.linspace(self.low_fq[0], self.fs / 2.0, 40)
+        if self.high_fq_width == 'auto':
+            self.high_fq_width = 2 * self.low_fq[0]
 
-    # compute the slow oscillation
-    # n_epochs, n_points = filtered_low.shape
-    filtered_low = multiple_band_pass(low_sig, fs, low_fq, low_fq_width,
-                                      filter_method=filter_method)
-    filtered_low = filtered_low[0]
-    filtered_low_real = np.real(filtered_low)
+        self.low_sig = check_array(low_sig)
+        self.high_sig = check_array(high_sig, accept_none=True)
+        if self.high_sig is None:
+            self.high_sig = self.low_sig
 
-    if False:
-        # find the trough in the filtered_low_real
-        extrema = 1 if peak_or_trough == 'peak' else -1
-        thresh = (filtered_low_real.max() - filtered_low_real.min()) / 10.
-        trough_loc, trough_mag = peak_finder_multi_epochs(
-            filtered_low_real, fs=fs, t_plot=t_plot, mask=mask, thresh=thresh,
-            extrema=extrema)
-    else:
-        # find the trough in the phase of filtered_low
-        phase = np.angle(filtered_low)
-        if peak_or_trough == 'peak':
-            phase = (phase + 2 * np.pi) % (2 * np.pi)
-        trough_loc, _ = peak_finder_multi_epochs(phase, fs=fs, t_plot=t_plot,
-                                                 mask=mask, extrema=1)
-        if draw_peaks:
-            trough_mag = filtered_low_real.ravel()[trough_loc]
+        self.mask = check_array(mask, accept_none=True)
+        check_consistent_shape(self.low_sig, self.high_sig, self.mask)
 
-    # plot the filtered_low_real troughs
-    if draw_peaks:
-        n_point_plot = min(3000, low_sig.shape[1])
-        t = np.arange(n_point_plot) / float(fs)
-        plt.figure(figsize=(16, 5))
-        plt.plot(t, low_sig[0, :n_point_plot], label='signal')
-        plt.plot(t, filtered_low_real[0, :n_point_plot], label='driver')
-        plt.plot(trough_loc[trough_loc < n_point_plot] / float(fs),
-                 trough_mag[trough_loc < n_point_plot], 'o', label='trough')
-        plt.xlabel('Time (sec)')
-        plt.title("Driver's trough detection")
-        plt.legend(loc=0)
+        # compute the slow oscillation
+        # 1, n_epochs, n_points = filtered_low.shape
+        filtered_low = multiple_band_pass(low_sig, self.fs, self.low_fq,
+                                          self.low_fq_width,
+                                          filter_method=self.filter_method)
+        self.filtered_low_ = filtered_low[0]
+        filtered_low_real = np.real(self.filtered_low_)
 
-    # extract several signals with band-pass filters
-    # n_frequencies, n_epochs, n_points = filtered_high.shape
-    filtered_high = multiple_band_pass(high_sig, fs, high_fq_range,
-                                       high_fq_width, n_cycles=None,
-                                       filter_method=filter_method)
+        if False:
+            # find the peak in the filtered_low_real
+            extrema = 1 if self.peak_or_trough == 'peak' else -1
+            thresh = (filtered_low_real.max() - filtered_low_real.min()) / 10.
+            self.peak_loc, self.peak_mag = peak_finder_multi_epochs(
+                filtered_low_real, fs=self.fs, t_plot=self.t_plot,
+                mask=self.mask, thresh=thresh, extrema=extrema)
+        else:
+            # find the peak in the phase of filtered_low
+            phase = np.angle(self.filtered_low_)
+            if self.peak_or_trough == 'peak':
+                phase = (phase + 2 * np.pi) % (2 * np.pi)
+            self.peak_loc, _ = peak_finder_multi_epochs(
+                phase, fs=self.fs, t_plot=self.t_plot, mask=self.mask,
+                extrema=1)
+            self.peak_mag = filtered_low_real.ravel()[self.peak_loc]
 
-    # compute the trough locked time-frequency representation
-    evoked_time_frequency = trough_locked_time_frequency(
-        filtered_high, fs, high_fq_range, trough_loc=trough_loc, t_plot=t_plot,
-        mask=mask)
+        # extract several signals with band-pass filters
+        # n_high, n_epochs, n_points = filtered_high.shape
+        self.filtered_high_ = multiple_band_pass(
+            self.high_sig, self.fs, self.high_fq_range, self.high_fq_width,
+            n_cycles=None, filter_method=self.filter_method)
 
-    # compute the trough locked time representation
-    # we don't need the mask here, since only the valid trough locations are
-    # kept in peak_finder_multi_epochs
-    evoked_time = trough_locked_percentile(low_sig[None, :], fs, trough_loc,
-                                           t_plot, percentiles)
+        # compute the peak locked time-frequency representation
+        time_frequency_ = peak_locked_time_frequency(
+            self.filtered_high_, self.fs, self.high_fq_range,
+            peak_loc=self.peak_loc, t_plot=self.t_plot, mask=self.mask)
 
-    return evoked_time_frequency, evoked_time
+        # compute the peak locked time representation
+        # we don't need the mask here, since only the valid peak locations are
+        # kept in peak_finder_multi_epochs
+        time_average_ = peak_locked_percentile(self.low_sig[None, :], self.fs,
+                                               self.peak_loc, self.t_plot,
+                                               self.percentiles)
+
+        self.time_frequency_ = time_frequency_
+        self.time_average_ = time_average_
+
+        return self
+
+    def plot_peaks(self, ax=None):
+        # plot the filtered_low_real peaks
+        if not isinstance(ax, matplotlib.axes.Axes):
+            fig = plt.figure(figsize=(16, 5))
+            ax = fig.gca()
+        n_point_plot = min(3000, self.low_sig.shape[1])
+        time = np.arange(n_point_plot) / float(self.fs)
+
+        filtered = np.real(self.filtered_low_[0, :n_point_plot])
+
+        ax.plot(time, self.low_sig[0, :n_point_plot], label='signal')
+        ax.plot(time, filtered, label='driver')
+        ax.plot(self.peak_loc[self.peak_loc < n_point_plot] / float(self.fs),
+                self.peak_mag[self.peak_loc < n_point_plot], 'o',
+                label='peaks')
+        ax.set_xlabel('Time (sec)')
+        ax.set_title("Driver's peak detection")
+        ax.set_legend(loc=0)
+
+    def plot(self, axs=None, vmin=None, vmax=None, ylim=None):
+        """
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Figure instance containing the plot.
+        """
+        if axs is None:
+            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
+            axs = axs.ravel()
+        else:
+            fig = axs[0].figure
+
+        # plot the peak-locked time-frequency
+        ax = axs[0]
+        vmax = np.abs(self.time_frequency_).max() if vmax is None else vmax
+        vmin = -vmax
+        extent = (
+            -self.t_plot / 2,
+            self.t_plot / 2,
+            self.high_fq_range[0],
+            self.high_fq_range[-1], )
+        cax = ax.imshow(self.time_frequency_, cmap=plt.get_cmap('RdBu_r'),
+                        vmin=vmin, vmax=vmax, aspect='auto', origin='lower',
+                        interpolation='none', extent=extent)
+
+        # ax.set_xlabel('Time (sec)')
+        ax.set_ylabel('Frequency (Hz)')
+        ax.set_title('Driver peak-locked Time-frequency decomposition')
+
+        # plot the colorbar
+        plt.tight_layout()
+        fig.subplots_adjust(right=0.85)
+        add_colorbar(fig, cax, vmin, vmax, unit='', ax=None)
+
+        # plot the peak-locked time
+        ax = axs[1]
+
+        labels = {
+            'std+': r'$\mu+\sigma$',
+            'std-': r'$\mu-\sigma$',
+            'ste+': r'$\mu+\sigma/\sqrt{n}$',
+            'ste-': r'$\mu-\sigma/\sqrt{n}$',
+            'mean': r'$\mu$',
+        }
+        colors = mpl_palette('viridis', n_colors=len(self.percentiles))
+
+        n_signals, n_percentiles, n_points = self.time_average_.shape
+        t = (np.arange(n_points) - n_points // 2) / float(self.fs)
+        for i, p in enumerate(self.percentiles):
+            label = ('%d %%' % p) if isinstance(p, int) else labels[p]
+            ax.plot(t, self.time_average_[0, i], color=colors[i], label=label)
+
+        ax.set_xlabel('Time (sec)')
+        ax.set_title('Driver peak-locked average of raw signal')
+        ax.legend(loc='lower center', ncol=5, labelspacing=0.)
+        ax.grid('on')
+
+        # make room for the legend or apply specified ylim
+        if ylim is None:
+            ylim = ax.get_ylim()
+            ylim = (ylim[0] - (ylim[1] - ylim[0]) * 0.2, ylim[1])
+        ax.set_ylim(ylim)
+        ax.set_xlim([t[0], t[-1]])
+
+        return fig
 
 
 def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
-                             extrema=1, verbose=None):
+                             extrema=1):
     """Call peak_finder for multiple epochs, and fill only one array
     as if peak_finder was called with the ravelled array.
     Also remove the peaks that are too close to the start or the end
@@ -142,7 +254,7 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
     peak_mags_list = []
     for i_epoch in range(n_epochs):
         peak_inds, peak_mags = peak_finder(x0[i_epoch], thresh=thresh,
-                                           extrema=extrema, verbose=verbose)
+                                           extrema=extrema)
 
         # remove the peaks too close to the start or the end
         if t_plot is not None and fs is not None:
@@ -170,20 +282,20 @@ def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,
     return np.array(peak_inds_list), np.array(peak_mags_list)
 
 
-def trough_locked_time_frequency(filtered_high, fs, high_fq_range, trough_loc,
-                                 t_plot, mask=None):
+def peak_locked_time_frequency(filtered_high, fs, high_fq_range, peak_loc,
+                               t_plot, mask=None):
     """
-    Compute the theta-trough locked Time-frequency
+    Compute the peak-locked Time-frequency
     """
     # normalize each signal independently
-    n_frequencies, n_epochs, n_points = filtered_high.shape
+    n_high, n_epochs, n_points = filtered_high.shape
 
     # normalization is done everywhere, but mean is computed
     #  only where mask == 1
     if mask is not None:
         masked_filtered_high = filtered_high[:, mask == 0]
     else:
-        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+        masked_filtered_high = filtered_high.reshape(n_high, -1)
 
     mean = masked_filtered_high.mean(axis=1)[:, None, None]
     std = masked_filtered_high.std(axis=1)[:, None, None]
@@ -199,51 +311,51 @@ def trough_locked_time_frequency(filtered_high, fs, high_fq_range, trough_loc,
     if mask is not None:
         masked_filtered_high = filtered_high[:, mask == 0]
     else:
-        masked_filtered_high = filtered_high.reshape(n_frequencies, -1)
+        masked_filtered_high = filtered_high.reshape(n_high, -1)
     mean = masked_filtered_high.mean(axis=1)[:, None, None]
     filtered_high -= mean
 
-    # compute the evoked signals (trough-locked mean)
-    evoked_signals = trough_locked_percentile(filtered_high, fs, trough_loc,
-                                              t_plot)
+    # compute the evoked signals (peak-locked mean)
+    evoked_signals = peak_locked_percentile(filtered_high, fs, peak_loc,
+                                            t_plot)
     evoked_signals = evoked_signals[:, 0, :]
 
     return evoked_signals
 
 
-def trough_locked_percentile(signals, fs, trough_loc, t_plot,
-                             percentiles=['mean']):
+def peak_locked_percentile(signals, fs, peak_loc, t_plot,
+                           percentiles=['mean']):
     """
-    Compute the mean of each signal in signals, locked to the troughs
+    Compute the mean of each signal in signals, locked to the peaks
 
     Parameters
     ----------
     signals    : shape (n_signals, n_epochs, n_points)
     fs         : sampling frequency
-    trough_loc : indices of the trough locations
-    t_plot     : in second, time to plot around the troughs
+    peak_loc   : indices of the peak locations
+    t_plot     : in second, time to plot around the peaks
     percentiles: list of precentile to compute. It can also include 'mean',
                  'std' or 'ste' (mean, standard deviation or standard error).
 
     Returns
     -------
-    evoked_signals :
+    evoked_signals : array, shape (n_signals, n_percentiles, n_window)
     """
     n_signals, n_epochs, n_points = signals.shape
     n_window = int(fs * t_plot / 2.) * 2 + 1
     n_percentiles = len(percentiles)
 
-    # build indices matrix: each line is a index range around trough locations
-    indices = np.tile(trough_loc, (n_window, 1)).T
+    # build indices matrix: each line is a index range around peak locations
+    indices = np.tile(peak_loc, (n_window, 1)).T
     indices = indices + np.arange(n_window) - n_window // 2
 
     # ravel the epochs since we now have isolated events
     signals = signals.reshape(n_signals, -1)
 
-    n_troughs = indices.shape[0]
-    assert n_troughs > 0
+    n_peaks = indices.shape[0]
+    assert n_peaks > 0
 
-    # compute the evoked signals (trough-locked mean)
+    # compute the evoked signals (peak-locked mean)
     evoked_signals = np.zeros((n_signals, n_percentiles, n_window))
     for i_s in range(n_signals):
         for i_p, p in enumerate(percentiles):
@@ -262,9 +374,9 @@ def trough_locked_percentile(signals, fs, trough_loc, t_plot,
                 elif p == 'std-':
                     evoked_signals[i_s, i_p] = mean - std
                 elif p == 'ste+':
-                    evoked_signals[i_s, i_p] = mean + std / np.sqrt(n_troughs)
+                    evoked_signals[i_s, i_p] = mean + std / np.sqrt(n_peaks)
                 elif p == 'ste-':
-                    evoked_signals[i_s, i_p] = mean - std / np.sqrt(n_troughs)
+                    evoked_signals[i_s, i_p] = mean - std / np.sqrt(n_peaks)
                 else:
                     raise (ValueError, 'wrong percentile string: %s' % p)
 
