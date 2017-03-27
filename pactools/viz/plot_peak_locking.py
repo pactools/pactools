@@ -22,7 +22,7 @@ def plot_peak_locking(
     else:
         fig = axs[0].figure
 
-    # plot the trough-locked time-frequency
+    # plot the peak-locked time-frequency
     ax = axs[0]
     vmax = np.abs(evoked_time_frequency).max() if vmax is None else vmax
     vmin = -vmax
@@ -34,14 +34,14 @@ def plot_peak_locking(
 
     # ax.set_xlabel('Time (sec)')
     ax.set_ylabel('Frequency (Hz)')
-    ax.set_title('Driver trough-locked Time-frequency decomposition')
+    ax.set_title('Driver peak-locked Time-frequency decomposition')
 
     # plot the colorbar
     plt.tight_layout()
     fig.subplots_adjust(right=0.85)
     add_colorbar(fig, cax, vmin, vmax, unit='', ax=None)
 
-    # plot the trough-locked time
+    # plot the peak-locked time
     ax = axs[1]
 
     lines = ['k--', 'k-', 'k--']
@@ -60,7 +60,7 @@ def plot_peak_locking(
         ax.plot(t, evoked_time[0, i], lines[i], label=label)
 
     ax.set_xlabel('Time (sec)')
-    ax.set_title('Driver trough-locked average of raw signal')
+    ax.set_title('Driver peak-locked average of raw signal')
     ax.legend(loc='lower center', ncol=5, labelspacing=0.)
     ax.grid('on')
 
@@ -71,4 +71,4 @@ def plot_peak_locking(
     ax.set_ylim(ylim)
     ax.set_xlim([t[0], t[-1]])
 
-    return fig, vmin, vmax, ylim
+    return fig
