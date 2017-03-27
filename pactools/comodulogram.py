@@ -11,7 +11,7 @@ from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d
 from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape
-from .viz.utils import add_colorbar
+from .utils.viz import add_colorbar
 from .preprocess import extract
 from .bandpass_filter import multiple_band_pass
 

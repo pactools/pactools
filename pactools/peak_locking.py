@@ -5,7 +5,7 @@ import matplotlib
 from .comodulogram import multiple_band_pass
 from .utils.peak_finder import peak_finder
 from .utils.validation import check_consistent_shape, check_array
-from .viz.utils import add_colorbar, mpl_palette
+from .utils.viz import add_colorbar, mpl_palette
 
 
 class PeakLocking(object):

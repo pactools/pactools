@@ -30,9 +30,9 @@ DAR models
 Utilities
 =========
 
-.. currentmodule:: pactools.utils
+.. currentmodule:: pactools.utils.peak_finder
 
 .. autosummary::
    :toctree: generated/
 
-   peak_finder.peak_finder
+   peak_finder

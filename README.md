@@ -6,22 +6,29 @@ This package provides tools to estimate **phase-amplitude coupling (PAC)** in ne
 
 In particular, it implements the **driven auto-regressive (DAR)** models presented in the reference below.
 
+Read more in the [documentation](https://pactools.github.io).
+
 ## Install
 
-We recommend the `Anaconda Python distribution <https://www.continuum.io/downloads>`_. To install ``pactools``, you first need to install its dependencies::
+We recommend the [Anaconda Python distribution](https://www.continuum.io/downloads). To install `pactools`, you first need to install its dependencies::
 
-	$ pip install numpy matplotlib scipy
+```
+$ pip install numpy matplotlib scipy
+```
 
 Then install pactools::
 
-	$ pip install git+https://github.com/pactools/pactools.git#egg=pactools
+```
+$ pip install git+https://github.com/pactools/pactools.git#egg=pactools
+```
 
-If you do not have admin privileges on the computer, use the ``--user`` flag
-with `pip`. To upgrade, use the ``--upgrade`` flag provided by `pip`.
+If you do not have admin privileges on the computer, use the `--user` flag with `pip`. To upgrade, use the `--upgrade` flag provided by `pip`.
 
 To check if everything worked fine, you can do::
 
-	$ python -c 'import pactools'
+```
+$ python -c 'import pactools'
+```
 
 and it should not give any error messages.
 

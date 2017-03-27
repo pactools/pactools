@@ -18,5 +18,4 @@ setup(
         'pactools',
         'pactools.dar_model',
         'pactools.utils',
-        'pactools.viz',
     ], )

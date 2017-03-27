@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..utils.spectrum import Spectrum
-from .viz.utils import add_colorbar, compute_vmin_vmax
+from ..utils.viz import add_colorbar, compute_vmin_vmax
 
 
 def plot_dar_model(model, title='', frange=None, mode='', vmin=None, vmax=None,
