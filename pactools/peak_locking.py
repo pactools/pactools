@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 
 from .comodulogram import multiple_band_pass
 from .utils.peak_finder import peak_finder
+from .viz.plot_peak_locking import plot_peak_locking
 
 
-def time_frequency_peak_locking(
-        fs, low_sig, high_sig=None, mask=None, low_fq=6.0,
-        high_fq_range=np.linspace(10.0, 150.0, 50), low_fq_width=2.0,
-        high_fq_width=20.0, t_plot=1.0, filter_method='carrier',
-        peak_or_trough='peak', draw_peaks=True):
+def peak_locking(fs, low_sig, high_sig=None, mask=None, low_fq=6.0,
+                 high_fq_range=np.linspace(10.0, 150.0, 50), low_fq_width=2.0,
+                 high_fq_width=20.0, t_plot=1.0, filter_method='carrier',
+                 peak_or_trough='peak', draw_peaks=True):
     """
     Plot the theta-trough locked Time-frequency plot of mean power
     modulation time-locked to the theta trough
@@ -117,14 +117,14 @@ def time_frequency_peak_locking(
 
     # compute the trough locked time representation
     percentiles = ['std+', 'mean', 'std-']
-    # we don't need the mask here, since only the valid trough locations are
+    # we don't need the mask here, since only the valid trough locations are
     # kept in peak_finder_multi_epochs
     evoked_time = trough_locked_percentile(low_sig[None, :], fs, trough_loc,
                                            t_plot, percentiles)
 
-    plot_time_frequency_peak_locking(fs, evoked_time_frequency, evoked_time,
-                                     t_plot, high_fq_range, percentiles,
-                                     axs=None, vmin=None, vmax=None, ylim=None)
+    plot_peak_locking(fs, evoked_time_frequency, evoked_time, t_plot,
+                      high_fq_range, percentiles, axs=None, vmin=None,
+                      vmax=None, ylim=None)
 
 
 def peak_finder_multi_epochs(x0, fs=None, t_plot=None, mask=None, thresh=None,

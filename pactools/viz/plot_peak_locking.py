@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from .utils import add_colorbar
 
 
-def plot_time_frequency_peak_locking(
+def plot_peak_locking(
         fs, evoked_time_frequency, evoked_time, t_plot, high_fq_range,
         percentiles, axs=None, vmin=None, vmax=None, ylim=None):
     """
