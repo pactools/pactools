@@ -11,7 +11,7 @@ def sigmoid(array, sharpness):
 def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
                   high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
                   sigmoid_sharpness=6, phi_0=0., delay=0.):
-    """Simulate a signal with artificial phase amplitude coupling (PAC).
+    """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
     ----------

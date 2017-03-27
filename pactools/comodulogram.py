@@ -10,65 +10,64 @@ from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d
 from .utils.validation import check_array, check_random_state
-from .viz.plot_comodulogram import plot_comodulogram
+from .utils.validation import check_consistent_shape
+from .viz.utils import add_colorbar
 from .preprocess import extract
 from .bandpass_filter import multiple_band_pass
 
 N_BINS_TORT = 18
 
 STANDARD_PAC_METRICS = ['ozkurt', 'canolty', 'tort', 'penny', 'vanwijk']
-MODEL_BASED_PAC_METRICS = ['dar', ]
+MODEL_BASED_PAC_METRICS = ['duprelatour', ]
 COHERENCE_PAC_METRICS = ['jiang', 'colgin']
 BICOHERENCE_PAC_METRICS = ['sigl', 'nagashima', 'hagihira', 'bispectrum']
 
 ALL_PAC_METRICS = (STANDARD_PAC_METRICS + MODEL_BASED_PAC_METRICS +
                    COHERENCE_PAC_METRICS + BICOHERENCE_PAC_METRICS)
 
+REFERENCES = {
+    'ozkurt': '[Ozkurt & al 2011]',
+    'canolty': '[Canolty & al 2006]',
+    'tort': '[Tort & al 2010]',
+    'penny': '[Penny & al 2008]',
+    'vanwijk': '[van Wijk & al 2015]',
+    'duprelatour': '[Dupre la Tour & al 2017]',
+    'jiang': '[Jiang & al 2016]',
+    'colgin': '[Colgin & al 2009]',
+    'sigl': '[Sigl & al 1994]',
+    'nagashima': '[Nagashima & al 2006]',
+    'hagihira': '[Hagihira & al 2001]',
+    'bispectrum': 'Bispectrum', }
 
-def comodulogram(fs, low_sig, high_sig=None, mask=None,
-                 low_fq_range=np.linspace(1.0, 10.0, 20),
-                 high_fq_range=np.linspace(10.0, 150.0, 50), low_fq_width=2.,
-                 high_fq_width=20.0, method='tort', n_surrogates=0, draw=False,
+
+class Comodulogram(object):
+    def __init__(self, fs, low_fq_range, low_fq_width=2., high_fq_range='auto',
+                 high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, draw_phase=False,
                  minimum_shift=1.0, random_state=None, coherence_params=dict(),
                  low_fq_width_2=4.0):
-    """
-    Compute the comodulogram for Phase Amplitude Coupling (PAC).
+        """
+        Parameters
+        ----------
+        fs : float,
+            Sampling frequency
 
-    Parameters
-    ----------
-    fs : float,
-        Sampling frequency
+        low_fq_range : array or list
+            List of filtering frequencies (phase signal)
 
-    low_sig : array, shape (n_epochs, n_points)
-        Input data for the phase signal
+        high_fq_range : array or list or 'auto'
+            List of filtering frequencies (amplitude signal)
+            If 'auto', it uses np.linspace(max(low_fq_range), fs / 2.0, 40).
 
-    high_sig : array or None, shape (n_epochs, n_points)
-        Input data for the amplitude signal.
-        If None, we use low_sig for both signals.
+        low_fq_width : float
+            Bandwidth of the band-pass filter (phase signal)
 
-    mask : array or list of array or None, shape (n_epochs, n_points)
-        The PAC is only evaluated where the mask is False.
-        Masking is done after filtering and Hilbert transform.
-        If the method computes the bicoherence, the mask has to be
-        unidimensional (n_points, ) and the same mask is applied on all epochs.
-        If a list is given, the filtering is done only once and the
-        comodulogram is computed on each mask.
+        high_fq_width : float or 'auto'
+            Bandwidth of the band-pass filter (amplitude signal)
+            If 'auto', it uses 2 * max(low_fq_range).
 
-    low_fq_range : array or list
-        List of filtering frequencies (phase signal)
-
-    high_fq_range : array or list
-        List of filtering frequencies (amplitude signal)
-
-    low_fq_width : float
-        Bandwidth of the band-pass filter (phase signal)
-
-    high_fq_width : float
-        Bandwidth of the band-pass filter (amplitude signal)
-
-    method : string or DAR instance
-        Modulation index method:
+        method : string or DAR instance
+            Modulation index method:
             - String in ('ozkurt', 'canolty', 'tort', 'penny', ), for a PAC
                 estimation based on filtering and using the Hilbert transform.
             - String in ('vanwijk', ) for a joint AAC and PAC estimation
@@ -81,164 +80,355 @@ def comodulogram(fs, low_sig, high_sig=None, mask=None,
             - String in ('dar', ) or a DAR instance, for a PAC estimation
                 based on a driven autoregressive model.
 
-    n_surrogates : int
-        Number of surrogates computed for the z-score
-        If n_surrogates <= 1, the z-score is not computed.
+        n_surrogates : int
+            Number of surrogates computed for the z-score
+            If n_surrogates <= 1, the z-score is not computed.
 
-    draw : boolean
-        If True, plot the comodulogram.
+        vmin, vmax : float or None
+            If not None, it define the min/max value of the plot.
 
-    vmin, vmax : float or None
-        If not None, it define the min/max value of the plot.
+        progress_bar : boolean
+            If True, a progress bar is shown in stdout.
 
-    progress_bar : boolean
-        If True, a progress bar is shown in stdout.
+        draw_phase : boolean
+            If True, plot the phase distribution in 'tort' index.
 
-    draw_phase : boolean
-        If True, plot the phase distribution in 'tort' index.
+        minimum_shift : float
+            Minimum time shift (in sec) for the surrogate analysis.
 
-    minimum_shift : float
-        Minimum time shift (in sec) for the surrogate analysis.
+        random_state : None, int or np.random.RandomState instance
+            Seed or random number generator for the surrogate analysis.
 
-    random_state : None, int or np.random.RandomState instance
-        Seed or random number generator for the surrogate analysis.
+        coherence_params : dict
+            Parameters for methods base on coherence or bicoherence.
+            May contain:
+                block_length : int
+                    Block length
+                fft_length : int or None
+                    Length of the FFT
+                step : int or None
+                    Step between two blocks
+            If the dictionary is empty, default values will be applied based on
+            fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
 
-    coherence_params : dict
-        Parameters for methods base on coherence or bicoherence.
-        May contain:
-            block_length : int
-                Block length
-            fft_length : int or None
-                Length of the FFT
-            step : int or None
-                Step between two blocks
-        If the dictionary is empty, default values will be applied based on
-        fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
+        low_fq_width_2 : float
+            Bandwidth of the band-pass filters centered on low_fq_range, for
+            the amplitude signal. Used only with 'vanwijk' method.
 
-    low_fq_width_2 : float
-        Bandwidth of the band-pass filters centered on low_fq_range, for
-        the amplitude signal. Used only with 'vanwijk' method.
+        """
+        self.fs = fs
+        self.low_fq_range = low_fq_range
+        self.low_fq_width = low_fq_width
+        self.high_fq_range = high_fq_range
+        self.high_fq_width = high_fq_width
+        self.method = method
+        self.n_surrogates = n_surrogates
+        self.vmin = vmin
+        self.vmax = vmax
+        self.progress_bar = progress_bar
+        self.draw_phase = draw_phase
+        self.minimum_shift = minimum_shift
+        self.random_state = random_state
+        self.coherence_params = coherence_params
+        self.low_fq_width_2 = low_fq_width_2
 
-    Return
-    ------
-    comod : array, shape (len(low_fq_range), len(high_fq_range))
-        Comodulogram for each couple of frequencies.
-        If a list of mask is given, it returns a list of comodulograms.
-    """
-    random_state = check_random_state(random_state)
-    if isinstance(method, str):
-        method = method.lower()
-    fs = float(fs)
-    low_sig = check_array(low_sig)
-    high_sig = check_array(high_sig, accept_none=True)
+    def _check_params(self):
+        if self.high_fq_range == 'auto':
+            self.high_fq_range = np.linspace(
+                max(self.low_fq_range), self.fs / 2.0, 40)
 
-    # convert to numpy array
-    low_fq_range = np.asarray(low_fq_range)
-    high_fq_range = np.asarray(high_fq_range)
+        if self.high_fq_width == 'auto':
+            self.high_fq_width = max(self.low_fq_range) * 2
 
-    multiple_masks = (isinstance(mask, list) or
-                      (isinstance(mask, np.ndarray) and mask.ndim == 3))
-    if not multiple_masks:
-        mask = [mask]
-    mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
-    n_masks = len(mask)
+        self.random_state = check_random_state(self.random_state)
 
-    if method in STANDARD_PAC_METRICS:
-        if high_sig is None:
-            high_sig = low_sig
+        if isinstance(self.method, str):
+            self.method = self.method.lower()
 
-        if progress_bar:
-            progress_bar = ProgressBar('comodulogram: %s' % method,
-                                       max_value=low_fq_range.size * n_masks)
+        self.fs = float(self.fs)
 
-        # compute a number of band-pass filtered and Hilbert filtered signals
-        filtered_high = multiple_band_pass(high_sig, fs, high_fq_range,
-                                           high_fq_width)
-        filtered_low = multiple_band_pass(low_sig, fs, low_fq_range,
-                                          low_fq_width)
-        if method == 'vanwijk':
-            filtered_low_2 = multiple_band_pass(low_sig, fs, low_fq_range,
-                                                low_fq_width_2)
+        self.low_fq_range = np.atleast_1d(self.low_fq_range)
+        self.high_fq_range = np.atleast_1d(self.high_fq_range)
+
+    def fit(self, low_sig, high_sig=None, mask=None):
+        """
+        Compute the comodulogram for Phase Amplitude Coupling (PAC).
+
+        Parameters
+        ----------
+        low_sig : array, shape (n_epochs, n_points)
+            Input data for the phase signal
+
+        high_sig : array or None, shape (n_epochs, n_points)
+            Input data for the amplitude signal.
+            If None, we use low_sig for both signals.
+
+        mask : array or list of array or None, shape (n_epochs, n_points)
+            The PAC is only evaluated where the mask is False.
+            Masking is done after filtering and Hilbert transform.
+            If the method computes the bicoherence, the mask has to be
+            unidimensional (n_points, ) and the same mask is applied on all
+            epochs.
+            If a list is given, the filtering is done only once and the
+            comodulogram is computed on each mask.
+
+        Attributes
+        ----------
+        comod_ : array, shape (len(low_fq_range), len(high_fq_range))
+            Comodulogram for each couple of frequencies.
+            If a list of mask is given, it returns a list of comodulograms.
+
+        """
+        self._check_params()
+        low_sig = check_array(low_sig)
+        high_sig = check_array(high_sig, accept_none=True)
+        check_consistent_shape(low_sig, high_sig)
+
+        multiple_masks = (isinstance(mask, list) or
+                          (isinstance(mask, np.ndarray) and mask.ndim == 3))
+        if not multiple_masks:
+            mask = [mask]
+        mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
+        n_masks = len(mask)
+
+        if self.method in STANDARD_PAC_METRICS:
+            if high_sig is None:
+                high_sig = low_sig
+
+            if self.progress_bar:
+                self.progress_bar = ProgressBar(
+                    'comodulogram: %s' % self.method,
+                    max_value=self.low_fq_range.size * n_masks)
+
+            # compute a number of band-pass filtered signals
+            filtered_high = multiple_band_pass(
+                high_sig, self.fs, self.high_fq_range, self.high_fq_width)
+            filtered_low = multiple_band_pass(
+                low_sig, self.fs, self.low_fq_range, self.low_fq_width)
+            if self.method == 'vanwijk':
+                filtered_low_2 = multiple_band_pass(
+                    low_sig, self.fs, self.low_fq_range, self.low_fq_width_2)
+            else:
+                filtered_low_2 = None
+
+            comod_list = []
+            for this_mask in mask:
+                comod = _comodulogram(self.fs, filtered_low, filtered_high,
+                                      this_mask, self.method,
+                                      self.n_surrogates, self.progress_bar,
+                                      self.draw_phase, self.minimum_shift,
+                                      self.random_state, filtered_low_2)
+                comod_list.append(comod)
+
+        elif self.method in COHERENCE_PAC_METRICS:
+            if high_sig is None:
+                high_sig = low_sig
+
+            if self.progress_bar:
+                self.progress_bar = ProgressBar('coherence: %s' % self.method,
+                                                max_value=n_masks)
+
+            # compute a number of band-pass filtered signals
+            filtered_high = multiple_band_pass(
+                high_sig, self.fs, self.high_fq_range, self.high_fq_width)
+
+            comod_list = []
+            for this_mask in mask:
+                comod = _coherence(self.fs, low_sig, filtered_high, this_mask,
+                                   self.method, self.low_fq_range,
+                                   self.low_fq_width, self.n_surrogates,
+                                   self.minimum_shift, self.random_state,
+                                   self.progress_bar, self.coherence_params)
+                comod_list.append(comod)
+                if self.progress_bar:
+                    self.progress_bar.update_with_increment_value(1)
+
+        # compute PAC with the bispectrum/bicoherence
+        elif self.method in BICOHERENCE_PAC_METRICS:
+            if high_sig is not None:
+                raise ValueError(
+                    "Impossible to use a bicoherence method (%s) on two "
+                    "signals, please try another method." % self.method)
+            if self.n_surrogates > 1:
+                raise NotImplementedError(
+                    "Surrogate analysis with a bicoherence method (%s) "
+                    "is not implemented." % self.method)
+
+            if self.progress_bar:
+                self.progress_bar = ProgressBar('bicoherence: %s' %
+                                                self.method, max_value=n_masks)
+
+            comod_list = []
+            for this_mask in mask:
+                comod = _bicoherence(fs=self.fs, sig=low_sig, mask=this_mask,
+                                     method=self.method,
+                                     low_fq_range=self.low_fq_range,
+                                     low_fq_width=self.low_fq_width,
+                                     high_fq_range=self.high_fq_range,
+                                     coherence_params=self.coherence_params)
+                comod_list.append(comod)
+                if self.progress_bar:
+                    self.progress_bar.update_with_increment_value(1)
+
+        elif isinstance(self.method,
+                        BaseDAR) or self.method in MODEL_BASED_PAC_METRICS:
+            if self.method == 'duprelatour':
+                self.method = DAR(ordar=10, ordriv=2)
+
+            comod_list = driven_comodulogram(
+                fs=self.fs, low_sig=low_sig, high_sig=high_sig, mask=mask,
+                model=self.method, low_fq_range=self.low_fq_range,
+                low_fq_width=self.low_fq_width,
+                high_fq_range=self.high_fq_range,
+                progress_bar=self.progress_bar, n_surrogates=self.n_surrogates,
+                random_state=self.random_state,
+                minimum_shift=self.minimum_shift)
         else:
-            filtered_low_2 = None
+            raise ValueError('unknown method: %s' % self.method)
 
-        comod_list = []
-        for this_mask in mask:
-            comod = _comodulogram(fs, filtered_low, filtered_high, this_mask,
-                                  method, n_surrogates, progress_bar,
-                                  draw_phase, minimum_shift, random_state,
-                                  filtered_low_2)
-            comod_list.append(comod)
+        # if self.draw:
+        #     contours = 4.0 if self.n_surrogates > 1 else None
+        #     plot_comodulogram(comod_list, self.fs, self.low_fq_range,
+        #                       self.high_fq_range, contours=contours)
 
-    elif method in COHERENCE_PAC_METRICS:
-        if high_sig is None:
-            high_sig = low_sig
+        if not multiple_masks:
+            self.comod_ = comod_list[0]
+        else:
+            self.comod_ = np.array(comod_list)
 
-        if progress_bar:
-            progress_bar = ProgressBar('coherence: %s' % method,
-                                       max_value=n_masks)
+        return self
 
-        # compute a number of band-pass filtered and Hilbert filtered signals
-        filtered_high = multiple_band_pass(high_sig, fs, high_fq_range,
-                                           high_fq_width)
+    def plot(self, titles=None, fig=None, axs=None, cmap=None, vmin=None,
+             vmax=None, unit='', cbar=True, label=True, contours=None):
+        """
+        Plot one or more comodulograms.
 
-        comod_list = []
-        for this_mask in mask:
-            comod = _coherence(fs, low_sig, filtered_high, this_mask, method,
-                               low_fq_range, low_fq_width, n_surrogates,
-                               minimum_shift, random_state, progress_bar,
-                               coherence_params)
-            comod_list.append(comod)
-            if progress_bar:
-                progress_bar.update_with_increment_value(1)
+        titles : list of string or None
+            List of titles for each comodulogram
 
-    # compute PAC with the bispectrum/bicoherence
-    elif method in BICOHERENCE_PAC_METRICS:
-        if high_sig is not None:
-            raise ValueError(
-                "Impossible to use a bicoherence method (%s) on two signals, "
-                "please try another method." % method)
-        if n_surrogates > 1:
-            raise NotImplementedError(
-                "Surrogate analysis with a bicoherence method (%s) "
-                "is not implemented." % method)
+        axs : list or array of matplotlib.axes.Axes
+            Axes where the comodulograms are drawn. If None, a new figure is
+            created. Typical use is: fig, axs = plt.subplots(3, 4)
 
-        if progress_bar:
-            progress_bar = ProgressBar('bicoherence: %s' % method,
-                                       max_value=n_masks)
+        cmap : colormap or None
+            Colormap used in the plot. If None, it uses 'viridis' colormap.
 
-        comod_list = []
-        for this_mask in mask:
-            comod = _bicoherence(
-                fs=fs, sig=low_sig, mask=this_mask, method=method,
-                low_fq_range=low_fq_range, low_fq_width=low_fq_width,
-                high_fq_range=high_fq_range, coherence_params=coherence_params)
-            comod_list.append(comod)
-            if progress_bar:
-                progress_bar.update_with_increment_value(1)
+        vmin, vmax : float or None
+            If not None, they define the min/max value of the plot, else
+            they are set to (0, comodulograms.max()).
 
-    elif isinstance(method, BaseDAR) or method in MODEL_BASED_PAC_METRICS:
-        if method == 'dar':
-            method = DAR(ordar=10, ordriv=2)
+        unit : string (default: '')
+            Unit of the comodulogram
 
-        comod_list = driven_comodulogram(
-            fs=fs, low_sig=low_sig, high_sig=high_sig, mask=mask, model=method,
-            low_fq_range=low_fq_range, low_fq_width=low_fq_width,
-            high_fq_range=high_fq_range, progress_bar=progress_bar,
-            n_surrogates=n_surrogates, random_state=random_state,
-            minimum_shift=minimum_shift)
-    else:
-        raise ValueError('unknown method: %s' % method)
+        cbar : True or False
+            Display colorbar or not
 
-    if draw:
-        contours = 4.0 if n_surrogates > 1 else None
-        plot_comodulogram(comod_list, fs, low_fq_range, high_fq_range,
-                          contours=contours)
+        label : True or False
+            Display labels or not
 
-    if not multiple_masks:
-        return comod_list[0]
-    else:
-        return comod_list
+        contours : None or float
+            If not None, contours will be added around values above contours
+            value.
+        """
+        if self.comod_.ndim == 2:
+            self.comod_ = self.comod_[None, :, :]
+
+        n_comod, n_low, n_high = self.comod_.shape
+
+        if axs is None:
+            fig, axs = plt.subplots(1, n_comod, figsize=(5 * n_comod, 4))
+        else:
+            fig = axs[0].figure
+        axs = np.array(axs).ravel()
+
+        if vmin is None and vmax is None:
+            vmin = min(0, self.comod_.min())
+            vmax = max(0, self.comod_.max())
+            if vmin < 0 and vmax > 0:
+                vmax = max(vmax, -vmin)
+                vmin = -vmax
+                if cmap is None:
+                    cmap = plt.get_cmap('RdBu_r')
+
+        if cmap is None:
+            cmap = plt.get_cmap('viridis')
+
+        n_channels, n_low_fq, n_high_fq = self.comod_.shape
+        extent = [
+            self.low_fq_range[0],
+            self.low_fq_range[-1],
+            self.high_fq_range[0],
+            self.high_fq_range[-1],
+        ]
+
+        # plot the image
+        for i in range(n_channels):
+            cax = axs[i].imshow(self.comod_[i].T, cmap=cmap, vmin=vmin,
+                                vmax=vmax, aspect='auto', origin='lower',
+                                extent=extent, interpolation='none')
+
+            if titles is not None:
+                axs[i].set_title(titles[i], fontsize=12)
+
+            if contours is not None:
+                axs[i].contour(self.comod_[i].T,
+                               levels=np.atleast_1d(contours), colors='w',
+                               origin='lower', extent=extent)
+
+        if label:
+            axs[-1].set_xlabel('Driver frequency (Hz)')
+            axs[0].set_ylabel('Signal frequency (Hz)')
+
+        fig.tight_layout()
+
+        if cbar:
+            # plot the colorbar once
+            ax = axs[0] if len(axs) == 1 else None
+            add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
+
+        return fig
+
+    def get_maximum_pac(self):
+        """Get maximum PAC value in a comodulogram.
+        'low_fq_range' and 'high_fq_range' must be the same than used in the
+        modulation_index function that computed 'comodulograms'.
+
+        Return
+        ------
+        low_fq : float or array, shape (n_comod, )
+            Low frequency of maximum PAC
+
+        high_fq : float or array, shape (n_comod, )
+            High frequency of maximum PAC
+
+        pac_value : float or array, shape (n_comod, )
+            Maximum PAC value
+        """
+        # only one comodulogram
+        return_array = True
+        if self.comod_.ndim == 2:
+            self.comod_ = self.comod_[None, :, :]
+            return_array = False
+
+        # check that the sizes match
+        n_comod, n_low, n_high = self.comod_.shape
+
+        # compute the maximum of the comodulogram, and get the frequencies
+        max_pac_value = np.zeros(n_comod)
+        low_fq = np.zeros(n_comod)
+        high_fq = np.zeros(n_comod)
+        for k, comodulogram in enumerate(self.comod_):
+            i, j = argmax_2d(comodulogram)
+            max_pac_value[k] = comodulogram[i, j]
+
+            low_fq[k] = self.low_fq_range[i]
+            high_fq[k] = self.high_fq_range[j]
+
+        # return arrays or floats
+        if return_array:
+            return low_fq, high_fq, max_pac_value
+        else:
+            return low_fq[0], high_fq[0], max_pac_value[0]
 
 
 def driven_comodulogram(fs, low_sig, high_sig, mask, model, low_fq_range,
@@ -822,66 +1012,3 @@ def _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
         comod /= np.std(comod_list[1:, ...], axis=0)
 
     return comod
-
-
-def get_maximum_pac(comodulograms, low_fq_range, high_fq_range):
-    """Get maximum PAC value in a comodulogram.
-    'low_fq_range' and 'high_fq_range' must be the same than used in the
-    modulation_index function that computed 'comodulograms'.
-
-    Parameters
-    ----------
-    comodulograms : array, shape (n_low, n_high) or (n_comod, n_low, n_high)
-        Comodulograms containing PAC values.
-        If a list or array or a 3D array is given, it returns an array of
-        each value for each comodulogram.
-
-    low_fq_range : list of array, shape (n_low, )
-        Low frequency range (phase signal)
-
-    high_fq_range : list of array, shape (n_high, )
-        High frequency range (amplitude signal)
-
-    Return
-    ------
-    low_fq : float or array, shape (n_comod, )
-        Low frequency of maximum PAC
-
-    high_fq : float or array, shape (n_comod, )
-        High frequency of maximum PAC
-
-    pac_value : float or array, shape (n_comod, )
-        Maximum PAC value
-    """
-    if isinstance(comodulograms, list):
-        comodulograms = np.array(comodulograms)
-
-    # only one comodulogram
-    return_array = True
-    if comodulograms.ndim == 2:
-        comodulograms = comodulograms[None, :, :]
-        return_array = False
-
-    # check that the sizes match
-    n_comod, n_low, n_high = comodulograms.shape
-    n_low_2, n_high_2 = len(low_fq_range), len(high_fq_range)
-    if n_low_2 != n_low or n_high_2 != n_high:
-        raise ValueError("Array shapes do not match: (%d, %d) and (%d, %d)" %
-                         (n_low, n_high, n_low_2, n_high_2))
-
-    # compute the maximum of the comodulogram, and get the frequencies
-    max_pac_value = np.zeros(n_comod)
-    low_fq = np.zeros(n_comod)
-    high_fq = np.zeros(n_comod)
-    for k, comodulogram in enumerate(comodulograms):
-        i, j = argmax_2d(comodulogram)
-        max_pac_value[k] = comodulogram[i, j]
-
-        low_fq[k] = low_fq_range[i]
-        high_fq[k] = high_fq_range[j]
-
-    # return arrays or floats
-    if return_array:
-        return low_fq, high_fq, max_pac_value
-    else:
-        return low_fq[0], high_fq[0], max_pac_value[0]

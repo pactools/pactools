@@ -34,7 +34,6 @@ Visualization
 .. autosummary::
    :toctree: generated/
 
-   plot_comodulogram
    plot_dar_model
 
 Utilities

@@ -82,13 +82,13 @@ class PeakLocking(object):
             Plot on the matplotlib.axes.Axes instance if given, or on a
             new figure.
 
-        Return
-        ------
-        time_frequency : array, shape (n_high, n_window)
+        Attributes
+        ----------
+        time_frequency_ : array, shape (n_high, n_window)
             Time-frequency representation, averaged with peak-locking.
             (n_window is the number of point in t_plot seconds)
 
-        time_average : array, shape (n_percentiles, n_window)
+        time_average_ : array, shape (n_percentiles, n_window)
             Time representation, averaged with peak-locking.
             (n_window is the number of point in t_plot seconds)
         """
