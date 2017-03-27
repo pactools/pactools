@@ -3,6 +3,7 @@ Example of comodulogram
 -----------------------
 This example creates an artificial signal with phase-amplitude coupling (PAC)
 and computes comodulograms with several methods.
+
 A comodulogram shows the estimated PAC metric on a grid of frequency bands.
 """
 import numpy as np
@@ -35,8 +36,10 @@ fig, axs = plt.subplots(n_lines, n_columns, figsize=(4 * n_columns,
 axs = axs.ravel()
 
 for ax, method in zip(axs, methods):
+    print('%s... ' % (method, ))
     estimator = Comodulogram(fs=fs, low_fq_range=low_fq_range,
-                             low_fq_width=low_fq_width, method=method)
+                             low_fq_width=low_fq_width, method=method,
+                             progress_bar=False)
     estimator.fit(signal)
     estimator.plot(titles=[REFERENCES[method]], axs=[ax])
 

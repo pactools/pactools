@@ -6,7 +6,7 @@ from pactools.dar_model import AR, DAR, HAR, StableDAR
 from pactools.utils.testing import assert_equal
 from pactools.utils.testing import assert_raises, assert_array_equal
 from pactools.utils.testing import assert_true, assert_array_almost_equal
-from pactools.comodulogram import comodulogram, get_maximum_pac
+from pactools.comodulogram import Comodulogram
 from pactools.comodulogram import ALL_PAC_METRICS, BICOHERENCE_PAC_METRICS
 from pactools.create_signal import create_signal
 
@@ -24,26 +24,25 @@ signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
                        random_state=0)
 
 
-def fast_comod(**kwargs):
+class ComodTest(Comodulogram):
     # A comodulogram call with default params used for testing
-    if 'fs' not in kwargs:
-        kwargs['fs'] = fs
-    if 'low_sig' not in kwargs:
-        kwargs['low_sig'] = signal
-    if 'low_fq_range' not in kwargs:
-        kwargs['low_fq_range'] = low_fq_range
-    if 'low_fq_width' not in kwargs:
-        kwargs['low_fq_width'] = 1.
-    if 'high_fq_range' not in kwargs:
-        kwargs['high_fq_range'] = high_fq_range
-    if 'high_fq_width' not in kwargs:
-        kwargs['high_fq_width'] = 14.
-    if 'progress_bar' not in kwargs:
-        kwargs['progress_bar'] = False
-    if 'random_state' not in kwargs:
-        kwargs['random_state'] = 0
+    def __init__(self, fs=fs, low_fq_range=low_fq_range, low_fq_width=1.,
+                 high_fq_range=high_fq_range, high_fq_width='auto',
+                 method='tort', n_surrogates=0, vmin=None, vmax=None,
+                 progress_bar=False, draw_phase=False, minimum_shift=1.0,
+                 random_state=0, coherence_params=dict(), low_fq_width_2=4.0):
+        super(ComodTest, self).__init__(
+            fs=fs, low_fq_range=low_fq_range, low_fq_width=low_fq_width,
+            high_fq_range=high_fq_range, high_fq_width=high_fq_width,
+            method=method, n_surrogates=n_surrogates, vmin=vmin, vmax=vmax,
+            progress_bar=progress_bar, draw_phase=draw_phase,
+            minimum_shift=minimum_shift, random_state=random_state,
+            coherence_params=coherence_params, low_fq_width_2=low_fq_width_2)
 
-    return comodulogram(**kwargs)
+
+def fast_comod(low_sig=signal, high_sig=None, mask=None, *args, **kwargs):
+    return ComodTest(*args, **kwargs).fit(low_sig=low_sig, high_sig=high_sig,
+                                          mask=mask).comod_
 
 
 def test_input_checking():
@@ -75,7 +74,8 @@ def test_high_sig_identical():
 def test_comod_correct_maximum():
     # Test that the PAC is maximum at the correct location in the comodulogram
     for method in ALL_PAC_METRICS:
-        comod = fast_comod(method=method, progress_bar=True)
+        est = ComodTest(method=method, progress_bar=True).fit(signal)
+        comod = est.comod_
         # test the shape of the comodulogram
         assert_array_equal(comod.shape, (n_low, n_high))
 
@@ -83,10 +83,10 @@ def test_comod_correct_maximum():
         if method in BICOHERENCE_PAC_METRICS or method == 'jiang':
             continue
 
-        low_fq_0, high_fq_0, _ = get_maximum_pac(comod, low_fq_range,
-                                                 high_fq_range)
+        low_fq_0, high_fq_0, max_pac = est.get_maximum_pac()
         assert_equal(low_fq_0, low_fq)
         assert_equal(high_fq_0, high_fq)
+        assert_equal(max_pac, comod.max())
         assert_true(np.all(comod > 0))
 
 
