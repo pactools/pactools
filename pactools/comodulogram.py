@@ -43,82 +43,86 @@ REFERENCES = {
 
 
 class Comodulogram(object):
+    """An object to compute the comodulogram for phase-amplitude coupling.
+
+    Parameters
+    ----------
+    fs : float
+        Sampling frequency
+
+    low_fq_range : array or list
+        List of filtering frequencies (phase signal)
+
+    high_fq_range : array or list or 'auto'
+        List of filtering frequencies (amplitude signal)
+        If 'auto', it uses np.linspace(max(low_fq_range), fs / 2.0, 40).
+
+    low_fq_width : float
+        Bandwidth of the band-pass filter (phase signal)
+
+    high_fq_width : float or 'auto'
+        Bandwidth of the band-pass filter (amplitude signal)
+        If 'auto', it uses 2 * max(low_fq_range).
+
+    method : string or DAR instance
+        Modulation index method:
+
+        - String in ('ozkurt', 'canolty', 'tort', 'penny', ), for a PAC
+            estimation based on filtering and using the Hilbert transform.
+        - String in ('vanwijk', ) for a joint AAC and PAC estimation
+            based on filtering and using the Hilbert transform.
+        - String in ('sigl', 'nagashima', 'hagihira', 'bispectrum', ), for
+            a PAC estimation based on the bicoherence.
+        - String in ('colgin', ) for a PAC estimation
+            and in ('jiang', ) for a PAC directionality estimation,
+            based on filtering and computing coherence.
+        - String in ('dar', ) or a DAR instance, for a PAC estimation
+            based on a driven autoregressive model.
+
+    n_surrogates : int
+        Number of surrogates computed for the z-score
+        If n_surrogates <= 1, the z-score is not computed.
+
+    vmin, vmax : float or None
+        If not None, it define the min/max value of the plot.
+
+    progress_bar : boolean
+        If True, a progress bar is shown in stdout.
+
+    ax_special : matplotlib.axes.Axes or None
+        If not None, a special figure is drawn on it, depending on
+        the PAC method used.
+
+    minimum_shift : float
+        Minimum time shift (in sec) for the surrogate analysis.
+
+    random_state : None, int or np.random.RandomState instance
+        Seed or random number generator for the surrogate analysis.
+
+    coherence_params : dict
+        Parameters for methods base on coherence or bicoherence.
+        May contain:
+
+        -block_length : int
+            Block length
+        -fft_length : int or None
+            Length of the FFT
+        -step : int or None
+            Step between two blocks
+
+        If the dictionary is empty, default values will be applied based on
+        fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
+
+    low_fq_width_2 : float
+        Bandwidth of the band-pass filters centered on low_fq_range, for
+        the amplitude signal. Used only with 'vanwijk' method.
+
+    """
     def __init__(self, fs, low_fq_range, low_fq_width=2., high_fq_range='auto',
                  high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, ax_special=None,
                  minimum_shift=1.0, random_state=None, coherence_params=dict(),
                  low_fq_width_2=4.0):
-        """
-        Parameters
-        ----------
-        fs : float,
-            Sampling frequency
-
-        low_fq_range : array or list
-            List of filtering frequencies (phase signal)
-
-        high_fq_range : array or list or 'auto'
-            List of filtering frequencies (amplitude signal)
-            If 'auto', it uses np.linspace(max(low_fq_range), fs / 2.0, 40).
-
-        low_fq_width : float
-            Bandwidth of the band-pass filter (phase signal)
-
-        high_fq_width : float or 'auto'
-            Bandwidth of the band-pass filter (amplitude signal)
-            If 'auto', it uses 2 * max(low_fq_range).
-
-        method : string or DAR instance
-            Modulation index method:
-            - String in ('ozkurt', 'canolty', 'tort', 'penny', ), for a PAC
-                estimation based on filtering and using the Hilbert transform.
-            - String in ('vanwijk', ) for a joint AAC and PAC estimation
-                based on filtering and using the Hilbert transform.
-            - String in ('sigl', 'nagashima', 'hagihira', 'bispectrum', ), for
-                a PAC estimation based on the bicoherence.
-            - String in ('colgin', ) for a PAC estimation
-                and in ('jiang', ) for a PAC directionality estimation,
-                based on filtering and computing coherence.
-            - String in ('dar', ) or a DAR instance, for a PAC estimation
-                based on a driven autoregressive model.
-
-        n_surrogates : int
-            Number of surrogates computed for the z-score
-            If n_surrogates <= 1, the z-score is not computed.
-
-        vmin, vmax : float or None
-            If not None, it define the min/max value of the plot.
-
-        progress_bar : boolean
-            If True, a progress bar is shown in stdout.
-
-        ax_special : matplotlib.axes.Axes or None
-            If not None, a special figure is drawn on it, depending on
-            the PAC method used.
-
-        minimum_shift : float
-            Minimum time shift (in sec) for the surrogate analysis.
-
-        random_state : None, int or np.random.RandomState instance
-            Seed or random number generator for the surrogate analysis.
-
-        coherence_params : dict
-            Parameters for methods base on coherence or bicoherence.
-            May contain:
-                block_length : int
-                    Block length
-                fft_length : int or None
-                    Length of the FFT
-                step : int or None
-                    Step between two blocks
-            If the dictionary is empty, default values will be applied based on
-            fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
-
-        low_fq_width_2 : float
-            Bandwidth of the band-pass filters centered on low_fq_range, for
-            the amplitude signal. Used only with 'vanwijk' method.
-
-        """
         self.fs = fs
         self.low_fq_range = low_fq_range
         self.low_fq_width = low_fq_width
@@ -161,8 +165,7 @@ class Comodulogram(object):
                     "contains only one frequency.")
 
     def fit(self, low_sig, high_sig=None, mask=None):
-        """
-        Compute the comodulogram for Phase Amplitude Coupling (PAC).
+        """Call fit to compute the comodulogram.
 
         Parameters
         ----------

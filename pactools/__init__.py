@@ -8,6 +8,8 @@ from .preprocess import decimate, extract_and_fill
 from .preprocess import low_pass_and_fill, whiten, fill_gap
 from .preprocess import extract
 
+__version__ = '0.1'
+
 __all__ = ['Comodulogram',
            'create_signal',
            'decimate',

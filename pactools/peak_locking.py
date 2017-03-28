@@ -9,46 +9,48 @@ from .utils.viz import add_colorbar, mpl_palette
 
 
 class PeakLocking(object):
+    """An object to compute time average and time-frequency averaged with
+    peak-locking, to analyze phase-amplitude coupling.
+
+    Parameters
+    ----------
+    fs : float
+        Sampling frequency
+
+    low_fq : float
+        Filtering frequency (phase signal)
+
+    low_fq_width : float
+        Bandwidth of the band-pass filter (phase signal)
+
+    high_fq_range : array or list, shape (n_high, ), or 'auto'
+        List of filtering frequencies (amplitude signal)
+        If 'auto', it uses np.linspace(low_fq, fs / 2, 40).
+
+    high_fq_width : float or 'auto'
+        Bandwidth of the band-pass filter (amplitude signal)
+        If 'auto', it uses 2 * low_fq.
+
+    t_plot : float
+        Time to plot around the peaks (in second)
+
+    filter_method : in {'mne', 'carrier'}
+        Choose band pass filtering method (in multiple_band_pass)
+        'mne': with mne.filter.band_pass_filter
+        'carrier': with pactools.Carrier (default)
+
+    peak_or_trough: in {'peak', 'trough'}
+        Lock to the maximum (peak) of minimum (trough) of the slow
+        oscillation.
+
+    percentiles : list of float or string, shape (n_percentiles, )
+        Percentile to compute for the time representation.
+        It can also include 'mean', 'std' or 'ste'
+        (resp. mean, standard deviation or standard error).
+    """
     def __init__(self, fs, low_fq, low_fq_width=1.0, high_fq_range='auto',
                  high_fq_width='auto', t_plot=1.0, filter_method='carrier',
                  peak_or_trough='peak', percentiles=['std+', 'mean', 'std-']):
-        """
-        Parameters
-        ----------
-        fs : float
-            Sampling frequency
-
-        low_fq : float
-            Filtering frequency (phase signal)
-
-        low_fq_width : float
-            Bandwidth of the band-pass filter (phase signal)
-
-        high_fq_range : array or list, shape (n_high, ), or 'auto'
-            List of filtering frequencies (amplitude signal)
-            If 'auto', it uses np.linspace(low_fq, fs / 2, 40).
-
-        high_fq_width : float or 'auto'
-            Bandwidth of the band-pass filter (amplitude signal)
-            If 'auto', it uses 2 * low_fq.
-
-        t_plot : float
-            Time to plot around the peaks (in second)
-
-        filter_method : in {'mne', 'carrier'}
-            Choose band pass filtering method (in multiple_band_pass)
-            'mne': with mne.filter.band_pass_filter
-            'carrier': with pactools.Carrier (default)
-
-        peak_or_trough: in {'peak', 'trough'}
-            Lock to the maximum (peak) of minimum (trough) of the slow
-            oscillation.
-
-        percentiles : list of float or string, shape (n_percentiles, )
-            Percentile to compute for the time representation.
-            It can also include 'mean', 'std' or 'ste'
-            (resp. mean, standard deviation or standard error).
-        """
         self.fs = fs
         self.low_fq = low_fq
         self.high_fq_range = high_fq_range
