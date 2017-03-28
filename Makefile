@@ -1,7 +1,6 @@
 # simple makefile to simplify repetetive build env management tasks
 
 PYTHON ?= python
-PYTEST ?= py.test --pyargs
 
 in: inplace
 
@@ -24,14 +23,14 @@ clean:
 
 ############
 test:
-	$(PYTEST) --pyargs pactools -v
+	$(PYTHON) run_pytest.py
 
 test-coverage:
 	rm -rf coverage .coverage
 	rm -rf dist
 	rm -f `find pactools -name "*.so"`
 	$(PYTHON) setup.py build_ext -i
-	$(PYTEST) --pyargs --cov=pactools pactools -v --cov-config=.coveragerc
+	$(PYTHON) run_pytest.py --cov=pactools
 
 ############
 trailing-spaces:

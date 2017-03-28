@@ -57,7 +57,7 @@ def test_empty_mask():
     assert_array_almost_equal(plkg_0.time_average_, plkg_1.time_average_)
 
 
-def test_plot_comodulogram():
+def test_plot_peaklocking():
     # Smoke test with the standard plotting function
     est = PeakLocking(fs=fs, low_fq=low_fq).fit(signal)
     est.plot()

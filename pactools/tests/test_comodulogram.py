@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from pactools.dar_model import AR, DAR, HAR, StableDAR
 from pactools.utils.testing import assert_equal
@@ -124,10 +125,6 @@ def test_comodulogram_dar_models():
 
 def test_plot_comodulogram():
     # Smoke test with the standard plotting function
-    import matplotlib
-    matplotlib.use('agg')
-    import matplotlib.pyplot as plt
-
     est = ComodTest().fit(signal)
     est.plot()
 
