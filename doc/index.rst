@@ -6,12 +6,6 @@
 Welcome to pactools's documentation!
 ====================================
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-.. _api_documentation:
-
 This package provides tools to estimate **phase-amplitude coupling (PAC)** in neural time series.
 
 In particular, it implements the **driven auto-regressive (DAR)** models presented in the reference below.
@@ -35,6 +29,16 @@ To check if everything worked fine, you can do::
 	$ python -c 'import pactools'
 
 and it should not give any error messages.
+
+
+Content
+-------
+
+.. toctree::
+   :maxdepth: 1
+
+   api.rst
+   auto_examples/index.rst
 
 Cite
 ----

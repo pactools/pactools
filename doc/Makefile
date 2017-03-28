@@ -21,7 +21,7 @@ help:
 
 
 clean:
-	rm -rf auto_examples modules build
+	rm -rf auto_examples modules build generated
 
 
 install:
