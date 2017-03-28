@@ -11,7 +11,8 @@ __all__ = [
     "assert_false", "assert_raises", "assert_dict_equal", "assert_in",
     "assert_not_in", "assert_less", "assert_greater", "assert_less_equal",
     "assert_greater_equal", "assert_almost_equal", "assert_array_equal",
-    "assert_array_almost_equal", "assert_array_less", "assert_approx_equal"
+    "assert_array_almost_equal", "assert_array_less", "assert_approx_equal",
+    "assert_array_not_almost_equal",
 ]
 
 _dummy = unittest.TestCase('__init__')
@@ -29,3 +30,9 @@ assert_less = _dummy.assertLess
 assert_greater = _dummy.assertGreater
 assert_less_equal = _dummy.assertLessEqual
 assert_greater_equal = _dummy.assertGreaterEqual
+
+
+def assert_array_not_almost_equal(*args, **kwargs):
+    def func():
+        assert_array_almost_equal(*args, **kwargs)
+    assert_raises(AssertionError, func)

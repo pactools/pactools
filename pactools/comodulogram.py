@@ -13,7 +13,7 @@ from .utils.maths import norm, argmax_2d
 from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape
 from .utils.viz import add_colorbar
-from .preprocess import extract
+from .preprocess import multiple_extract
 from .bandpass_filter import multiple_band_pass
 
 N_BINS_TORT = 18
@@ -118,6 +118,7 @@ class Comodulogram(object):
         the amplitude signal. Used only with 'vanwijk' method.
 
     """
+
     def __init__(self, fs, low_fq_range, low_fq_width=2., high_fq_range='auto',
                  high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, ax_special=None,
@@ -160,9 +161,8 @@ class Comodulogram(object):
         if self.ax_special is not None:
             assert isinstance(self.ax_special, matplotlib.axes.Axes)
             if self.low_fq_range.size > 1:
-                raise ValueError(
-                    "ax_special can only be used if low_fq_range "
-                    "contains only one frequency.")
+                raise ValueError("ax_special can only be used if low_fq_range "
+                                 "contains only one frequency.")
 
     def fit(self, low_sig, high_sig=None, mask=None):
         """Call fit to compute the comodulogram.
@@ -279,6 +279,10 @@ class Comodulogram(object):
                                               high_sig=high_sig, mask=mask)
         else:
             raise ValueError('unknown method: %s' % self.method)
+
+        # remove very small values
+        for comod in comod_list:
+            comod[np.abs(comod) < 10 * np.finfo(np.float64).eps] = 0
 
         if not multiple_masks:
             self.comod_ = comod_list[0]
@@ -790,9 +794,10 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask,
                           title='comodulogram: %s' %
                           model.get_title(name=True))
     for j, filtered_signals in enumerate(
-            extract(sigs=sigs, fs=estimator.fs, bandwidth=estimator.
-                    low_fq_width, low_fq_range=estimator.low_fq_range,
-                    random_state=estimator.random_state, **extract_params)):
+            multiple_extract(
+                sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
+                low_fq_range=estimator.low_fq_range,
+                random_state=estimator.random_state, **extract_params)):
 
         if extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals
@@ -869,8 +874,7 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     spec_diff = np.interp(high_fq_range, frequencies, spec_diff)
 
     if ax_special is not None and shift == 0:
-        model.plot_dar_model(frange=[high_fq_range[0], high_fq_range[-1]],
-                             ax=ax_special)
+        model.plot(frange=[high_fq_range[0], high_fq_range[-1]], ax=ax_special)
 
     return spec_diff
 

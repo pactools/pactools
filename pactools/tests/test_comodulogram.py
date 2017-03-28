@@ -138,6 +138,7 @@ def test_plot_comodulogram():
     # has more than one element
     func = partial(fast_comod, ax_special=ax)
     assert_raises(ValueError, func)
+    plt.close('all')
 
 
 def test_signal_unchanged():

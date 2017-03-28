@@ -10,7 +10,8 @@ def sigmoid(array, sharpness):
 
 def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
                   high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
-                  sigmoid_sharpness=6, phi_0=0., delay=0.):
+                  sigmoid_sharpness=6, phi_0=0., delay=0.,
+                  return_driver=False):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
@@ -52,6 +53,9 @@ def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     delay : float
         Delay between the slow oscillation and the modulation
 
+    return_driver : boolean
+        If True, return the complex driver instead of the full signal
+
     Returns
     -------
     signal : array, shape (n_points, )
@@ -73,6 +77,8 @@ def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     driver = driver_real + 1j * driver_imag
     # We scale by sqrt(2) to have correct amplitude in the real-valued driver
     driver *= low_fq_amp / driver.std() * np.sqrt(2)
+    if return_driver:
+        return driver
 
     # decay of sigdriv for continuity after np.roll
     if delay != 0:

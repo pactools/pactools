@@ -131,16 +131,18 @@ class LowPass(Carrier):
         self.fs = fs
         self.extract_complex = False
 
-    def design(self, fs, fc):
+    def design(self, fs, fc, bandwidth, ripple_db=60.0):
         """
         Designs a FIR filter that is a low-pass filter.
         fs : sampling frequency (Hz)
         fc : cut-off frequency (Hz)
+        bandwidth : transition bandwidth (Hz)s
         """
-        half_order = int(1.65 * fs / fc / 2) // 2
-        order = half_order * 2 + 1
+        # Compute the order and Kaiser parameter for the FIR filter.
+        N, beta = signal.kaiserord(ripple_db, bandwidth / fs * 2)
 
-        fir = np.blackman(order)
+        # Use firwin with a Kaiser window to create a lowpass FIR filter.
+        fir = signal.firwin(N, fc / fs * 2, window=('kaiser', beta))
 
         # the filter must be odd and symmetric, in order to be zero-phase
         assert fir.size % 2 == 1
@@ -148,5 +150,4 @@ class LowPass(Carrier):
 
         self.fir = fir / np.sum(fir)
         self.fs = fs
-
         return self

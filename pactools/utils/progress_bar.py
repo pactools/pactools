@@ -114,13 +114,3 @@ class ProgressBar():
             sys.stdout.write('\n')
             sys.stdout.flush()
             self.closed = True
-
-
-def test1():
-    n = 50
-    app = ProgressBar(title='Testing progressBar', max_value=n - 1)
-    for k in range(n):
-        app.update(k)
-        time.sleep(0.01)
-
-    print('in a new line')

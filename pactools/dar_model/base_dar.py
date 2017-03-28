@@ -383,7 +383,7 @@ class BaseDAR(object):
             ordriv_ = self.ordriv_
             title += '(%d, %d)' % (ordar_, ordriv_)
 
-            if criterion is not None:
+            if criterion is not None and criterion is not False:
                 title += '_%s=%.4f' % (criterion,
                                        self.get_criterion(criterion))
         else:
@@ -944,9 +944,8 @@ class BaseDAR(object):
         bounds = (-bound_min, bound_min)
         return bounds
 
-    def plot_dar_model(self, title='', frange=None, mode='', vmin=None,
-                       vmax=None, ax=None, xlim=None, cmap=None,
-                       colorbar=True):
+    def plot(self, title='', frange=None, mode='', vmin=None, vmax=None,
+             ax=None, xlim=None, cmap=None, colorbar=True):
         """
         represent the power spectral density as a function of
         the amplitude of the driving signal
@@ -1011,8 +1010,8 @@ class BaseDAR(object):
 
         return fig, cax, vmin, vmax
 
-    def plot_dar_lines(self, title='', frange=None, mode='', ax=None,
-                       xlim=None, vmin=None, vmax=None):
+    def plot_lines(self, title='', frange=None, mode='', ax=None, xlim=None,
+                   vmin=None, vmax=None):
         """
         Represent the power spectral density as a function of
         the amplitude of the driving signal

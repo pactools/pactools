@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from pactools.utils.testing import assert_equal, assert_array_almost_equal
 from pactools.utils.testing import assert_raises
@@ -61,3 +62,4 @@ def test_plot_peaklocking():
     # Smoke test with the standard plotting function
     est = PeakLocking(fs=fs, low_fq=low_fq).fit(signal)
     est.plot()
+    plt.close('all')

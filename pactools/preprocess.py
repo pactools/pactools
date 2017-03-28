@@ -143,7 +143,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         random_noise = rng.randn(len(sig))
 
     if low_pass:
-        filt = LowPass().design(fs=fs, fc=fc)
+        filt = LowPass().design(fs=fs, fc=fc, bandwidth=bandwidth)
         if extract_complex:
             raise NotImplementedError('extract_complex incompatible with '
                                       'low_pass filter.')
@@ -270,8 +270,10 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         return low_sig, high_sig
 
 
-def low_pass_and_fill(sig, fs, fc=1.0, draw='', random_state=None):
+def low_pass_and_fill(sig, fs, fc=1.0, draw='', bandwidth=1.,
+                      random_state=None):
     low_sig, high_sig = extract_and_fill(sig, fs, fc, fill=1, low_pass=True,
+                                         bandwidth=bandwidth,
                                          random_state=random_state)
 
     rng = check_random_state(random_state)
@@ -424,14 +426,18 @@ def _show_plot(draw):
         plt.show()
 
 
-def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
-            draw='', ordar=8, enf=50.0, random_noise=None, normalize=False,
-            whitening='after', extract_complex=True, random_state=None):
+def extract_driver(low_fq, *args, **kwargs):
+    """helper"""
+    for sigs in multiple_extract(low_fq_range=[low_fq], *args, **kwargs):
+        return sigs
+
+
+def multiple_extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0,
+                     fill=5, draw='', ordar=8, enf=50.0, random_noise=None,
+                     normalize=False, whitening='after', extract_complex=True,
+                     random_state=None):
     """
     Do fast preprocessing for several values of fc (the driver frequency).
-
-    Parameters
-    ----------
 
     Example
     -------
@@ -454,12 +460,13 @@ def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
     # extract the high frequencies independently of the driver
     whiten_fill4 = whitening == 'after'
     fc_low_pass = low_fq_range[-1] + low_fq_range[0] + bandwidth  # hack
+    low_pass_width = bandwidth
     low_and_high = [
-        extract_and_fill(
-            sig, fs=fs, fc=fc_low_pass, fill=fill, ordar=ordar, enf=enf,
-            whiten_fill4=whiten_fill4, random_noise=random_noise, draw=draw,
-            extract_complex=False, low_pass=True, random_state=random_state)
-        for sig in sigs
+        extract_and_fill(sig, fs=fs, fc=fc_low_pass, bandwidth=low_pass_width,
+                         fill=fill, ordar=ordar, enf=enf,
+                         whiten_fill4=whiten_fill4, random_noise=random_noise,
+                         draw=draw, extract_complex=False, low_pass=True,
+                         random_state=random_state) for sig in sigs
     ]
     high_sigs = [both[1] for both in low_and_high]
 
