@@ -35,18 +35,20 @@ axs = axs.ravel()
 # Extract a low frequency band and fit a DAR model
 sigdriv, sigin, sigdriv_imag = extract_driver(
     sigs=signal, fs=fs, low_fq=low_fq, bandwidth=low_fq_width,
-    extract_complex=True, random_state=None, fill=5)
+    extract_complex=True, random_state=0, fill=5)
 
 # Here we use BIC selection to get optimal hyperparameters (ordar, ordriv)
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
 dar.fit(sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, fs=fs)
-lines = axs[0].plot(dar.model_selection_criterions_['bic'])
+bic_array = dar.model_selection_criterions_['bic']
+lines = axs[0].plot(bic_array)
 axs[0].legend(lines, ['ordriv=%d' % d for d in [0, 1, 2]])
 axs[0].set_xlabel('ordar')
 axs[0].set_ylabel('BIC / T')
 axs[0].set_title('BIC order selection')
+axs[0].plot(dar.ordar_, bic_array[dar.ordar_, dar.ordriv_], 'ro')
 
-# plot the modulation extracted by the optimal model
+# Plot the modulation extracted by the optimal model
 dar.plot(ax=axs[1])
 axs[1].set_title(dar.get_title(name=True))
 
@@ -54,7 +56,8 @@ axs[1].set_title(dar.get_title(name=True))
 # of low frequency, fit a model, and quantify PAC accross the spectrum.
 low_fq_range = np.linspace(1, 10, 50)
 estimator = Comodulogram(fs=fs, low_fq_range=low_fq_range,
-                         low_fq_width=low_fq_width, method=dar)
+                         low_fq_width=low_fq_width, method=dar,
+                         progress_bar=False, random_state=0)
 estimator.fit(signal)
 estimator.plot(axs=[axs[2]])
 axs[2].set_title('Comodulogram')
