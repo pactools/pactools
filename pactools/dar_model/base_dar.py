@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 import warnings
 
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy import linalg
 from scipy.signal import fftconvolve
 from scipy import stats
@@ -9,7 +10,8 @@ from scipy import stats
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
 from ..utils.validation import check_array, check_consistent_shape
-
+from ..utils.spectrum import Spectrum
+from ..utils.viz import add_colorbar, compute_vmin_vmax, phase_string
 
 EPSILON = np.finfo(np.float32).eps
 
@@ -577,8 +579,8 @@ class BaseDAR(object):
         ordar_ = self.ordar_
 
         # -------- get the training data
-        basis, residual, mask = self.get_train_data([self.basis_,
-                                                     self.residual_])
+        basis, residual, mask = self.get_train_data(
+            [self.basis_, self.residual_])
         selection = ~mask if mask is not None else None
 
         residual += EPSILON
@@ -692,9 +694,8 @@ class BaseDAR(object):
         assert hasattr(self, 'G_')
         self.reset_criterions()
         self.check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
-        self.basis_ = self.make_basis(sigdriv=sigdriv,
-                                      sigdriv_imag=sigdriv_imag,
-                                      ordriv=self.ordriv_)
+        self.basis_ = self.make_basis(
+            sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
         self.estimate_error(recompute=True)
         return self.residual_
@@ -717,11 +718,11 @@ class BaseDAR(object):
         skip : how many initial samples to skip
         """
         if train:
-            basis, residual, mask = self.get_train_data([self.basis_,
-                                                         self.residual_])
+            basis, residual, mask = self.get_train_data(
+                [self.basis_, self.residual_])
         else:
-            basis, residual, mask = self.get_test_data([self.basis_,
-                                                        self.residual_])
+            basis, residual, mask = self.get_test_data(
+                [self.basis_, self.residual_])
 
         # skip first samples
         residual = residual[:, skip:]
@@ -873,7 +874,7 @@ class BaseDAR(object):
         if frange is not None:
             frequencies = np.linspace(0, self.fs // 2, 1 + nfft // 2)
             mask = np.logical_and(frequencies <= frange[1],
-                                  frequencies > frange[0])
+                                  frequencies >= frange[0])
             spec = spec[mask, :]
         return spec
 
@@ -942,6 +943,155 @@ class BaseDAR(object):
 
         bounds = (-bound_min, bound_min)
         return bounds
+
+    def plot_dar_model(self, title='', frange=None, mode='', vmin=None,
+                       vmax=None, ax=None, xlim=None, cmap=None,
+                       colorbar=True):
+        """
+        represent the power spectral density as a function of
+        the amplitude of the driving signal
+
+        self  : the AR model to plot
+        title : title of the plot
+        frange: frequency range
+        mode  : normalisation mode ('c' = centered, 'v' = unit variance)
+        vmin  : minimum power to plot (dB)
+        vmax  : maximum power to plot (dB)
+        tick  : tick in the scale (dB)
+        ax    : matplotlib.axes.Axes
+        xlim  : force xlim to these values if defined
+        """
+        spec, xlim, sigdriv, sigdriv_imag = self.amplitude_frequency(
+            mode=mode, xlim=xlim, frange=frange)
+
+        if cmap is None:
+            if 'c' in mode:
+                cmap = plt.get_cmap('RdBu_r')
+            else:
+                cmap = plt.get_cmap('inferno')
+
+        if frange is None:
+            frange = [0, self.fs / 2.0]
+
+        if ax is None:
+            fig = plt.figure(title)
+            ax = fig.gca()
+        else:
+            fig = ax.figure
+
+        if sigdriv_imag is not None:
+            extent = (-np.pi, np.pi, frange[0], frange[-1])
+        else:
+            extent = (xlim[0], xlim[1], frange[0], frange[-1])
+
+        # -------- plot spectrum
+        vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, tick=1, percentile=0)
+        if 'c' in mode:
+            vmax = max(vmax, -vmin)
+            vmin = -vmax
+        cax = ax.imshow(spec, cmap=cmap, vmin=vmin, vmax=vmax, aspect='auto',
+                        origin='lower', extent=extent, interpolation='none')
+
+        if colorbar:
+            # fig.tight_layout()
+            add_colorbar(fig, cax, vmin, vmax, unit='dB', ax=ax)
+
+        if title == '':
+            title = self.get_title(name=True, criterion=self.criterion)
+        ax.set_title(title)
+        ax.set_ylabel('Frequency (Hz)')
+
+        if sigdriv_imag is not None:
+            ax.set_xlabel(r"Driver's phase $\phi_x$")
+            ticks = np.arange(-np.pi, np.pi + np.pi / 2, np.pi / 2)
+            ax.set_xticks(ticks)
+            ax.set_xticklabels([r'$%s$' % phase_string(d) for d in ticks])
+        else:
+            ax.set_xlabel(r"Driver's value $x$")
+
+        return fig, cax, vmin, vmax
+
+    def plot_dar_lines(self, title='', frange=None, mode='', ax=None,
+                       xlim=None, vmin=None, vmax=None):
+        """
+        Represent the power spectral density as a function of
+        the amplitude of the driving signal
+
+        self    : the AR model to plot
+        title   : title of the plot
+        frange  : frequency range
+        mode    : normalisation mode ('c' = centered, 'v' = unit variance)
+        ax      : matplotlib.axes.Axes
+        xlim    : force xlim to these values if defined
+        vmin    : minimum power to plot (dB)
+        vmax    : maximum power to plot (dB)
+        """
+        spec, xlim, sigdriv, sigdriv_imag = self.amplitude_frequency(
+            mode=mode, xlim=xlim, frange=frange)
+
+        if ax is None:
+            fig = plt.figure(title)
+            ax = fig.gca()
+        else:
+            fig = ax.figure
+
+        if frange is None:
+            frange = [0, self.fs / 2.0]
+
+        # -------- plot spectrum
+        n_frequency, n_amplitude = spec.shape
+        if sigdriv_imag is None:
+            n_lines = 5
+            ploted_amplitudes = np.linspace(0, n_amplitude - 1, n_lines)
+        else:
+            n_lines = 4
+            ploted_amplitudes = np.linspace(0, n_amplitude, n_lines + 1)[:-1]
+        ploted_amplitudes = np.floor(ploted_amplitudes).astype(np.int)
+
+        frequencies = np.linspace(frange[0], frange[-1], n_frequency)
+        for i, i_amplitude in enumerate(ploted_amplitudes[::-1]):
+
+            # build label
+            if sigdriv_imag is not None:
+                sig_complex = sigdriv[..., i_amplitude] + 1j * sigdriv_imag[
+                    ..., i_amplitude]
+                label = r'$\phi_x=%s$' % phase_string(sig_complex)
+            else:
+                label = r'$x=%.2f$' % sigdriv_imag[i_amplitude]
+
+            ax.plot(frequencies, spec[:, i_amplitude], label=label)
+
+        # plot simple periodogram
+        if True:
+            spect = Spectrum(block_length=128, fs=self.fs, wfunc=np.blackman)
+            sigin = self.sigin
+            if self.train_mask is not None:
+                sigin = sigin[~self.train_mask]
+            spect.periodogram(sigin)
+            fft_length, _ = spect.check_params()
+            n_frequency = fft_length // 2 + 1
+            psd = spect.psd[0][0, 0:n_frequency]
+            psd = 10.0 * np.log10(np.maximum(psd, 1.0e-12))
+            psd -= psd.mean()
+            if 'c' not in mode:
+                psd += 20.0 * np.log10(sigin.std())
+            frequencies = np.linspace(0, spect.fs / 2, n_frequency)
+            ax.plot(frequencies, psd, '--k', label=r'$PSD$')
+
+        if title == '':
+            title = self.get_title(name=True, criterion=self.criterion)
+        ax.set_title(title)
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Power (dB)')
+        ax.legend(loc=0)
+        vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, 0.1, percentile=0)
+        vmin_, vmax_ = compute_vmin_vmax(psd, None, None, 0.1, percentile=0)
+        vmin = min(vmin, vmin_)
+        vmax = max(vmax, vmax_)
+        ax.set_ylim((vmin, vmax))
+        ax.grid('on')
+
+        return fig
 
     # ------------------------------------------------ #
     def to_dict(self):

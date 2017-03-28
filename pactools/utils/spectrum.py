@@ -173,8 +173,6 @@ class Spectrum(object):
         fmax = self.fs / 2
         freq = np.linspace(0, fmax, fft_length // 2 + 1)
 
-        if len(self.psd) > 1:
-            plt.hold(True)
         for label_, color, psd in zip(labels, colors, self.psd):
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
             for i in range(replicate + 1):

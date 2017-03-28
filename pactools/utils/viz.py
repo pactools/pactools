@@ -127,3 +127,24 @@ def mpl_palette(name, n_colors=6, extrema=False, cycle=False):
         return itertools.cycle(palette)
     else:
         return palette
+
+
+def phase_string(sig):
+    """Take the angle and create a string as \pi if close to some \pi values"""
+    if isinstance(sig, np.ndarray):
+        sig = sig.ravel()[0]
+    if isinstance(sig, np.complex):
+        angle = np.angle(sig)
+    else:
+        angle = sig
+
+    pi_multiples = np.pi * np.arange(-1, 1.25, 0.25)
+    strings = [
+        '-\pi', '-3\pi/4', '-\pi/2', '-\pi/4', '0', '\pi/4', '\pi/2', '3\pi/4',
+        '\pi'
+    ]
+
+    if np.min(np.abs(angle - pi_multiples)) < 1e-3:
+        return strings[np.argmin(np.abs(angle - pi_multiples))]
+    else:
+        return '%.2f' % angle

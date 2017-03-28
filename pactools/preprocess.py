@@ -91,7 +91,7 @@ def decimate(sig, fs, decimation_factor):
 
 def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
                      draw='', ordar=8, enf=50.0, whiten_fill4=True,
-                     random_noise=None, extract_complex=False, low_pass=False,
+                     random_noise=None, extract_complex=True, low_pass=False,
                      random_state=None):
     """Creates a FIR bandpass filter, applies this filter to a signal to obtain
     the filtered signal low_sig and its complement high_sig.
@@ -426,7 +426,7 @@ def _show_plot(draw):
 
 def extract(sigs, fs, low_fq_range, n_cycles=None, bandwidth=1.0, fill=0,
             draw='', ordar=8, enf=50.0, random_noise=None, normalize=False,
-            whitening='after', extract_complex=False, random_state=None):
+            whitening='after', extract_complex=True, random_state=None):
     """
     Do fast preprocessing for several values of fc (the driver frequency).
 

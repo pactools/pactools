@@ -6,10 +6,11 @@ from .spectrum import Spectrum
 from .progress_bar import ProgressBar
 
 
-def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
+def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw='',
+             progress_bar=True):
     """Removes the ENF signal and its harmonics
 
-    sig    : input signal
+    sig    : input 1D signal
     fs     : sampling frequency
     enf    : electrical network frequency
     hmax   : maximum number of harmonics
@@ -19,8 +20,14 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
     returns the denoised signal
     """
     hmax = min(hmax, int(0.5 * fs / enf))
+    if sig.ndim > 2 or (sig.ndim == 2 and min(sig.shape) > 1):
+        raise ValueError('Input signal should be 1D. Got %s.' % (sig.shape, ))
+    input_shape = sig.shape
+    sig = np.ravel(sig)
 
+    block_length = min(block_length, sig.size)
     block_length_o2 = block_length // 2
+
     # -------- the window and its shift by block_length/2 must sum to 1.0
     window = np.hamming(block_length)
     window[0:block_length_o2] /= (
@@ -35,7 +42,8 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
     tmax = len(sig)
     freq = np.zeros(2 + 2 * tmax // block_length)
     kf = 0
-    bar = ProgressBar(max_value=len(freq), title='dehumming %.0f Hz' % enf)
+    if progress_bar:
+        bar = ProgressBar(max_value=len(freq), title='dehumming %.0f Hz' % enf)
 
     # -------- process successive blocks
     for tmid in range(0, tmax + block_length_o2, block_length_o2):
@@ -81,9 +89,10 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
 
         freq[kf] = best_f
         kf += 1
-        if kf % 10 == 0:
+        if progress_bar and kf % 10 == 0:
             bar.update(kf)
-    bar.update(bar.max_value)
+    if progress_bar:
+        bar.update(bar.max_value)
 
     # -------- plot estimated electrical network frequency
     if 'f' in draw or 'z' in draw:
@@ -98,12 +107,13 @@ def dehummer(sig, fs, enf=50.0, hmax=5, block_length=2048, draw=''):
 
     # -------- plot long term spectum of noisy and denoised signals
     if 'd' in draw or 'z' in draw:
-        sp = Spectrum(block_length=2048, fs=fs, donorm=True, wfunc=np.blackman)
+        sp = Spectrum(block_length=block_length, fs=fs, donorm=True,
+                      wfunc=np.blackman)
         sp.periodogram(sig)
         sp.periodogram(result, hold=True)
         sp.plot('Power spectral density before/after dehumming', fscale='lin')
 
-    return result
+    return result.reshape(input_shape)
 
 
 def single_estimate(sigin, f, fs, hmax):

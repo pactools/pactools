@@ -19,6 +19,11 @@ help:
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
+
+clean:
+	rm -rf auto_examples modules build
+
+
 install:
 	rm -rf build/doctrees build/pactools.github.io
 	# first clone the pactools/pactools.github.io repo because it may ask

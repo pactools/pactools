@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from pactools.dar_model import AR, DAR, HAR, StableDAR
 from pactools.utils.testing import assert_equal
@@ -10,6 +11,7 @@ from pactools.comodulogram import Comodulogram
 from pactools.comodulogram import ALL_PAC_METRICS, BICOHERENCE_PAC_METRICS
 from pactools.create_signal import create_signal
 
+# Parameters used for the simulated signal in the test
 low_fq_range = [1., 3., 5., 7.]
 high_fq_range = [25., 50., 75.]
 n_low = len(low_fq_range)
@@ -22,6 +24,7 @@ fs = 200.
 signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
                        low_fq=low_fq, low_fq_width=1., noise_level=0.1,
                        random_state=0)
+signal_copy = signal.copy()
 
 
 class ComodTest(Comodulogram):
@@ -29,13 +32,13 @@ class ComodTest(Comodulogram):
     def __init__(self, fs=fs, low_fq_range=low_fq_range, low_fq_width=1.,
                  high_fq_range=high_fq_range, high_fq_width='auto',
                  method='tort', n_surrogates=0, vmin=None, vmax=None,
-                 progress_bar=False, draw_phase=False, minimum_shift=1.0,
+                 progress_bar=False, ax_special=None, minimum_shift=1.0,
                  random_state=0, coherence_params=dict(), low_fq_width_2=4.0):
         super(ComodTest, self).__init__(
             fs=fs, low_fq_range=low_fq_range, low_fq_width=low_fq_width,
             high_fq_range=high_fq_range, high_fq_width=high_fq_width,
             method=method, n_surrogates=n_surrogates, vmin=vmin, vmax=vmax,
-            progress_bar=progress_bar, draw_phase=draw_phase,
+            progress_bar=progress_bar, ax_special=ax_special,
             minimum_shift=minimum_shift, random_state=random_state,
             coherence_params=coherence_params, low_fq_width_2=low_fq_width_2)
 
@@ -58,7 +61,16 @@ def test_input_checking():
 
 
 def test_different_dimension_in_input():
-    pass
+    # Test that 1D or 2D signals are accepted, but not 3D
+    for dim in [
+        (4, -1),
+        (-1, ),
+        (1, -1),
+    ]:
+        fast_comod(signal.reshape(*dim))
+
+    dim = (2, 2, -1)
+    assert_raises(ValueError, fast_comod, signal.reshape(*dim))
 
 
 def test_high_sig_identical():
@@ -109,3 +121,25 @@ def test_comodulogram_dar_models():
             model = klass(ordar=10, ordriv=2)
         comod = fast_comod(method=model)
         assert_true(~np.any(np.isnan(comod)))
+
+
+def test_plot_comodulogram():
+    # Smoke test with the standard plotting function
+    est = ComodTest().fit(signal)
+    est.plot()
+
+    # Smoke test with the special plotting functions
+    ax = plt.figure().gca()
+    for method in ALL_PAC_METRICS:
+        est = ComodTest(low_fq_range=[low_fq],
+                        method=method, ax_special=ax).fit(signal)
+
+    # Test that it raises an error if ax_special is not None and low_fq_range
+    # has more than one element
+    func = partial(fast_comod, ax_special=ax)
+    assert_raises(ValueError, func)
+
+
+def test_signal_unchanged():
+    # Test that signal has not been changed during the test
+    assert_array_equal(signal_copy, signal)

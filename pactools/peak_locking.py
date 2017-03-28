@@ -10,9 +10,8 @@ from .utils.viz import add_colorbar, mpl_palette
 
 class PeakLocking(object):
     def __init__(self, fs, low_fq, low_fq_width=1.0, high_fq_range='auto',
-                 high_fq_width='auto', t_plot=1.0,
-                 filter_method='carrier', peak_or_trough='peak',
-                 percentiles=['std+', 'mean', 'std-']):
+                 high_fq_width='auto', t_plot=1.0, filter_method='carrier',
+                 peak_or_trough='peak', percentiles=['std+', 'mean', 'std-']):
         """
         Parameters
         ----------
@@ -97,6 +96,7 @@ class PeakLocking(object):
             self.high_fq_range = np.linspace(self.low_fq[0], self.fs / 2.0, 40)
         if self.high_fq_width == 'auto':
             self.high_fq_width = 2 * self.low_fq[0]
+        self.high_fq_range = np.asarray(self.high_fq_range)
 
         self.low_sig = check_array(low_sig)
         self.high_sig = check_array(high_sig, accept_none=True)
@@ -148,6 +148,7 @@ class PeakLocking(object):
         time_average_ = peak_locked_percentile(self.low_sig[None, :], self.fs,
                                                self.peak_loc, self.t_plot,
                                                self.percentiles)
+        time_average_ = time_average_[0, :, :]
 
         self.time_frequency_ = time_frequency_
         self.time_average_ = time_average_
@@ -188,6 +189,7 @@ class PeakLocking(object):
 
         # plot the peak-locked time-frequency
         ax = axs[0]
+        n_high, n_points = self.time_average_.shape
         vmax = np.abs(self.time_frequency_).max() if vmax is None else vmax
         vmin = -vmax
         extent = (
@@ -220,11 +222,12 @@ class PeakLocking(object):
         }
         colors = mpl_palette('viridis', n_colors=len(self.percentiles))
 
-        n_signals, n_percentiles, n_points = self.time_average_.shape
-        t = (np.arange(n_points) - n_points // 2) / float(self.fs)
+        n_percentiles, n_points = self.time_average_.shape
+        time = (np.arange(n_points) - n_points // 2) / float(self.fs)
         for i, p in enumerate(self.percentiles):
             label = ('%d %%' % p) if isinstance(p, int) else labels[p]
-            ax.plot(t, self.time_average_[0, i], color=colors[i], label=label)
+            ax.plot(time, self.time_average_[i, :], color=colors[i],
+                    label=label)
 
         ax.set_xlabel('Time (sec)')
         ax.set_title('Driver peak-locked average of raw signal')
@@ -236,7 +239,6 @@ class PeakLocking(object):
             ylim = ax.get_ylim()
             ylim = (ylim[0] - (ylim[1] - ylim[0]) * 0.2, ylim[1])
         ax.set_ylim(ylim)
-        ax.set_xlim([t[0], t[-1]])
 
         return fig
 
