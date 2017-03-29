@@ -24,6 +24,7 @@ clean:
 ############
 test:
 	$(PYTHON) run_pytest.py
+	make flake8
 
 test-coverage:
 	rm -rf coverage .coverage
@@ -31,6 +32,7 @@ test-coverage:
 	rm -f `find pactools -name "*.so"`
 	$(PYTHON) setup.py build_ext -i
 	$(PYTHON) run_pytest.py --cov=pactools
+	make flake8
 
 ############
 trailing-spaces:

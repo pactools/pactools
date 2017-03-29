@@ -124,7 +124,7 @@ def test_comodulogram_dar_models():
 
 
 def test_plot_comodulogram():
-    # Smoke test with the standard plotting function
+    # Smoke test with the standard plotting function
     est = ComodTest().fit(signal)
     est.plot()
 

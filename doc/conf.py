@@ -22,7 +22,7 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 import sphinx_bootstrap_theme
-# import pactools  # import pactools here will make sphinx-gallery fail !
+# import pactools  # import pactools here will make sphinx-gallery fail !
 
 
 # -- General configuration ------------------------------------------------

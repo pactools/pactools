@@ -59,7 +59,7 @@ def test_empty_mask():
 
 
 def test_plot_peaklocking():
-    # Smoke test with the standard plotting function
+    # Smoke test with the standard plotting function
     est = PeakLocking(fs=fs, low_fq=low_fq).fit(signal)
     est.plot()
     plt.close('all')

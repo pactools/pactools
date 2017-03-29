@@ -799,8 +799,8 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     for j, filtered_signals in enumerate(
             multiple_extract_driver(
                 sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
-                frequency_range=estimator.low_fq_range,
-                random_state=estimator.random_state, **estimator.extract_params)):
+                frequency_range=estimator.low_fq_range, random_state=estimator.
+                random_state, **estimator.extract_params)):
 
         if extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals

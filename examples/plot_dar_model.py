@@ -47,7 +47,7 @@ axs[0].set_ylabel('BIC / T')
 axs[0].set_title('BIC order selection')
 axs[0].plot(dar.ordar_, bic_array[dar.ordar_, dar.ordriv_], 'ro')
 
-# Plot the modulation extracted by the optimal model
+# Plot the modulation extracted by the optimal model
 dar.plot(ax=axs[1])
 axs[1].set_title(dar.get_title(name=True))
 

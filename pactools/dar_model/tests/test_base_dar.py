@@ -121,7 +121,7 @@ def test_make_basis_new_sigdriv():
 
 
 def test_make_basis_ortho_normalize():
-    # Test the effect of ortho and normalize parameters
+    # Test the effect of ortho and normalize parameters
     model_params = {'ordar': 5, 'ordriv': 2, 'criterion': False}
 
     for normalize in (True, False):
@@ -151,7 +151,7 @@ def test_make_basis_ortho_normalize():
 
 
 def test_plot_comodulogram():
-    # Smoke test with the standard plotting function
+    # Smoke test with the standard plotting function
     model = fast_fitted_model()
     model.plot_lines()
     model.plot()
