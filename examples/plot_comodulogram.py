@@ -1,6 +1,6 @@
 """
-Example of comodulogram
------------------------
+Comodulogram
+------------
 This example creates an artificial signal with phase-amplitude coupling (PAC)
 and computes comodulograms with several methods.
 

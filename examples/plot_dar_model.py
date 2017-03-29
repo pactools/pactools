@@ -1,6 +1,6 @@
 """
-Example of fitting a DAR model
-------------------------------
+Fitting a DAR model
+-------------------
 This example creates an artificial signal with phase-amplitude coupling (PAC),
 fits a DAR model and show the modulation extracted in the DAR model.
 
@@ -39,6 +39,8 @@ sigdriv, sigin, sigdriv_imag = extract_driver(
 # Here we use BIC selection to get optimal hyperparameters (ordar, ordriv)
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
 dar.fit(sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, fs=fs)
+
+# Plot the BIC selection
 bic_array = dar.model_selection_criterions_['bic']
 lines = axs[0].plot(bic_array)
 axs[0].legend(lines, ['ordriv=%d' % d for d in [0, 1, 2]])
@@ -53,6 +55,7 @@ axs[1].set_title(dar.get_title(name=True))
 
 # Compute the comodulogram: It handles the driver extraction for a range
 # of low frequency, fit a model, and quantify PAC accross the spectrum.
+# For each low frequency, a new dar model is fitted with BIC selection.
 low_fq_range = np.linspace(1, 10, 50)
 estimator = Comodulogram(fs=fs, low_fq_range=low_fq_range,
                          low_fq_width=low_fq_width, method=dar,

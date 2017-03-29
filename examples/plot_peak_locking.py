@@ -1,6 +1,6 @@
 """
-Example of peak-locking
------------------------
+Peak-locking
+------------
 The peaks are extracted from the low frequency band, then both the raw-signal
 and a time-frequency representation are peak-locked and averaged.
 

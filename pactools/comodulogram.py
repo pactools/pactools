@@ -296,7 +296,8 @@ class Comodulogram(object):
         return self
 
     def plot(self, titles=None, fig=None, axs=None, cmap=None, vmin=None,
-             vmax=None, unit='', cbar=True, label=True, contours=None):
+             vmax=None, unit='', cbar=True, label=True, contours=None,
+             tight_layout=True):
         """
         Plot one or more comodulograms.
 
@@ -317,15 +318,18 @@ class Comodulogram(object):
         unit : string (default: '')
             Unit of the comodulogram
 
-        cbar : True or False
+        cbar : boolean
             Display colorbar or not
 
-        label : True or False
+        label : boolean
             Display labels or not
 
         contours : None or float
             If not None, contours will be added around values above contours
             value.
+
+        tight_layout : boolean
+            Use tight_layout or not
         """
         if self.comod_.ndim == 2:
             self.comod_ = self.comod_[None, :, :]
@@ -376,7 +380,8 @@ class Comodulogram(object):
             axs[-1].set_xlabel('Driver frequency (Hz)')
             axs[0].set_ylabel('Signal frequency (Hz)')
 
-        fig.tight_layout()
+        if tight_layout:
+            fig.tight_layout()
 
         if cbar:
             # plot the colorbar once
