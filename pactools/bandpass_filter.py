@@ -36,9 +36,8 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
         - 'carrier' uses internal wavelet-based bandpass filter. (default)
         - 'mne' uses mne.filter.band_pass_filter in MNE-python package
 
-
-    Return
-    ------
+    Returns
+    -------
     filtered : array, shape (n_frequencies, n_epochs, n_points)
         Bandpass filtered version of the input signals
     """

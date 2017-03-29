@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d, interp2d
 
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
-from .dar_model.preprocess import multiple_extract
+from .dar_model.preprocess import multiple_extract_driver
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d
@@ -113,6 +113,9 @@ class Comodulogram(object):
         If the dictionary is empty, default values will be applied based on
         fs and low_fq_width, with 0.5 overlap windows and no zero-padding.
 
+    extract_params : dict
+        Parameters for DAR models driver extraction
+
     low_fq_width_2 : float
         Bandwidth of the band-pass filters centered on low_fq_range, for
         the amplitude signal. Used only with 'vanwijk' method.
@@ -123,7 +126,7 @@ class Comodulogram(object):
                  high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, ax_special=None,
                  minimum_shift=1.0, random_state=None, coherence_params=dict(),
-                 low_fq_width_2=4.0):
+                 extract_params=dict(), low_fq_width_2=4.0):
         self.fs = fs
         self.low_fq_range = low_fq_range
         self.low_fq_width = low_fq_width
@@ -138,6 +141,7 @@ class Comodulogram(object):
         self.minimum_shift = minimum_shift
         self.random_state = random_state
         self.coherence_params = coherence_params
+        self.extract_params = extract_params
         self.low_fq_width_2 = low_fq_width_2
 
     def _check_params(self):
@@ -386,8 +390,8 @@ class Comodulogram(object):
         'low_fq_range' and 'high_fq_range' must be the same than used in the
         modulation_index function that computed 'comodulograms'.
 
-        Return
-        ------
+        Returns
+        -------
         low_fq : float or array, shape (n_comod, )
             Low frequency of maximum PAC
 
@@ -767,8 +771,7 @@ def _interpolate(x1, y1, z1, x2, y2):
     return z2
 
 
-def _driven_comodulogram(estimator, low_sig, high_sig, mask,
-                         extract_params=dict()):
+def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     """
     Helper function for the comodulogram.
     Used by PAC method in DAR_BASED_PAC_METRICS.
@@ -786,7 +789,7 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask,
         sigs = np.r_[low_sig, high_sig]
         n_epochs = low_sig.shape[0]
 
-    extract_complex = extract_params.get('extract_complex', True)
+    extract_complex = estimator.extract_params.get('extract_complex', True)
 
     comod_list = None
     if estimator.progress_bar:
@@ -794,10 +797,10 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask,
                           title='comodulogram: %s' %
                           model.get_title(name=True))
     for j, filtered_signals in enumerate(
-            multiple_extract(
+            multiple_extract_driver(
                 sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
-                low_fq_range=estimator.low_fq_range,
-                random_state=estimator.random_state, **extract_params)):
+                frequency_range=estimator.low_fq_range,
+                random_state=estimator.random_state, **estimator.extract_params)):
 
         if extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals

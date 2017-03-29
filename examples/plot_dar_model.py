@@ -34,7 +34,7 @@ axs = axs.ravel()
 # Extract a low frequency band and fit a DAR model
 sigdriv, sigin, sigdriv_imag = extract_driver(
     sigs=signal, fs=fs, low_fq=low_fq, bandwidth=low_fq_width,
-    extract_complex=True, random_state=0, fill=5)
+    extract_complex=True, random_state=0, fill=2)
 
 # Here we use BIC selection to get optimal hyperparameters (ordar, ordriv)
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
