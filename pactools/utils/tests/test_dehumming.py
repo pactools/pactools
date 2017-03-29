@@ -1,6 +1,6 @@
 import numpy as np
 
-from pactools.utils.dehumming import dehummer
+from pactools.utils.dehummer import dehummer
 from pactools.utils.maths import norm
 from pactools.utils.testing import assert_greater
 from pactools.utils.testing import assert_array_equal

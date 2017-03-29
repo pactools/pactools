@@ -2,10 +2,10 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 
-from .utils.spectrum import Spectrum
-from .utils.carrier import Carrier, LowPass
-from .utils.arma import Arma
-from .utils.validation import check_random_state
+from ..utils.spectrum import Spectrum
+from ..utils.carrier import Carrier, LowPass
+from ..utils.arma import Arma
+from ..utils.validation import check_random_state
 
 
 def _decimate(x, q):

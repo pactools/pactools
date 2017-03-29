@@ -45,6 +45,10 @@ extensions = [
     'sphinx_gallery.gen_gallery',
 ]
 
+# remove hundred of warning when building the doc
+# cf https://github.com/phn/pytpm/issues/3#issuecomment-12133978
+numpydoc_show_class_members = False
+
 # generate autosummary even if no references
 autosummary_generate = True
 

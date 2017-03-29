@@ -21,7 +21,10 @@ help:
 
 
 clean:
-	rm -rf auto_examples modules build generated
+	rm -rf auto_examples
+	rm -rf modules
+	rm -rf build
+	rm -rf generated
 
 
 install:

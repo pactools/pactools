@@ -14,6 +14,7 @@ Phase amplitude coupling
 
    Comodulogram
    PeakLocking
+   create_signal
 
 
 DAR models
@@ -25,14 +26,20 @@ DAR models
    :toctree: generated/
 
    DAR
+   extract_driver
 
 
 Utilities
 =========
 
-.. currentmodule:: pactools.utils.peak_finder
+.. currentmodule:: pactools.utils
 
 .. autosummary::
    :toctree: generated/
 
-   peak_finder
+   carrier.Carrier
+   carrier.LowPass
+   spectrum.Spectrum
+   spectrum.Coherence
+   spectrum.Bicoherence
+   peak_finder.peak_finder

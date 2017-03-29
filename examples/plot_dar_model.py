@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 
 from pactools import Comodulogram
 from pactools import create_signal
-from pactools.dar_model import DAR
-from pactools.preprocess import extract_driver
+from pactools.dar_model import DAR, extract_driver
 
 fs = 200.  # Hz
 high_fq = 50.0  # Hz

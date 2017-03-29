@@ -7,13 +7,13 @@ from scipy.interpolate import interp1d, interp2d
 
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
+from .dar_model.preprocess import multiple_extract
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d
 from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape
 from .utils.viz import add_colorbar
-from .preprocess import multiple_extract
 from .bandpass_filter import multiple_band_pass
 
 N_BINS_TORT = 18
