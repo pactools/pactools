@@ -56,7 +56,10 @@ If you use this code in your project, please cite:
      organization={IEEE}
      }
 
+Acknowledgment
+--------------
 
+The project was supported by the ERC Starting Grant SLAB ERC-YStG-676943 to Alexandre Gramfort and IDEX Grant NoTime to Virginie van Wassenhove.
 
 Indices and tables
 ==================
