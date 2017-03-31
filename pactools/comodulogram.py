@@ -853,7 +853,7 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
               train_mask=mask)
 
     # get PSD difference
-    spec, _, _, _ = model.amplitude_frequency()
+    spec, _, _, _ = model._amplitude_frequency()
 
     # KL divergence for each phase, as in [Tort & al 2010]
     n_freq, n_phases = spec.shape

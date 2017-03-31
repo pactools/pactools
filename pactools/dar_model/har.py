@@ -4,7 +4,6 @@ from .base_dar import BaseDAR
 
 
 class HAR(BaseDAR):
-
     def last_model(self):
         return self._next_model(only_last=True)
 
@@ -27,7 +26,7 @@ class HAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        sigin, basis, mask = self.get_train_data([self.sigin, self.basis_])
+        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
         selection = ~mask if mask is not None else None
 
         # -------- select signal, basis and regression signals
@@ -77,8 +76,8 @@ class HAR(BaseDAR):
 
         residual = sigin.copy()
         for k in range(self.ordar_):
-            residual[:, k + 1:n_points] += (
-                self.AR_[k, 0] * sigin[:, 0:n_points - k - 1])
+            residual[:, k + 1:n_points] += (self.AR_[k, 0] *
+                                            sigin[:, 0:n_points - k - 1])
         self.residual_ = residual
 
     def develop(self, basis):

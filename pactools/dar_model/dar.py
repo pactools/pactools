@@ -4,7 +4,6 @@ from .base_dar import BaseDAR
 
 
 class DAR(BaseDAR):
-
     def last_model(self):
         return self._next_model(only_last=True)
 
@@ -27,7 +26,7 @@ class DAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        sigin, basis, mask = self.get_train_data([self.sigin, self.basis_])
+        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
         selection = ~mask if mask is not None else None
 
         # mask the signal
@@ -57,8 +56,8 @@ class DAR(BaseDAR):
 
             # -------- prepare auto/inter correlations
             scale = 1.0 / n_points
-            R = scale * np.dot(sigreg.reshape(K * m, -1),
-                               sigreg.reshape(K * m, -1).T)
+            R = scale * np.dot(
+                sigreg.reshape(K * m, -1), sigreg.reshape(K * m, -1).T)
             r = scale * np.dot(masked_sigin[:, K:].reshape(1, -1),
                                sigreg.reshape(K * m, -1).T)
 
@@ -120,5 +119,4 @@ class DAR(BaseDAR):
 
 class AR(DAR):
     def __init__(self, ordar=1, ordriv=0, *args, **kwargs):
-        super(AR, self).__init__(
-            ordar=ordar, ordriv=0, *args, **kwargs)
+        super(AR, self).__init__(ordar=ordar, ordriv=0, *args, **kwargs)

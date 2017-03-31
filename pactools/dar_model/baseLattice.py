@@ -43,9 +43,8 @@ class BaseLattice(BaseDAR):
             sigin_init = np.random.randn(1, ordar_)
         sigin_init = np.atleast_2d(sigin_init)
         if sigin_init.shape[1] < ordar_:
-            raise(ValueError, "initialization of incorrect length: %d instead"
-                              "of %d (self.ordar_)" %
-                              (sigin_init.shape[1], ordar_))
+            raise (ValueError, "initialization of incorrect length: %d instead"
+                   "of %d (self.ordar_)" % (sigin_init.shape[1], ordar_))
 
         # initialization
         signal = np.zeros(n_points)
@@ -112,13 +111,13 @@ class BaseLattice(BaseDAR):
         for t in range(-tburn, n_points_minus_ordar_):
             e_forward[:, ordar] = excitation[:, t + tburn] * gain[0, max(t, 0)]
             for p in range(ordar, 0, -1):
-                e_forward[:, p - 1] = (e_forward[:, p]
-                                       - parcor_list[p - 1, :, max(t, 0)]
-                                       * e_backward[:, p - 1])
+                e_forward[:, p - 1] = (
+                    e_forward[:, p] - parcor_list[p - 1, :, max(t, 0)] *
+                    e_backward[:, p - 1])
             for p in range(ordar, 0, -1):
-                e_backward[:, p] = (e_backward[:, p - 1]
-                                    + parcor_list[p - 1, :, max(t, 0)]
-                                    * e_forward[:, p - 1])
+                e_backward[:, p] = (
+                    e_backward[:, p - 1] + parcor_list[p - 1, :, max(t, 0)] *
+                    e_forward[:, p - 1])
             e_backward[:, 0] = e_forward[:, 0]
             sigout[:, max(t, 0)] = e_forward[:, 0]
 
@@ -274,7 +273,7 @@ class BaseLattice(BaseDAR):
                              self.__class__.__name__)
 
         # --------  get the training data
-        sigin, basis, mask = self.get_train_data([self.sigin, self.basis_])
+        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
 
         selection = ~mask if mask is not None else None
         if selection is not None:
@@ -319,8 +318,8 @@ class BaseLattice(BaseDAR):
             backward_regressor.shape = (n_basis, -1)
             backward_res.shape = (1, -1)
 
-            R = (np.dot(forward_regressor, forward_regressor.T) +
-                 np.dot(backward_regressor, backward_regressor.T))
+            R = (np.dot(forward_regressor, forward_regressor.T) + np.dot(
+                backward_regressor, backward_regressor.T))
             r = np.dot(forward_regressor, backward_res.T)
             backward_res.shape = (n_epochs, -1)
 
@@ -345,16 +344,15 @@ class BaseLattice(BaseDAR):
             # -------- Newton-Raphson refinement
             dLAR = np.inf
             itnum = 0
-            while (itnum < self.iter_newton
-                   and np.amax(np.abs(dLAR)) > self.eps_newton):
+            while (itnum < self.iter_newton and
+                   np.amax(np.abs(dLAR)) > self.eps_newton):
                 itnum += 1
 
                 # -------- compute next residual
                 lar_list = self.develop_parcor(LAR.ravel(), basis)
                 parcor_list = self.decode(lar_list)
                 forward_res_next, backward_res_next = self.cell(
-                    parcor_list,
-                    self.forward_residual[k],
+                    parcor_list, self.forward_residual[k],
                     self.backward_residual[k])
                 self.forward_residual[k + 1] = forward_res_next
                 self.backward_residual[k + 1] = backward_res_next
@@ -373,18 +371,17 @@ class BaseLattice(BaseDAR):
                     (basis[:, :, 1:n_points] * h).reshape(n_basis, -1),
                     basis[:, :, 1:n_points].reshape(n_basis, -1).T)
 
-                dLAR = np.reshape(linalg.solve(hessian, gradient),
-                                  (1, n_basis))
+                dLAR = np.reshape(
+                    linalg.solve(hessian, gradient), (1, n_basis))
                 LAR -= dLAR
 
             # -------- save current cell and residuals
             lar_list = self.develop_parcor(LAR.ravel(), basis)
             parcor_list = self.decode(lar_list)
 
-            forward_res, backward_res = self.cell(
-                parcor_list,
-                self.forward_residual[k],
-                self.backward_residual[k])
+            forward_res, backward_res = self.cell(parcor_list,
+                                                  self.forward_residual[k],
+                                                  self.backward_residual[k])
             self.forward_residual[k + 1] = forward_res
             self.backward_residual[k + 1] = backward_res
 

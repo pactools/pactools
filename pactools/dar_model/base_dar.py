@@ -66,7 +66,7 @@ class BaseDAR(object):
 
         # power of the Taylor expansion
         self.ordriv = ordriv
-        self.compute_cross_orders(ordriv)
+        self._compute_cross_orders(ordriv)
 
         # left-out system
         self.train_mask = None
@@ -75,8 +75,8 @@ class BaseDAR(object):
         # prepare other arrays
         self.basis_ = None
 
-    def check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_mask,
-                         test_mask):
+    def _check_all_arrayss(self, sigin, sigdriv, sigdriv_imag, train_mask,
+                           test_mask):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -149,8 +149,8 @@ class BaseDAR(object):
         self
         """
         self.reset_criterions()
-        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, train_mask,
-                              test_mask)
+        self._check_all_arrayss(sigin, sigdriv, sigdriv_imag, train_mask,
+                                test_mask)
         self.fs = fs
 
         # -------- prepare the estimates
@@ -160,7 +160,7 @@ class BaseDAR(object):
         # -------- estimation of the model
         if self.criterion:
             # -------- select the best order
-            self.order_selection()
+            self._order_selection()
             self.estimate_error(recompute=True)
             self.estimate_gain()
 
@@ -177,7 +177,7 @@ class BaseDAR(object):
         self.estimate_error(recompute=self.test_mask is not None)
         self.estimate_gain()
 
-    def compute_cross_orders(self, ordriv):
+    def _compute_cross_orders(self, ordriv):
         power_list_re, power_list_im = [], []
 
         # power of the driver
@@ -243,7 +243,7 @@ class BaseDAR(object):
             power_list_im = np.zeros(ordriv + 1)
             n_basis = ordriv + 1
         else:
-            power_list_re, power_list_im, n_basis = self.compute_cross_orders(
+            power_list_re, power_list_im, n_basis = self._compute_cross_orders(
                 ordriv)
 
         # -------- memorize in alpha the various transforms
@@ -350,7 +350,7 @@ class BaseDAR(object):
 
         return output_signals
 
-    def get_train_data(self, sig_list):
+    def _get_train_data(self, sig_list):
         if not isinstance(sig_list, list):
             sig_list = list(sig_list)
 
@@ -360,7 +360,7 @@ class BaseDAR(object):
 
         return sig_list
 
-    def get_test_data(self, sig_list):
+    def _get_test_data(self, sig_list):
         if not isinstance(sig_list, list):
             sig_list = list(sig_list)
 
@@ -449,7 +449,7 @@ class BaseDAR(object):
         self.model_selection_criterions_ = None
         self.criterions_ = None
 
-    def order_selection(self):
+    def _order_selection(self):
         """Fit several models with a grid-search over self.ordar and
         self.ordriv, and select the model with the best criterion
         self.criterion (negative log_likelihood, AIC or BIC)
@@ -485,7 +485,7 @@ class BaseDAR(object):
             model = self.copy()
             model.ordriv = ordriv
             model.ordriv_ = ordriv
-            _, _, n_basis = model.compute_cross_orders(ordriv)
+            _, _, n_basis = model._compute_cross_orders(ordriv)
             model.basis_ = self.basis_[:n_basis]
 
             # -------- estimate the best AR order for this value of ordriv
@@ -518,7 +518,7 @@ class BaseDAR(object):
         self.criterions_ = best_criterion
 
         # select the corresponding basis
-        _, _, n_basis = self.compute_cross_orders(self.ordriv_)
+        _, _, n_basis = self._compute_cross_orders(self.ordriv_)
         assert self.AR_.shape[1] == n_basis
         self.basis_ = self.basis_[:n_basis]
         self.alpha_ = self.alpha_[:n_basis, :n_basis]
@@ -538,7 +538,7 @@ class BaseDAR(object):
         """Estimates a fixed gain from the predicton error self.residual_.
         """
         # -------- get the training data
-        residual, mask = self.get_train_data([self.residual_])
+        residual, mask = self._get_train_data([self.residual_])
 
         # -------- crop the ordar first values
         residual = residual[:, self.ordar_:]
@@ -579,7 +579,7 @@ class BaseDAR(object):
         ordar_ = self.ordar_
 
         # -------- get the training data
-        basis, residual, mask = self.get_train_data(
+        basis, residual, mask = self._get_train_data(
             [self.basis_, self.residual_])
         selection = ~mask if mask is not None else None
 
@@ -693,7 +693,7 @@ class BaseDAR(object):
         assert hasattr(self, 'AR_')
         assert hasattr(self, 'G_')
         self.reset_criterions()
-        self.check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
+        self._check_all_arrayss(sigin, sigdriv, sigdriv_imag, None, test_mask)
         self.basis_ = self.make_basis(
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
@@ -718,10 +718,10 @@ class BaseDAR(object):
         skip : how many initial samples to skip
         """
         if train:
-            basis, residual, mask = self.get_train_data(
+            basis, residual, mask = self._get_train_data(
                 [self.basis_, self.residual_])
         else:
-            basis, residual, mask = self.get_test_data(
+            basis, residual, mask = self._get_test_data(
                 [self.basis_, self.residual_])
 
         # skip first samples
@@ -878,7 +878,8 @@ class BaseDAR(object):
             spec = spec[mask, :]
         return spec
 
-    def amplitude_frequency(self, nbcols=256, frange=None, mode='', xlim=None):
+    def _amplitude_frequency(self, nbcols=256, frange=None, mode='',
+                             xlim=None):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -960,7 +961,7 @@ class BaseDAR(object):
         ax    : matplotlib.axes.Axes
         xlim  : force xlim to these values if defined
         """
-        spec, xlim, sigdriv, sigdriv_imag = self.amplitude_frequency(
+        spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
 
         if cmap is None:
@@ -1025,7 +1026,7 @@ class BaseDAR(object):
         vmin    : minimum power to plot (dB)
         vmax    : maximum power to plot (dB)
         """
-        spec, xlim, sigdriv, sigdriv_imag = self.amplitude_frequency(
+        spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
 
         if ax is None:

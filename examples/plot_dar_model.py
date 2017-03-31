@@ -40,7 +40,7 @@ sigdriv, sigin, sigdriv_imag = extract_driver(
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
 dar.fit(sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, fs=fs)
 
-# Plot the BIC selection
+# Plot the BIC selection
 bic_array = dar.model_selection_criterions_['bic']
 lines = axs[0].plot(bic_array)
 axs[0].legend(lines, ['ordriv=%d' % d for d in [0, 1, 2]])

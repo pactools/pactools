@@ -73,8 +73,8 @@ tort = Reference(
 
 ozkurt = Reference(
     short='[Ozkurt & al 2011]',
-    full='Özkurt, T. E., & Schnitzler, A. (2011). A critical note on the '
-    'definition of phase–amplitude cross-frequency coupling. '
+    full='Ozkurt, T. E., & Schnitzler, A. (2011). A critical note on the '
+    'definition of phase-amplitude cross-frequency coupling. '
     'Journal of neuroscience methods, 201(2), 438-443.')
 
 vanwijk = Reference(
