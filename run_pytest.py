@@ -8,8 +8,9 @@ if __name__ == "__main__":
     # to be able to run plot on Travis.
     matplotlib.use('agg')
 
-    # append the arguments of the command line
+    # default arguments
     args = ['--pyargs', 'pactools', '-v', '--duration=10']  # '--cov=pactools'
+    # append the arguments of the command line
     for arg in sys.argv:
         args.append(arg)
 

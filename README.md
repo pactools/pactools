@@ -8,6 +8,8 @@ In particular, it implements the **driven auto-regressive (DAR)** models present
 
 Read more in the [documentation](https://pactools.github.io).
 
+**WARNING:** The API of this package is not fixed yet; function names and parameters may change without notice. Estimated date of reliable API: May 2017
+
 ## Install
 
 We recommend the [Anaconda Python distribution](https://www.continuum.io/downloads). To install `pactools`, you first need to install its dependencies::

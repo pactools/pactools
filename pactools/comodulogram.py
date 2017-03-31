@@ -15,6 +15,7 @@ from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape
 from .utils.viz import add_colorbar
 from .bandpass_filter import multiple_band_pass
+from .mne_api import MaskIterator
 
 N_BINS_TORT = 18
 
@@ -171,8 +172,9 @@ class Comodulogram(object):
             If the method computes the bicoherence, the mask has to be
             unidimensional (n_points, ) and the same mask is applied on all
             epochs.
-            If a list is given, the filtering is done only once and the
-            comodulogram is computed on each mask.
+            If a list or a MaskIterator is given, the filtering is done only
+            once and the comodulogram is computed on each mask.
+
 
         Attributes
         ----------
@@ -187,11 +189,13 @@ class Comodulogram(object):
         check_consistent_shape(low_sig, high_sig)
 
         # check the masks
-        multiple_masks = (isinstance(mask, list) or
-                          (isinstance(mask, np.ndarray) and mask.ndim == 3))
+        multiple_masks = (isinstance(mask, list)
+                          or isinstance(mask, MaskIterator)
+                          or (isinstance(mask, np.ndarray) and mask.ndim == 3))
         if not multiple_masks:
             mask = [mask]
-        mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
+        if not isinstance(mask, MaskIterator):
+            mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
         n_masks = len(mask)
 
         if self.method in STANDARD_PAC_METRICS:
@@ -827,7 +831,7 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
             # initialize the comodulogram arrays
             if comod_list is None:
                 comod_list = []
-                for _ in mask:
+                for _ in range(len(mask)):
                     comod_list.append(
                         np.zeros((estimator.low_fq_range.size, comod.size)))
             comod_list[i_mask][j, :] = comod
