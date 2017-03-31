@@ -32,6 +32,10 @@ $ python -c 'import pactools'
 
 and it should not give any error messages.
 
+## Acknowledgment
+
+The project was supported by the ERC Starting Grant SLAB ERC-YStG-676943 to Alexandre Gramfort and IDEX Grant NoTime to Virginie van Wassenhove.
+
 ## Cite
 
 If you use this code in your project, please cite:
