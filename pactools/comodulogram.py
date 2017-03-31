@@ -26,21 +26,6 @@ BICOHERENCE_PAC_METRICS = ['sigl', 'nagashima', 'hagihira', 'bispectrum']
 ALL_PAC_METRICS = (STANDARD_PAC_METRICS + DAR_BASED_PAC_METRICS +
                    COHERENCE_PAC_METRICS + BICOHERENCE_PAC_METRICS)
 
-REFERENCES = {
-    'bispectrum': 'Bispectrum',
-    'sigl': '[Sigl & al 1994]',
-    'hagihira': '[Hagihira & al 2001]',
-    'canolty': '[Canolty & al 2006]',
-    'nagashima': '[Nagashima & al 2006]',
-    'penny': '[Penny & al 2008]',
-    'colgin': '[Colgin & al 2009]',
-    'tort': '[Tort & al 2010]',
-    'ozkurt': '[Ozkurt & al 2011]',
-    'vanwijk': '[van Wijk & al 2015]',
-    'jiang': '[Jiang & al 2016]',
-    'duprelatour': '[Dupre la Tour & al 2017]',
-}
-
 
 class Comodulogram(object):
     """An object to compute the comodulogram for phase-amplitude coupling.

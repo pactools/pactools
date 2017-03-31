@@ -1,5 +1,6 @@
 from .bandpass_filter import multiple_band_pass
-from .comodulogram import Comodulogram, REFERENCES
+from .comodulogram import Comodulogram
+from .references import REFERENCES
 from .simulate_pac import simulate_pac, sigmoid
 from .peak_locking import PeakLocking
 
