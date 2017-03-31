@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pactools import Comodulogram, REFERENCES
-from pactools import create_signal
+from pactools import simulate_pac
 
 fs = 200.  # Hz
 high_fq = 50.0  # Hz
@@ -21,13 +21,15 @@ n_points = 10000
 noise_level = 0.4
 t_plot = 2.0  # sec
 
-signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
-                       low_fq=low_fq, low_fq_width=low_fq_width,
-                       noise_level=noise_level, random_state=0)
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+                      low_fq_width=low_fq_width, noise_level=noise_level,
+                      random_state=0)
 
 low_fq_range = np.linspace(1, 10, 50)
-methods = ['ozkurt', 'canolty', 'tort', 'penny', 'vanwijk', 'duprelatour',
-           'colgin', 'sigl', 'bispectrum']
+methods = [
+    'ozkurt', 'canolty', 'tort', 'penny', 'vanwijk', 'duprelatour', 'colgin',
+    'sigl', 'bispectrum'
+]
 
 n_lines = 3
 n_columns = int(np.ceil(len(methods) / float(n_lines)))

@@ -14,7 +14,7 @@ Phase amplitude coupling
 
    Comodulogram
    PeakLocking
-   create_signal
+   simulate_pac
 
 
 DAR models

@@ -1,13 +1,13 @@
 from .bandpass_filter import multiple_band_pass
 from .comodulogram import Comodulogram, REFERENCES
-from .create_signal import create_signal, sigmoid
+from .simulate_pac import simulate_pac, sigmoid
 from .peak_locking import PeakLocking
 
 
 __version__ = '0.1'
 
 __all__ = ['Comodulogram',
-           'create_signal',
+           'simulate_pac',
            'multiple_band_pass',
            'PeakLocking',
            'REFERENCES',

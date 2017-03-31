@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from pactools.utils.testing import assert_equal, assert_array_almost_equal
 from pactools.utils.testing import assert_raises
 from pactools.peak_locking import PeakLocking
-from pactools.create_signal import create_signal
+from pactools.simulate_pac import simulate_pac
 
 # Parameters used for the simulated signal in the test
 low_fq_range = [1., 3., 5., 7.]
@@ -16,9 +16,8 @@ low_fq = low_fq_range[1]
 n_points = 1024
 fs = 200.
 
-signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
-                       low_fq=low_fq, low_fq_width=1., noise_level=0.1,
-                       random_state=0)
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+                      low_fq_width=1., noise_level=0.1, random_state=0)
 
 
 def fast_peak_locking(low_sig=signal, high_sig=None, mask=None, fs=fs,
@@ -41,7 +40,7 @@ def test_peak_locking_shape():
 
 def test_different_dimension_in_input():
     # Test that 1D or 2D signals are accepted, but not 3D
-    for dim in [(4, -1), (-1, ), (1, -1), ]:
+    for dim in [(4, -1), (-1, ), (1, -1)]:
         fast_peak_locking(signal.reshape(*dim))
 
     dim = (2, 2, -1)

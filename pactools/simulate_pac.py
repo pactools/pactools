@@ -8,7 +8,7 @@ def sigmoid(array, sharpness):
     return 1. / (1. + np.exp(-sharpness * array))
 
 
-def create_signal(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
+def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
                   high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
                   sigmoid_sharpness=6, phi_0=0., delay=0.,
                   return_driver=False):

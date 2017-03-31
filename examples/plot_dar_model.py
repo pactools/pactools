@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pactools import Comodulogram
-from pactools import create_signal
+from pactools import simulate_pac
 from pactools.dar_model import DAR, extract_driver
 
 fs = 200.  # Hz
@@ -23,9 +23,9 @@ noise_level = 0.4
 t_plot = 2.0  # sec
 
 # Create the artificial signal with PAC
-signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
-                       low_fq=low_fq, low_fq_width=low_fq_width,
-                       noise_level=noise_level, random_state=0)
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+                      low_fq_width=low_fq_width, noise_level=noise_level,
+                      random_state=0)
 
 # Prepare the plot for the two figures
 fig, axs = plt.subplots(1, 3, figsize=(14, 4))

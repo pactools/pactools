@@ -9,7 +9,7 @@ from pactools.utils.testing import assert_raises, assert_array_equal
 from pactools.utils.testing import assert_true, assert_array_almost_equal
 from pactools.comodulogram import Comodulogram
 from pactools.comodulogram import ALL_PAC_METRICS, BICOHERENCE_PAC_METRICS
-from pactools.create_signal import create_signal
+from pactools.simulate_pac import simulate_pac
 
 # Parameters used for the simulated signal in the test
 low_fq_range = [1., 3., 5., 7.]
@@ -21,9 +21,8 @@ low_fq = low_fq_range[1]
 n_points = 1024
 fs = 200.
 
-signal = create_signal(n_points=n_points, fs=fs, high_fq=high_fq,
-                       low_fq=low_fq, low_fq_width=1., noise_level=0.1,
-                       random_state=0)
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+                      low_fq_width=1., noise_level=0.1, random_state=0)
 signal_copy = signal.copy()
 
 
@@ -131,8 +130,8 @@ def test_plot_comodulogram():
     # Smoke test with the special plotting functions
     ax = plt.figure().gca()
     for method in ALL_PAC_METRICS:
-        est = ComodTest(low_fq_range=[low_fq],
-                        method=method, ax_special=ax).fit(signal)
+        est = ComodTest(low_fq_range=[low_fq], method=method,
+                        ax_special=ax).fit(signal)
 
     # Test that it raises an error if ax_special is not None and low_fq_range
     # has more than one element
