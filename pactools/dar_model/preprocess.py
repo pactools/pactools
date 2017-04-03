@@ -208,7 +208,7 @@ def low_pass_and_fill(sig, fs, fc=1.0, draw='', bandwidth=1.,
     rng = check_random_state(random_state)
     random_noise = rng.randn(*sig.shape)
 
-    filt = LowPass().design(fs=fs, fc=fc)
+    filt = LowPass().design(fs=fs, fc=fc, bandwidth=bandwidth)
     fill_sig = filt.direct(random_noise)
     # adjust power of fill_sig and add it to high_sig
     filled_sig = fill_gap(sig=high_sig, fs=fs, fa=fc / 2., dfa=fc / 2.,
