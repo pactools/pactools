@@ -62,7 +62,7 @@ class Comodulogram(object):
         - String in ('colgin', ) for a PAC estimation
             and in ('jiang', ) for a PAC directionality estimation,
             based on filtering and computing coherence.
-        - String in ('dar', ) or a DAR instance, for a PAC estimation
+        - String in ('duprelatour', ) or a DAR instance, for a PAC estimation
             based on a driven autoregressive model.
 
     n_surrogates : int
