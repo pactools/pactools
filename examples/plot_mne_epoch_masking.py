@@ -29,14 +29,14 @@ tmin, tmax = -5, 15
 # select the channels (phase_channel, amplitude_channel)
 ixs = (8, 10)
 
-# create the input array for Comodulogram.fit
+# create the input array for Comodulogram.fit
 low_sig, high_sig, mask = raw_to_mask(raw, ixs=ixs, events=events, tmin=tmin,
                                       tmax=tmax)
 # create the instance of Comodulogram
 estimator = Comodulogram(fs=raw.info['sfreq'],
                          low_fq_range=np.linspace(1, 10, 20), low_fq_width=2.,
                          method='tort', progress_bar=True)
-# compute the comodulogram
+# compute the comodulogram
 estimator.fit(low_sig, high_sig, mask)
 # plot the results
 estimator.plot(tight_layout=False)

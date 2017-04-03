@@ -28,8 +28,8 @@ signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       random_state=0)
 
 ###############################################################################
-# Prepare the plot for the two figures
-fig, axs = plt.subplots(1, 2, figsize=(14, 4))
+# Prepare the plot for the three figures
+fig, axs = plt.subplots(1, 3, figsize=(14, 4))
 axs = axs.ravel()
 
 # Extract a low frequency band
@@ -37,10 +37,10 @@ sigdriv, sigin, sigdriv_imag = extract_driver(
     sigs=signal, fs=fs, low_fq=low_fq, bandwidth=low_fq_width,
     extract_complex=True, random_state=0, fill=2)
 
-# Create a DAR model
+# Create a DAR model
 # Here we use BIC selection to get optimal hyperparameters (ordar, ordriv)
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
-# Fit the DAR model
+# Fit the DAR model
 dar.fit(sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, fs=fs)
 
 # Plot the BIC selection

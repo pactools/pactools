@@ -32,7 +32,7 @@ def test_mask_iterator():
     n_masks_1 = len(masks_list)
     assert_equal(n_masks_0, n_masks_1)
 
-    # test that the masks are of the correct shape
+    # test that the masks are of the correct shape
     for mask in masks_list:
         assert_array_equal(mask.shape, (1, n_points))
 
