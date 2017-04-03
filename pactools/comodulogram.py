@@ -326,7 +326,10 @@ class Comodulogram(object):
         n_comod, n_low, n_high = self.comod_.shape
 
         if axs is None:
-            fig, axs = plt.subplots(1, n_comod, figsize=(5 * n_comod, 4))
+            n_lines = int(np.sqrt(n_comod))
+            n_columns = int(np.ceil(n_comod / float(n_lines)))
+            fig, axs = plt.subplots(n_lines, n_columns,
+                                    figsize=(4 * n_columns, 3 * n_lines))
         else:
             fig = axs[0].figure
         axs = np.array(axs).ravel()

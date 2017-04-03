@@ -36,7 +36,7 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
 
     Attributes
     ----------
-    low_sig : array, shape (1, n_times)
+    low_sig : array, shape (1, n_points)
         Input data for the phase signal
 
     high_sig : array or None, shape (1, n_points)
@@ -44,56 +44,64 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
         If None, we use low_sig for both signals.
 
     mask : MaskIterator instance
-        The PAC is only evaluated where the mask is False.
-        Masking is done after filtering and Hilbert transform.
+        Object that behaves like a list of mask, without storing them all.
+        The PAC will only be evaluated where the mask is False.
 
     Examples
     --------
     >>> low_sig, high_sig, mask = raw_to_mask(raw, ixs, events, tmin, tmax)
     >>> n_masks = len(mask)
-    >>> for this_mask in mask:
+    >>> for one_mask in mask:
     >>>     pass
     """
     if not isinstance(raw, BaseRaw):
         raise ValueError('Must supply Raw as input')
 
     ixs = np.atleast_1d(ixs)
-    tmin = min(raw.times) if tmin is None else tmin
-    tmax = max(raw.n_times) if tmax is None else tmax
     fs = raw.info['sfreq']
 
     data = raw[:][0]
-    n_channels, n_times = data.shape
-    low_sig = data[ixs[0]]
+    n_channels, n_points = data.shape
+    low_sig = data[ixs[0]][None, :]
     if ixs.shape[0] > 1:
-        high_sig = data[ixs[1]]
+        high_sig = data[ixs[1]][None, :]
     else:
         high_sig = None
 
-    mask = MaskIterator(events, tmin, tmax, n_times, fs)
+    mask = MaskIterator(events, tmin, tmax, n_points, fs)
 
-    return low_sig[None, :], high_sig[None, :], mask
+    return low_sig, high_sig, mask
 
 
 class MaskIterator(object):
-    def __init__(self, events, tmin, tmax, n_times, fs):
+    """Iterator that creates the masks one at a time.
+
+    Examples
+    --------
+    >>> all_masks = MaskIterator(events, tmin, tmax, n_points, fs)
+    >>> n_masks = len(all_masks)
+    >>> for one_mask in all_masks:
+    >>>     pass
+    """
+
+    def __init__(self, events, tmin, tmax, n_points, fs):
         self.events = events
         self.tmin = tmin
         self.tmax = tmax
-        self.n_times = n_times
+        self.n_points = n_points
         self.fs = float(fs)
         self._init()
 
     def _init(self):
-        self.tmin = np.atleast_1d(self.tmin) * self.fs
-        self.tmax = np.atleast_1d(self.tmax) * self.fs
+        self.tmin = np.atleast_1d(self.tmin)
+        self.tmax = np.atleast_1d(self.tmax)
 
         if len(self.tmin) != len(self.tmax):
             raise ValueError('tmin and tmax have differing lengths')
         n_windows = len(self.tmin)
 
         if self.events is None:
-            self.events = np.array([self.tmin[0]])
+            self.events = np.array([0.])
             n_events = 1
 
         if self.events.ndim == 1:
@@ -110,15 +118,29 @@ class MaskIterator(object):
         return self._n_iter
 
     def next(self):
-        event_names = np.unique(self.events[:, -1])
+        if self.events.ndim == 1:
+            event_names = [None, ]
+        else:
+            event_names = np.unique(self.events[:, -1])
 
-        mask = np.ones((1, self.n_times), dtype=bool)  # it masks everything
+        mask = np.empty((1, self.n_points), dtype=bool)
         for event_name in event_names:
-            # select the event indices of one kind of event
-            these_events = self.events[self.events[:, -1] == event_name, 0]
+
+            if self.events.ndim == 1:
+                # select all the events since their kind is not specified
+                these_events = self.events
+            else:
+                # select the event indices of one kind of event
+                these_events = self.events[self.events[:, -1] == event_name, 0]
+
             for tmin, tmax in zip(self.tmin, self.tmax):
-                mask.fill(True)
+                mask.fill(True)  # it masks everything
                 for event in these_events:
-                    mask[int(event + tmin):int(event + tmax)] = False
+                    start, stop = None, None
+                    if tmin is not None:
+                        start = int(event + tmin * self.fs)
+                    if tmax is not None:
+                        stop = int(event + tmax * self.fs)
+                    mask[:, start:stop] = False
 
                 yield mask
