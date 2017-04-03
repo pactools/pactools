@@ -43,8 +43,7 @@ class Carrier:
         car = np.cos(phase)
         fir = w * car
 
-        # the filter must be odd and symmetric, in order to be zero-phase
-        assert fir.size % 2 == 1
+        # the filter must be symmetric, in order to be zero-phase
         assert np.all(np.abs(fir - fir[::-1]) < 1e-15)
 
         # remove the constant component by forcing fir.sum() = 0
@@ -144,8 +143,7 @@ class LowPass(Carrier):
         # Use firwin with a Kaiser window to create a lowpass FIR filter.
         fir = signal.firwin(N, fc / fs * 2, window=('kaiser', beta))
 
-        # the filter must be odd and symmetric, in order to be zero-phase
-        assert fir.size % 2 == 1
+        # the filter must be symmetric, in order to be zero-phase
         assert np.all(np.abs(fir - fir[::-1]) < 1e-15)
 
         self.fir = fir / np.sum(fir)
