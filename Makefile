@@ -23,6 +23,7 @@ clean:
 
 ############
 test:
+	make ascii
 	$(PYTHON) run_pytest.py
 	make flake8
 

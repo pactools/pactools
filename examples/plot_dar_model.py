@@ -13,6 +13,9 @@ from pactools import Comodulogram
 from pactools import simulate_pac
 from pactools.dar_model import DAR, extract_driver
 
+###############################################################################
+# Create the artificial signal with PAC
+
 fs = 200.  # Hz
 high_fq = 50.0  # Hz
 low_fq = 5.0  # Hz
@@ -22,14 +25,15 @@ n_points = 10000
 noise_level = 0.4
 t_plot = 2.0  # sec
 
-# Create the artificial signal with PAC
 signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=low_fq_width, noise_level=noise_level,
                       random_state=0)
 
 ###############################################################################
-# Prepare the plot for the three figures
-fig, axs = plt.subplots(1, 3, figsize=(14, 4))
+# Extract a low-frequency band, and fit a DAR model, using BIC order selection.
+
+# Prepare the plot for the two figures
+fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 axs = axs.ravel()
 
 # Extract a low frequency band
@@ -57,24 +61,27 @@ dar.plot(ax=axs[1])
 axs[1].set_title(dar.get_title(name=True))
 
 ###############################################################################
-# To compute a comodulogram, we need to perform the same steps for each
-# low frequency: extract the low frequency, fit a DAR model, potentially with
-# a model selection with the BIC, and quantify the PAC accross the spectrum.
+# To compute a comodulogram, we perform the same steps for each low frequency:
+# * Extract the low frequency
+# * Fit a DAR model
+# * Potentially with a model selection using the BIC
+# * And quantify the PAC accross the spectrum.
 #
-# Everything is handled by the function ``Comodulogram``, by giving a
-# (non-fitted) DAR model in the parameter ``method``.
+# Everything is handled by the class :class:`~pactools.Comodulogram`, by giving
+# a (non-fitted) DAR model in the parameter ``method``.
 # Giving ``method='duprelatour'`` will default to
 # ``DAR(ordar=10, ordriv=1, criterion=None)``, without BIC selection.
 
-# Here we give a different set of parameter, and the BIC selection will be
-# performed independantly for each model (i.e. at each low frequency).
+# Here we do not give the default set of parameter. Note that the BIC selection
+# will be performed independantly for each model (i.e. at each low frequency).
 dar = DAR(ordar=20, ordriv=2, criterion='bic')
 low_fq_range = np.linspace(1, 10, 50)
 estimator = Comodulogram(fs=fs, low_fq_range=low_fq_range,
                          low_fq_width=low_fq_width, method=dar,
                          progress_bar=False, random_state=0)
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 estimator.fit(signal)
-estimator.plot(axs=[axs[2]])
-axs[2].set_title('Comodulogram')
+estimator.plot(axs=[ax])
+ax.set_title('Comodulogram')
 
 plt.show()

@@ -15,6 +15,7 @@ Phase amplitude coupling
    Comodulogram
    PeakLocking
    simulate_pac
+   raw_to_mask
 
 
 DAR models
