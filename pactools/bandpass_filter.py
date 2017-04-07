@@ -57,6 +57,9 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
                         dtype=np.complex128)
     for ii in range(n_epochs):
         for jj, frequency in enumerate(frequency_range):
+            if frequency <= 0:
+                raise ValueError("Center frequency for bandpass filter should"
+                                 "be non-negative. Got %s." % (frequency, ))
             # evaluate the number of cycle for this bandwidth and frequency
             if fixed_n_cycles is None:
                 n_cycles = 1.65 * frequency / bandwidth

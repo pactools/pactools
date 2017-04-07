@@ -10,7 +10,7 @@ from .dar_model.dar import DAR
 from .dar_model.preprocess import multiple_extract_driver
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
-from .utils.maths import norm, argmax_2d
+from .utils.maths import norm, argmax_2d, next_power2
 from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape
 from .utils.viz import add_colorbar
@@ -859,8 +859,11 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     model.fit(fs=fs, sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
               train_mask=mask)
 
+    # estimate the length of the padding for the FFT
+    delta_f = np.diff(high_fq_range).mean()
+    n_fft = next_power2(fs / delta_f)
     # get PSD difference
-    spec, _, _, _ = model._amplitude_frequency()
+    spec, _, _, _ = model._amplitude_frequency(n_fft=n_fft)
 
     # KL divergence for each phase, as in [Tort & al 2010]
     n_freq, n_phases = spec.shape

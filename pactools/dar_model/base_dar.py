@@ -840,7 +840,7 @@ class BaseDAR(object):
     # ------------------------------------------------ #
     # Functions to plot the models                     #
     # ------------------------------------------------ #
-    def _basis2spec(self, sigdriv, sigdriv_imag=None, frange=None):
+    def _basis2spec(self, sigdriv, sigdriv_imag=None, frange=None, n_fft=256):
         """Compute the power spectral density for a given basis
         frange  : frequency range
 
@@ -856,30 +856,29 @@ class BaseDAR(object):
         G_cols = G_cols[:1, :]
 
         # -------- estimate AR spectrum
-        nfft = 256
-        while nfft < (ordar_ + 1):
-            nfft *= 2
+        while n_fft < (ordar_ + 1):
+            n_fft *= 2
 
         if ordar_ > 0:
             AR_cols = AR_cols / (G_cols + EPSILON)
-            AR_spec = np.fft.rfft(AR_cols, n=nfft, axis=0)
+            AR_spec = np.fft.rfft(AR_cols, n=n_fft, axis=0)
         else:
             Ginv_cols = 1.0 / (G_cols + EPSILON)
-            AR_spec = np.fft.rfft(Ginv_cols, n=nfft, axis=0)
+            AR_spec = np.fft.rfft(Ginv_cols, n=n_fft, axis=0)
 
         # -------- estimate AR spectrum
         spec = -20.0 * np.log10(np.abs(AR_spec))
 
         # -------- truncate to frange
         if frange is not None:
-            frequencies = np.linspace(0, self.fs // 2, 1 + nfft // 2)
+            frequencies = np.linspace(0, self.fs // 2, 1 + n_fft // 2)
             mask = np.logical_and(frequencies <= frange[1],
                                   frequencies >= frange[0])
             spec = spec[mask, :]
         return spec
 
     def _amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                             xlim=None):
+                             xlim=None, n_fft=256):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)
@@ -898,7 +897,7 @@ class BaseDAR(object):
 
         # -------- compute spectra
         spec = self._basis2spec(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
-                                frange=frange)
+                                frange=frange, n_fft=n_fft)
 
         # -------- normalize
         if 'c' in mode:

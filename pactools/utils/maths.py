@@ -41,20 +41,14 @@ def argmax_2d(a):
 
 
 def is_power2(num):
-    """Test if number is a power of 2
-
-    Parameters
-    ----------
-    num : int
-        Number.
-
-    Returns
-    -------
-    b : bool
-        True if is power of 2.
-    """
+    """Test if num is a power of 2. (int -> bool)"""
     num = int(num)
     return num != 0 and ((num & (num - 1)) == 0)
+
+
+def next_power2(num):
+    """Compute the smallest power of 2 >= to num.(float -> int)"""
+    return 2 ** int(np.ceil(np.log2(num)))
 
 
 def compute_n_fft(signals):
