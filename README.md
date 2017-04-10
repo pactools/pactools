@@ -40,7 +40,7 @@ The project was supported by the ERC Starting Grant SLAB ERC-YStG-676943 to Alex
 
 ## Cite
 
-If you use this code in your project, please cite [this paper](https://hal.archives-ouvertes.fr/hal-01448603v1):
+If you use this code in your project, please cite [this paper](https://hal.archives-ouvertes.fr/hal-01448603v2):
 
 ```
 @inproceedings{duprelatour2017parametric,
