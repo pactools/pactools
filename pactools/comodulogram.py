@@ -131,11 +131,13 @@ class Comodulogram(object):
         self.low_fq_width_2 = low_fq_width_2
 
     def _check_params(self):
-        if self.high_fq_range == 'auto':
+        high_fq_range = self.high_fq_range
+        if isinstance(high_fq_range, str) and high_fq_range == 'auto':
             self.high_fq_range = np.linspace(
                 max(self.low_fq_range), self.fs / 2.0, 40)
 
-        if self.high_fq_width == 'auto':
+        high_fq_width = self.high_fq_width
+        if isinstance(high_fq_width, str) and high_fq_width == 'auto':
             self.high_fq_width = max(self.low_fq_range) * 2
 
         self.random_state = check_random_state(self.random_state)

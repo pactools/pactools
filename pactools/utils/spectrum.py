@@ -95,15 +95,18 @@ class Spectrum(object):
         fft_length, step = self.check_params()
 
         signals = np.atleast_2d(signals)
+        n_epochs, n_points = signals.shape
 
-        window = self.wfunc(self.block_length)
+        block_length = min(self.block_length, n_points)
+
+        window = self.wfunc(block_length)
         n_epochs, tmax = signals.shape
         n_freq = fft_length // 2 + 1
 
         psd = np.zeros((n_epochs, n_freq))
 
         for i, sig in enumerate(signals):
-            block = np.arange(self.block_length)
+            block = np.arange(block_length)
 
             # iterate on blocks
             count = 0
@@ -260,7 +263,9 @@ class Coherence(Spectrum):
             raise ValueError('Incompatible shapes: %s and %s' %
                              (sigs_a.shape[1:], sigs_b.shape[1:]))
 
-        window = self.wfunc(self.block_length)
+        block_length = min(self.block_length, n_points)
+
+        window = self.wfunc(block_length)
         n_freq = fft_length // 2 + 1
         coherence = np.zeros((n_signals_a, n_signals_b, n_freq),
                              dtype=np.complex128)
@@ -270,7 +275,7 @@ class Coherence(Spectrum):
         # iterate on blocks
         count = 0
         for i_epoch in range(n_epochs):
-            block = np.arange(self.block_length)
+            block = np.arange(block_length)
             while block[-1] < n_points:
 
                 for i_a in range(n_signals_a):
@@ -296,7 +301,7 @@ class Coherence(Spectrum):
         if count == 0:
             raise IndexError(
                 'bicoherence: first block needs %d samples but sigs has shape '
-                '%s' % (self.block_length, sigs_a.shape))
+                '%s' % (block_length, sigs_a.shape))
 
         self.coherence = coherence
         return self.coherence
@@ -366,7 +371,9 @@ class Bicoherence(Spectrum):
         sigs = np.atleast_2d(sigs)
         n_epochs, n_points = sigs.shape
 
-        window = self.wfunc(self.block_length)
+        block_length = min(self.block_length, n_points)
+
+        window = self.wfunc(block_length)
         n_freq = fft_length // 2 + 1
         bicoherence = np.zeros((n_freq, n_freq), dtype=np.complex128)
         normalization = np.zeros((n_freq, n_freq), dtype=np.float64)
@@ -374,7 +381,7 @@ class Bicoherence(Spectrum):
         # iterate on blocks
         count = 0
         for i_epoch in range(n_epochs):
-            block = np.arange(self.block_length)
+            block = np.arange(block_length)
             while block[-1] < n_points:
                 F = sp.fft(window * sigs[i_epoch, block], fft_length,
                            0)[:n_freq]
