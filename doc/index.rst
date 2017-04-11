@@ -38,7 +38,8 @@ and it should not give any error messages.
 Cite
 ----
 
-If you use this code in your project, please cite:
+If you use this code in your project, please cite
+`this paper <https://hal.archives-ouvertes.fr/hal-01448603v2>`_::
 
 .. code::
 
