@@ -9,7 +9,7 @@ def check_array(sig, dtype='float64', accept_none=False):
     elif not accept_none and sig is None:
         raise ValueError("This array should not be None.")
 
-    array = np.atleast_2d(np.array(sig, dtype=dtype))
+    array = np.atleast_2d(np.asarray(sig, dtype=dtype))
     if array.ndim > 2:
         raise ValueError("This array should not be more than 2 dimensional.")
     return array

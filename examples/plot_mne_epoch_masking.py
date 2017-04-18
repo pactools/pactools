@@ -8,7 +8,7 @@ instance and an events array, and returns the corresponding input signals
 and masks for the ``Comodulogram.fit`` method.
 
 Note that this example is quite bad since it does not contain any
-phase-amplitude coupling.
+phase-amplitude coupling. It is just an API example.
 """
 import mne
 import numpy as np

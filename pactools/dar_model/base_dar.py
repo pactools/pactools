@@ -75,8 +75,8 @@ class BaseDAR(object):
         # prepare other arrays
         self.basis_ = None
 
-    def _check_all_arrayss(self, sigin, sigdriv, sigdriv_imag, train_mask,
-                           test_mask):
+    def _check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_mask,
+                          test_mask):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -149,8 +149,8 @@ class BaseDAR(object):
         self
         """
         self.reset_criterions()
-        self._check_all_arrayss(sigin, sigdriv, sigdriv_imag, train_mask,
-                                test_mask)
+        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, train_mask,
+                               test_mask)
         self.fs = fs
 
         # -------- prepare the estimates
@@ -693,7 +693,7 @@ class BaseDAR(object):
         assert hasattr(self, 'AR_')
         assert hasattr(self, 'G_')
         self.reset_criterions()
-        self._check_all_arrayss(sigin, sigdriv, sigdriv_imag, None, test_mask)
+        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
         self.basis_ = self.make_basis(
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
@@ -877,8 +877,8 @@ class BaseDAR(object):
             spec = spec[mask, :]
         return spec
 
-    def _amplitude_frequency(self, nbcols=256, frange=None, mode='',
-                             xlim=None, n_fft=256):
+    def _amplitude_frequency(self, nbcols=256, frange=None, mode='', xlim=None,
+                             n_fft=256):
         """Computes an amplitude-frequency power spectral density
 
         nbcols : number of expected columns (amplitude)

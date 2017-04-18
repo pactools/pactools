@@ -155,3 +155,8 @@ def test_plot_comodulogram():
     model.plot_lines()
     model.plot()
     plt.close('all')
+
+
+def test_weighting_mask():
+    #
+    pass
