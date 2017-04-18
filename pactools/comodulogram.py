@@ -191,9 +191,9 @@ class Comodulogram(object):
         check_consistent_shape(low_sig, high_sig)
 
         # check the masks
-        multiple_masks = (isinstance(mask, list)
-                          or isinstance(mask, MaskIterator)
-                          or (isinstance(mask, np.ndarray) and mask.ndim == 3))
+        multiple_masks = (isinstance(mask, list) or
+                          isinstance(mask, MaskIterator) or
+                          (isinstance(mask, np.ndarray) and mask.ndim == 3))
         if not multiple_masks:
             mask = [mask]
         if not isinstance(mask, MaskIterator):

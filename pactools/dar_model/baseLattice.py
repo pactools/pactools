@@ -273,13 +273,13 @@ class BaseLattice(BaseDAR):
                              self.__class__.__name__)
 
         # --------  get the training data
-        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
+        sigin, basis, weights = self._get_train_data([self.sigin, self.basis_])
 
-        selection = ~mask if mask is not None else None
-        if selection is not None:
-            masked_basis = basis * selection
+        if weights is not None:
+            weights = np.sqrt(weights)
+            w_basis = basis * weights
         else:
-            masked_basis = basis
+            w_basis = basis
 
         # -------- select signal, basis and regression signals
         n_basis, n_epochs, n_points = basis.shape
@@ -302,10 +302,10 @@ class BaseLattice(BaseDAR):
         # -------- loop on successive orders
         for k in range(0, ordar_):
             # -------- prepare initial estimation (driven parcor)
-            if selection is not None:
-                # the mask and basis are not delay as backward_res /!\
-                forward_res = selection[:, k + 1:] * forward_res[:, k + 1:]
-                backward_res = selection[:, k + 1:] * backward_res[:, k:-1]
+            if weights is not None:
+                # the weights and basis are not delay as backward_res /!\
+                forward_res = weights[:, k + 1:] * forward_res[:, k + 1:]
+                backward_res = weights[:, k + 1:] * backward_res[:, k:-1]
             else:
                 forward_res = forward_res[:, k + 1:]
                 backward_res = backward_res[:, k:-1]
@@ -332,14 +332,16 @@ class BaseLattice(BaseDAR):
             parcor_list = self.develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
-            if selection is not None:
-                parcor_list *= selection
 
-            R = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
-                               masked_basis[:, :, k:].reshape(n_basis, -1).T)
-            r = scale * np.dot(masked_basis[:, :, k:].reshape(n_basis, -1),
-                               self.encode(parcor_list[:, k:]).reshape(-1, 1))
-            LAR = np.linalg.solve(R, r).T
+            lar_list = self.encode(parcor_list[:, k:])
+            if weights is not None:
+                lar_list *= weights[:, k:]
+
+            R2 = scale * np.dot(w_basis[:, :, k:].reshape(n_basis, -1),
+                                w_basis[:, :, k:].reshape(n_basis, -1).T)
+            r2 = scale * np.dot(w_basis[:, :, k:].reshape(n_basis, -1),
+                                lar_list.reshape(-1, 1))
+            LAR = np.linalg.solve(R2, r2).T
 
             # -------- Newton-Raphson refinement
             dLAR = np.inf
@@ -359,17 +361,19 @@ class BaseLattice(BaseDAR):
 
                 # -------- correct the current vector
                 g = self.common_gradient(k + 1, parcor_list)
+                if weights is not None:
+                    g *= weights[:, 1:n_points]
                 # n_epochs, n_points - 1 = g.shape = h.shape
                 # n_basis, n_epochs, n_points = basis.shape
                 gradient = 2.0 * np.dot(
-                    basis[:, :, 1:n_points].reshape(n_basis, -1),
+                    w_basis[:, :, 1:n_points].reshape(n_basis, -1),
                     g.reshape(-1, 1))
                 gradient.shape = (n_basis, 1)
 
                 h = self.common_hessian(k + 1, parcor_list)
                 hessian = 2.0 * np.dot(
-                    (basis[:, :, 1:n_points] * h).reshape(n_basis, -1),
-                    basis[:, :, 1:n_points].reshape(n_basis, -1).T)
+                    (w_basis[:, :, 1:n_points] * h).reshape(n_basis, -1),
+                    w_basis[:, :, 1:n_points].reshape(n_basis, -1).T)
 
                 dLAR = np.reshape(
                     linalg.solve(hessian, gradient), (1, n_basis))

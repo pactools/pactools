@@ -26,8 +26,7 @@ class HAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
-        selection = ~mask if mask is not None else None
+        sigin, basis, weights = self._get_train_data([self.sigin, self.basis_])
 
         # -------- select signal, basis and regression signals
         n_epochs, n_points = sigin.shape
@@ -44,15 +43,15 @@ class HAR(BaseDAR):
         for k in range(K):
             sigreg[k, :] = sigin[:, K - 1 - k:n_points - 1 - k]
 
-        if selection is not None:
-            sigreg *= selection[None, :, K:]
-            masked_sigin = selection * sigin
+        if weights is not None:
+            sigreg *= weights[None, :, K:]
+            w_sigin = weights * sigin
         else:
-            masked_sigin = sigin
+            w_sigin = sigin
 
         # -------- prepare auto/inter correlations
         R = scale * np.dot(sigreg.reshape(K, -1), sigreg.reshape(K, -1).T)
-        r = scale * np.dot(masked_sigin[:, K:], sigreg.reshape(K, -1).T)
+        r = scale * np.dot(w_sigin[:, K:], sigreg.reshape(K, -1).T)
 
         # -------- loop on successive orders
         range_iter = [K - 1, ] if only_last else range(0, K)

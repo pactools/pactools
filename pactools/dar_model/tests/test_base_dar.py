@@ -28,13 +28,17 @@ _sigdriv_imag = np.imag(_sigdriv)
 _sigdriv = np.real(_sigdriv)
 _noise = np.random.RandomState(0).randn(n_points)
 
-model_params = {'ordar': 10, 'ordriv': 2, 'criterion': False}
+_model_params = {'ordar': 10, 'ordriv': 2, 'criterion': False}
 
 
-def fast_fitted_model(klass=DAR, model_params=model_params, sigin=_sigin,
-                      sigdriv=_sigdriv, sigdriv_imag=_sigdriv_imag, fs=fs):
-    return klass(**model_params).fit(sigin=sigin, sigdriv=sigdriv,
-                                     sigdriv_imag=sigdriv_imag, fs=fs)
+def fast_fitted_model(klass=DAR, model_params=_model_params, sigin=_sigin,
+                      sigdriv=_sigdriv, sigdriv_imag=_sigdriv_imag, fs=fs,
+                      train_weights=None, test_weights=None):
+    if klass == StableDAR and 'iter_newton' not in model_params:
+        model_params['iter_newton'] = 10
+    return klass(**model_params).fit(
+        sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, fs=fs,
+        train_weights=train_weights, test_weights=test_weights)
 
 
 def test_likelihood_ratio_noise():
@@ -157,6 +161,47 @@ def test_plot_comodulogram():
     plt.close('all')
 
 
-def test_weighting_mask():
-    #
-    pass
+def test_weighting_with_ones():
+    # Test that weighting with ones is identical as no weighting
+    factor = 1.5
+    train_weights = np.ones_like(_sigin) * factor
+    for klass in ALL_MODELS:
+        model_2 = fast_fitted_model(klass=klass, train_weights=train_weights,
+                                    test_weights=train_weights)
+        model_1 = fast_fitted_model(klass=klass, train_weights=train_weights,
+                                    test_weights=None)
+        model_0 = fast_fitted_model(klass=klass, train_weights=None,
+                                    test_weights=None)
+        assert_array_almost_equal(model_1.AR_, model_0.AR_, decimal=5)
+        assert_array_almost_equal(model_2.AR_, model_0.AR_, decimal=5)
+        assert_array_almost_equal(model_1.G_, model_0.G_, decimal=5)
+        assert_array_almost_equal(model_2.G_, model_0.G_, decimal=5)
+        for train in [False, True]:
+            assert_array_almost_equal(
+                model_0.log_likelihood(train=train)[0] * factor,
+                model_1.log_likelihood(train=train)[0], decimal=4)
+            assert_array_almost_equal(
+                model_1.log_likelihood(train=train)[0],
+                model_2.log_likelihood(train=train)[0], decimal=4)
+
+
+def test_weighting_with_zeros():
+    # Test that
+    split = int(n_points // 2)
+    train_weights = np.ones_like(_sigin)
+    train_weights[split:] = 0
+    sigin_half = _sigin[:split]
+    sigdriv_half = _sigdriv[:split]
+    sigdriv_imag_half = _sigdriv_imag[:split]
+    for klass in ALL_MODELS:
+        print(klass.__name__)
+        model_1 = fast_fitted_model(klass=klass, train_weights=train_weights)
+        model_0 = fast_fitted_model(
+            klass=klass, sigin=sigin_half, sigdriv=sigdriv_half,
+            sigdriv_imag=sigdriv_imag_half, train_weights=None)
+        assert_array_almost_equal(model_1.AR_, model_0.AR_)
+        assert_array_almost_equal(model_1.G_, model_0.G_)
+        for train in [False, True]:
+            assert_array_almost_equal(
+                model_0.log_likelihood(train=train),
+                model_1.log_likelihood(train=train), decimal=5)

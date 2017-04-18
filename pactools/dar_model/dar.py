@@ -26,16 +26,16 @@ class DAR(BaseDAR):
             raise ValueError('basis does not yet exist')
 
         # -------- get the training data
-        sigin, basis, mask = self._get_train_data([self.sigin, self.basis_])
-        selection = ~mask if mask is not None else None
+        sigin, basis, weights = self._get_train_data([self.sigin, self.basis_])
 
         # mask the signal
-        if selection is not None:
-            masked_basis = selection * basis
-            masked_sigin = selection * sigin
+        if weights is not None:
+            weights = np.sqrt(weights)
+            w_basis = weights * basis
+            w_sigin = weights * sigin
         else:
-            masked_basis = basis
-            masked_sigin = sigin
+            w_basis = basis
+            w_sigin = sigin
 
         # -------- select signal, basis and regression signals
         n_epochs, n_points = sigin.shape
@@ -51,14 +51,14 @@ class DAR(BaseDAR):
             sigreg = np.empty((K * m, n_epochs, n_points - K))
             for k in range(K):
                 sigreg[k * m:(k + 1) * m, :, :] = (
-                    masked_basis[:, :, K:] *
+                    w_basis[:, :, K:] *
                     sigin[:, K - 1 - k:n_points - 1 - k])
 
             # -------- prepare auto/inter correlations
             scale = 1.0 / n_points
             R = scale * np.dot(
                 sigreg.reshape(K * m, -1), sigreg.reshape(K * m, -1).T)
-            r = scale * np.dot(masked_sigin[:, K:].reshape(1, -1),
+            r = scale * np.dot(w_sigin[:, K:].reshape(1, -1),
                                sigreg.reshape(K * m, -1).T)
 
             # -------- loop on successive orders

@@ -68,15 +68,15 @@ class BaseDAR(object):
         self.ordriv = ordriv
         self._compute_cross_orders(ordriv)
 
-        # left-out system
-        self.train_mask = None
-        self.test_mask = None
+        # weighting system
+        self.train_weights = None
+        self.test_weights = None
 
         # prepare other arrays
         self.basis_ = None
 
-    def _check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_mask,
-                          test_mask):
+    def _check_all_arrays(self, sigin, sigdriv, sigdriv_imag, train_weights,
+                          test_weights):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
@@ -84,25 +84,35 @@ class BaseDAR(object):
         check_consistent_shape(sigin, sigdriv, sigdriv_imag)
         check_consistent_shape(sigdriv, sigdriv_imag)
 
-        test_mask = check_array(test_mask, dtype='bool', accept_none=True)
-        train_mask = check_array(train_mask, dtype='bool', accept_none=True)
+        train_weights = check_array(train_weights, accept_none=True)
+        test_weights = check_array(test_weights, accept_none=True)
 
-        if train_mask is not None:
-            check_consistent_shape(sigdriv, train_mask)
+        if train_weights is not None:
+            self.train_mask_ = train_weights == 0
+            check_consistent_shape(sigdriv, train_weights)
 
-            # if test_mask is None, we set test_mask = train_mask
-            if test_mask is None:
-                both_masks = train_mask
+            # if test_weights is None, we use test_weights = train_weights
+            if test_weights is None:
+                mask = train_weights == 0
             else:
-                both_masks = np.logical_and(test_mask, train_mask)
+                mask = np.logical_and(train_weights == 0, test_weights == 0)
 
             # we remove far masked data (by both masks)
-            train_mask, test_mask, sigin, sigdriv, sigdriv_imag = \
+            train_weights, test_weights, sigin, sigdriv, sigdriv_imag = \
                 self._remove_far_masked_data(
-                    both_masks,
-                    [train_mask, test_mask, sigin, sigdriv, sigdriv_imag])
+                    mask, [train_weights, test_weights, sigin,
+                           sigdriv, sigdriv_imag])
 
-            check_consistent_shape(sigdriv, train_mask)
+            self.train_mask_ = train_weights == 0
+            if test_weights is not None:
+                self.test_mask_ = test_weights == 0
+            else:
+                self.test_mask_ = None
+
+            check_consistent_shape(sigdriv, train_weights)
+        else:
+            self.train_mask_ = None
+            self.test_mask_ = None
 
         if self.use_driver_phase and self.ordriv > 0:
             amplitude = np.sqrt(sigdriv ** 2 + sigdriv_imag ** 2)
@@ -116,11 +126,11 @@ class BaseDAR(object):
         self.sigin = sigin
         self.sigdriv = sigdriv
         self.sigdriv_imag = sigdriv_imag
-        self.train_mask = train_mask
-        self.test_mask = test_mask
+        self.train_weights = train_weights
+        self.test_weights = test_weights
 
-    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, train_mask=None,
-            test_mask=None):
+    def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, train_weights=None,
+            test_weights=None):
         """ Estimate a DAR model from input signals.
 
         Parameters
@@ -137,20 +147,20 @@ class BaseDAR(object):
         sigdriv_imag : None or array, shape (n_epochs, n_points)
             Second driver, containing the imaginary part of the driver
 
-        train_mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is fitted only where 'train_mask' is False.
+        train_weights : None or array, shape (n_epochs, n_points)
+            If not None, the model is fitted with these sample weights.
 
-        test_mask : None or array, shape (n_epochs, n_points)
-            If not None, the model is tested only where 'test_mask' is False.
-            If 'test_mask' is None, it set equal to 'train_mask'.
+        test_weights : None or array, shape (n_epochs, n_points)
+            If not None, the model is tested with these sample weights.
+            If 'test_weights' is None, it is set equal to 'train_weights'.
 
         Returns
         -------
         self
         """
         self.reset_criterions()
-        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, train_mask,
-                               test_mask)
+        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, train_weights,
+                               test_weights)
         self.fs = fs
 
         # -------- prepare the estimates
@@ -174,7 +184,7 @@ class BaseDAR(object):
         self.ordriv_ = self.ordriv
         self.make_basis()
         self.estimate_ar()
-        self.estimate_error(recompute=self.test_mask is not None)
+        self.estimate_error(recompute=self.test_weights is not None)
         self.estimate_gain()
 
     def _compute_cross_orders(self, ordriv):
@@ -354,9 +364,9 @@ class BaseDAR(object):
         if not isinstance(sig_list, list):
             sig_list = list(sig_list)
 
-        train_mask = self.train_mask
-        sig_list.append(train_mask)
-        sig_list = self._remove_far_masked_data(train_mask, sig_list)
+        train_weights = self.train_weights
+        sig_list.append(train_weights)
+        sig_list = self._remove_far_masked_data(self.train_mask_, sig_list)
 
         return sig_list
 
@@ -364,10 +374,11 @@ class BaseDAR(object):
         if not isinstance(sig_list, list):
             sig_list = list(sig_list)
 
-        test_mask = self.test_mask
-        if test_mask is None:
-            test_mask = self.train_mask
-        sig_list.append(test_mask)
+        test_weights = self.test_weights
+        if test_weights is None:
+            test_weights = self.train_weights
+        sig_list.append(test_weights)
+        sig_list = self._remove_far_masked_data(self.test_mask_, sig_list)
         return sig_list
 
     def degrees_of_freedom(self):
@@ -496,7 +507,7 @@ class BaseDAR(object):
                     bar_k += 1
                     bar.update(bar_k, title=title)
 
-                model.estimate_error(recompute=self.test_mask is not None)
+                model.estimate_error(recompute=self.test_weights is not None)
                 model.estimate_gain()
                 model.reset_criterions()
                 this_criterion = model._compute_criterion()
@@ -538,20 +549,24 @@ class BaseDAR(object):
         """Estimates a fixed gain from the predicton error self.residual_.
         """
         # -------- get the training data
-        residual, mask = self._get_train_data([self.residual_])
+        residual, weights = self._get_train_data([self.residual_])
 
         # -------- crop the ordar first values
         residual = residual[:, self.ordar_:]
-        if mask is not None:
-            mask = mask[:, self.ordar_:]
+        if weights is not None:
+            weights = weights[:, self.ordar_:]
 
         # -------- apply the mask
-        if mask is not None:
-            residual = residual[~mask]
+        if weights is not None:
+            average = np.average(residual, weights=weights)
+            sigma2 = np.average((residual - average) ** 2, weights=weights)
+            sigma = np.sqrt(sigma2)
+        else:
+            sigma = np.std(residual)
 
         # -------- estimate an initial (fixed) model of the residual
         self.G_ = np.zeros((1, self.n_basis))
-        self.G_[0, 0] = np.log(np.std(residual))
+        self.G_[0, 0] = np.log(sigma)
 
     def estimate_gain(self, regul=0.01):
         """helper to handle failure in gain estimation"""
@@ -579,25 +594,23 @@ class BaseDAR(object):
         ordar_ = self.ordar_
 
         # -------- get the training data
-        basis, residual, mask = self._get_train_data(
+        basis, residual, weights = self._get_train_data(
             [self.basis_, self.residual_])
-        selection = ~mask if mask is not None else None
 
         residual += EPSILON
 
         # -------- crop the ordar first values
         residual = residual[:, ordar_:]
         basis = basis[:, :, ordar_:]
-        if selection is not None:
-            selection = selection[:, ordar_:]
+        if weights is not None:
+            weights = weights[:, ordar_:]
 
         # concatenate the epochs since it does not change the computations
         # as in estimating the AR coefficients
-        if selection is not None:
-            residual = residual[selection]
-            basis = basis[:, selection]
         residual = residual.reshape(1, -1)
         basis = basis.reshape(basis.shape[0], -1)
+        if weights is not None:
+            weights = weights.reshape(1, -1)
 
         residual2 = residual ** 2
         n_points = residual.size
@@ -626,8 +639,14 @@ class BaseDAR(object):
         kmax = tmp[1:]
         kmid = (kmin + kmax) // 2
         for k, (this_min, this_max) in enumerate(zip(kmin, kmax)):
-            e[k] = np.mean(residual2[0, index[this_min:this_max]])
+            indices = index[this_min:this_max]
+            if weights is not None:
+                e[k] = np.average(residual2[0, indices],
+                                  weights=weights[0, indices])
+            else:
+                e[k] = np.mean(residual2[0, indices])
 
+        # this least-square is not weighted, only the construction of e
         e = 0.5 * np.log(e)
         R = np.dot(basis[:, index[kmid]], basis[:, index[kmid]].T)
         r = np.dot(e, basis[:, index[kmid]].T)
@@ -649,13 +668,22 @@ class BaseDAR(object):
 
         if iter_gain > 0:
             resreg = basis * residual
+            if weights is not None:
+                weighted_basis = weights * basis
+                weighted_resreg = weights * resreg
         # -------- refine this model (iteratively maximise the likelihood)
         for itnum in range(iter_gain):
             sigma2 = self._compute_sigma2(basis)
-            loglike[itnum] = wgn_log_likelihood(residual, sigma2, mask=None)
+            loglike[itnum] = wgn_log_likelihood(residual, sigma2,
+                                                weights=weights)
 
-            gradient = np.sum(basis * (residual2 / sigma2 - 1.0), 1)
-            hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
+            tmp = residual2 / sigma2 - 1.0
+            if weights is not None:
+                gradient = np.sum(weighted_basis * tmp, 1)
+                hessian = -2.0 * np.dot(weighted_resreg / sigma2, resreg.T)
+            else:
+                gradient = np.sum(basis * tmp, 1)
+                hessian = -2.0 * np.dot(resreg / sigma2, resreg.T)
             dG = linalg.solve(hessian, gradient)
             self.G_ -= dG.T
             if np.amax(np.absolute(dG)) < eps_gain:
@@ -718,29 +746,24 @@ class BaseDAR(object):
         skip : how many initial samples to skip
         """
         if train:
-            basis, residual, mask = self._get_train_data(
+            basis, residual, weights = self._get_train_data(
                 [self.basis_, self.residual_])
         else:
-            basis, residual, mask = self._get_test_data(
+            basis, residual, weights = self._get_test_data(
                 [self.basis_, self.residual_])
 
         # skip first samples
         residual = residual[:, skip:]
         basis = basis[:, :, skip:]
-        if mask is not None:
-            mask = mask[:, skip:]
-
-        # apply mask
-        if mask is not None:
-            basis = basis[:, ~mask][:, None, :]
-            residual = residual[~mask]
+        if weights is not None:
+            weights = weights[:, skip:]
 
         # -------- estimate the gain
         gain2 = self.develop_gain(basis, squared=True)
         gain2 += EPSILON
 
         # -------- compute the log likelihood from the residual
-        logL = wgn_log_likelihood(residual, gain2, mask=None)
+        logL = wgn_log_likelihood(residual, gain2, weights=weights)
 
         tmax = gain2.size
 
@@ -1127,21 +1150,25 @@ class BaseDAR(object):
         return self.get_title(name=True)
 
 
-def wgn_log_likelihood(eps, sigma2, mask=None):
+def wgn_log_likelihood(eps, sigma2, weights=None):
     """Returns the likelihood of a gaussian uncorrelated signal
     given a model of its variance
 
     eps    : gaussian signal (residual or innovation)
     sigma2 : variance of this signal
     """
-    if mask is not None:
-        eps = eps[~mask]
-        sigma2 = sigma2[~mask]
+    if weights is not None:
+        weights_sum = weights.sum()
+    else:
+        weights_sum = eps.size
 
-    tmax = eps.size
-    logL = tmax * np.log(2.0 * np.pi)
-    logL += np.sum(eps * eps / sigma2)
-    logL += np.sum(np.log(sigma2))
+    logL = weights_sum * np.log(2.0 * np.pi)
+
+    if weights is not None:
+        logL += np.sum(weights * (eps * eps / sigma2 + np.log(sigma2)))
+    else:
+        logL += np.sum(eps * eps / sigma2 + np.log(sigma2))
+
     logL *= -0.5
 
     return logL

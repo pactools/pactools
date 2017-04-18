@@ -4,7 +4,7 @@ from scipy.linalg import hankel
 from scipy.signal import hilbert
 import matplotlib.pyplot as plt
 
-from .maths import square, is_power2, prime_factors, compute_n_fft
+from .maths import square, is_power2, prime_factors, compute_n_fft, next_power2
 from .viz import compute_vmin_vmax
 
 
@@ -54,7 +54,7 @@ class Spectrum(object):
 
         # fft_length
         if self.fft_length is None:
-            fft_length = int(2 ** np.ceil(np.log2(self.block_length)))
+            fft_length = next_power2(self.block_length)
         else:
             fft_length = int(self.fft_length)
         if not is_power2(fft_length):
