@@ -34,6 +34,7 @@ _model_params = {'ordar': 10, 'ordriv': 2, 'criterion': False}
 def fast_fitted_model(klass=DAR, model_params=_model_params, sigin=_sigin,
                       sigdriv=_sigdriv, sigdriv_imag=_sigdriv_imag, fs=fs,
                       train_weights=None, test_weights=None):
+    model_params = model_params.copy()
     if klass == StableDAR and 'iter_newton' not in model_params:
         model_params['iter_newton'] = 10
     return klass(**model_params).fit(

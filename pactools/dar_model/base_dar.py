@@ -646,7 +646,7 @@ class BaseDAR(object):
             else:
                 e[k] = np.mean(residual2[0, indices])
 
-        # this least-square is not weighted, only the construction of e
+        # this least-square is not weighted, only the construction of e
         e = 0.5 * np.log(e)
         R = np.dot(basis[:, index[kmid]], basis[:, index[kmid]].T)
         r = np.dot(e, basis[:, index[kmid]].T)
@@ -706,22 +706,24 @@ class BaseDAR(object):
         return sigma2
 
     def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
-                      train_mask=None, test_mask=None):
+                      train_weights=None, test_weights=None):
         """Same as fit, but return the residual instead of the model object
         """
         self.fit(sigin=sigin, sigdriv=sigdriv, fs=fs,
-                 sigdriv_imag=sigdriv_imag, train_mask=train_mask,
-                 test_mask=test_mask)
+                 sigdriv_imag=sigdriv_imag, train_weights=train_weights,
+                 test_weights=test_weights)
         return self.residual_
 
-    def transform(self, sigin, sigdriv, fs, sigdriv_imag=None, test_mask=None):
+    def transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
+                  test_weights=None):
         """Whiten a signal with the already fitted model
         """
         assert fs == self.fs
         assert hasattr(self, 'AR_')
         assert hasattr(self, 'G_')
         self.reset_criterions()
-        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None, test_mask)
+        self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None,
+                               test_weights)
         self.basis_ = self.make_basis(
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
@@ -952,10 +954,10 @@ class BaseDAR(object):
             if sigdriv_imag is None:
                 sigdriv_imag = self.sigdriv_imag
 
-            if self.train_mask is not None:
-                sigdriv = sigdriv[~self.train_mask]
+            if self.train_weights is not None:
+                sigdriv = sigdriv[self.train_weights != 0]
                 if sigdriv_imag is not None:
-                    sigdriv_imag = sigdriv_imag[~self.train_mask]
+                    sigdriv_imag = sigdriv_imag[self.train_weights != 0]
 
             if sigdriv_imag is None:
                 bounds = np.percentile(sigdriv, [5, 95])
@@ -1087,8 +1089,8 @@ class BaseDAR(object):
         if True:
             spect = Spectrum(block_length=128, fs=self.fs, wfunc=np.blackman)
             sigin = self.sigin
-            if self.train_mask is not None:
-                sigin = sigin[~self.train_mask]
+            if self.train_weights is not None:
+                sigin = sigin[self.train_weights != 0]
             spect.periodogram(sigin)
             fft_length, _ = spect.check_params()
             n_frequency = fft_length // 2 + 1

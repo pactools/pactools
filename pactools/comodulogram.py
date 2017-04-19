@@ -857,9 +857,11 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     if shift != 0:
         sigdriv = np.roll(sigdriv, shift)
 
+    train_weights = ~mask if mask is not None else None
+
     # fit the model DAR on the data
     model.fit(fs=fs, sigin=sigin, sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
-              train_mask=mask)
+              train_weights=train_weights)
 
     # estimate the length of the padding for the FFT
     delta_f = np.diff(high_fq_range).mean()

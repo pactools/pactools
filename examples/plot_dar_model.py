@@ -63,8 +63,8 @@ axs[1].set_title(dar.get_title(name=True))
 ###############################################################################
 # To compute a comodulogram, we perform the same steps for each low frequency:
 # * Extract the low frequency
-# * Fit a DAR model
-# * Potentially with a model selection using the BIC
+# * Fit a DAR model
+# * Potentially with a model selection using the BIC
 # * And quantify the PAC accross the spectrum.
 #
 # Everything is handled by the class :class:`~pactools.Comodulogram`, by giving
