@@ -1,6 +1,6 @@
 # pactools
 
-[![Build Status](https://travis-ci.org/pactools/pactools.svg?branch=master)](https://travis-ci.org/pactools/pactools) [![codecov](https://codecov.io/gh/pactools/pactools/branch/master/graph/badge.svg)](https://codecov.io/gh/pactools/pactools)
+[![Build Status](https://travis-ci.org/pactools/pactools.svg?branch=master)](https://travis-ci.org/pactools/pactools) [![codecov](https://codecov.io/gh/pactools/pactools/branch/master/graph/badge.svg)](https://codecov.io/gh/pactools/pactools) [![Python27](https://img.shields.io/badge/python-2.7-blue.svg)](https://github.com/pactools/pactools) [![Python36](https://img.shields.io/badge/python-3.6-blue.svg)](https://github.com/pactools/pactools)
 
 This package provides tools to estimate **phase-amplitude coupling (PAC)** in neural time series.
 

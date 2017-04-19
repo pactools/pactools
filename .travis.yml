@@ -1,22 +1,16 @@
 language: python
-before_install:
-    - wget -q http://repo.continuum.io/miniconda/Miniconda-3.6.0-Linux-x86_64.sh -O miniconda.sh
-    - chmod +x miniconda.sh
-    - ./miniconda.sh -b -p /home/travis/miniconda
-    - export PATH=/home/travis/miniconda/bin:$PATH
-    - conda update --yes --quiet conda
-install:
-    - conda create -n testenv --yes pip python=3.6
-    - source activate testenv
-    - conda install --yes --quiet numpy scipy matplotlib
-    - conda install --yes --quiet pytest pytest-cov
-    - pip install -q flake8 mne
-    - make install
-script:
-    - python run_pytest.py --cov=pactools
-    - make flake8
-after_success:
-    - bash <(curl -s https://codecov.io/bash)
+
+matrix:
+  include:
+    # Most recent versions
+    - env: PYTHON_VERSION="3.6" COVERAGE="true"
+    - env: PYTHON_VERSION="2.7"
+    - env: RUN_FLAKE8="true" SKIP_TEST="true"
+
+before_install: source continuous_integration/before_install.sh
+install: source continuous_integration/install.sh
+script: source continuous_integration/test_script.sh
+after_success: source continuous_integration/after_script.sh
 
 notifications:
   email: false

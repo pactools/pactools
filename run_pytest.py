@@ -14,4 +14,5 @@ if __name__ == "__main__":
     for arg in sys.argv:
         args.append(arg)
 
-    pytest.main(args)
+    code = pytest.main(args)
+    sys.exit(code)
