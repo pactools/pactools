@@ -1,4 +1,6 @@
 import itertools
+from fractions import Fraction
+
 import matplotlib as mpl
 import numpy as np
 
@@ -129,6 +131,24 @@ def mpl_palette(name, n_colors=6, extrema=False, cycle=False):
         return palette
 
 
+def frac_to_str(frac):
+    res = ''
+    if frac.numerator not in (1, -1):
+        res += str(frac.numerator)
+    if frac.numerator == -1:
+        res += '-'
+    if frac.numerator != 0:
+        res += '\pi'
+        if frac.denominator != 1:
+            res += '/' + str(frac.denominator)
+
+    return res
+
+
+def frac_to_float(frac):
+    return frac.numerator / float(frac.denominator)
+
+
 def phase_string(sig):
     """Take the angle and create a string as \pi if close to some \pi values"""
     if isinstance(sig, np.ndarray):
@@ -138,11 +158,9 @@ def phase_string(sig):
     else:
         angle = sig
 
-    pi_multiples = np.pi * np.arange(-1, 1.25, 0.25)
-    strings = [
-        '-\pi', '-3\pi/4', '-\pi/2', '-\pi/4', '0', '\pi/4', '\pi/2', '3\pi/4',
-        '\pi'
-    ]
+    fractions = [Fraction(i, 12) for i in np.arange(-12, 12 + 1)]
+    pi_multiples = np.array([np.pi * frac_to_float(f) for f in fractions])
+    strings = [frac_to_str(f) for f in fractions]
 
     if np.min(np.abs(angle - pi_multiples)) < 1e-3:
         return strings[np.argmin(np.abs(angle - pi_multiples))]

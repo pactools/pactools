@@ -969,11 +969,10 @@ class BaseDAR(object):
         bounds = (-bound_min, bound_min)
         return bounds
 
-    def plot(self, title='', frange=None, mode='', vmin=None, vmax=None,
+    def plot(self, title=None, frange=None, mode='c', vmin=None, vmax=None,
              ax=None, xlim=None, cmap=None, colorbar=True):
         """
-        represent the power spectral density as a function of
-        the amplitude of the driving signal
+        Represent the power spectral density as a function of the driver
 
         self  : the AR model to plot
         title : title of the plot
@@ -987,6 +986,7 @@ class BaseDAR(object):
         """
         spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
+        self.spec_ = spec
 
         if cmap is None:
             if 'c' in mode:
@@ -1020,7 +1020,7 @@ class BaseDAR(object):
             # fig.tight_layout()
             add_colorbar(fig, cax, vmin, vmax, unit='dB', ax=ax)
 
-        if title == '':
+        if title is None:
             title = self.get_title(name=True, criterion=self.criterion)
         ax.set_title(title)
         ax.set_ylabel('Frequency (Hz)')
@@ -1052,6 +1052,7 @@ class BaseDAR(object):
         """
         spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
+        self.spec_ = spec
 
         if ax is None:
             fig = plt.figure(title)
