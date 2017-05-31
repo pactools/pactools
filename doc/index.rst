@@ -5,7 +5,6 @@ This package provides tools to estimate **phase-amplitude coupling (PAC)** in ne
 
 In particular, it implements the **driven auto-regressive (DAR)** models presented in the reference below.
 
-WARNING: The API of this package is not fixed yet; function names and parameters may change without notice. Estimated date of reliable API: May 2017
 
 Installation
 ------------
