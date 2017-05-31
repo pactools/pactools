@@ -27,10 +27,10 @@ class BaseDAR(object):
         Parameters
         ----------
         ordar : int > 0
-            Order of the autoregressive model
+            Order of the autoregressive model (p)
 
         ordriv : int >= 0
-            Order of the taylor expansion for sigdriv
+            Order of the taylor expansion for sigdriv (m)
 
         criterion : None or string in ('bic', 'aic', 'logl')
             If not None, select the criterion used for model selection.

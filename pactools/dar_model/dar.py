@@ -4,6 +4,24 @@ from .base_dar import BaseDAR
 
 
 class DAR(BaseDAR):
+    """
+    A driven auto-regressive (DAR) model, as described in [1].
+
+    This model uses the simple parametrization:
+
+    .. math:: y(t) + \\sum_{i=1}^p a_i(t) y(t-i)= \\varepsilon(t)
+
+    with:
+
+    .. math:: a_i(t) = \\sum_{k=0}^m a_{ik} x(t)^k
+
+    References
+    ----------
+    [1] Dupre la Tour, T. , Grenier, Y., & Gramfort, A. (2017). Parametric
+    estimation of spectrum driven by an exogenous signal. Acoustics, Speech
+    and Signal Processing (ICASSP), 2017 IEEE International Conference on,
+    4301--4305.
+    """
     def last_model(self):
         return self._next_model(only_last=True)
 
@@ -118,5 +136,10 @@ class DAR(BaseDAR):
 
 
 class AR(DAR):
+    """
+    A simple linear auto-regressive (AR) model:
+
+    .. math:: y(t) + \\sum_{i=1}^p a_i y(t-i)= \\varepsilon(t)
+    """
     def __init__(self, ordar=1, ordriv=0, *args, **kwargs):
         super(AR, self).__init__(ordar=ordar, ordriv=0, *args, **kwargs)

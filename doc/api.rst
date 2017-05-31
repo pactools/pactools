@@ -27,6 +27,7 @@ DAR models
    :toctree: generated/
 
    DAR
+   StableDAR
    extract_driver
 
 

@@ -4,6 +4,29 @@ from .baseLattice import BaseLattice
 
 
 class StableDAR(BaseLattice):
+    """
+    A stable driven auto-regressive (DAR) model, as described in [1].
+    This model is designed to have an stable instantaneous AR model at each
+    time.
+
+    This model uses the parametrization:
+
+    .. math:: y(t) + \\sum_{i=1}^p a_i(t) y(t-i)= \\varepsilon(t)
+
+    with:
+
+    .. math:: a_p^{(p)} = k_p; \;\;\;\;
+              a_i^{(p)} = a_i^{(p-1)} + k_p a_{p-i}^{(p-1)}
+    .. math:: \\gamma_i = \\log\\left(\\frac{1+k_i}{1-k_i}\\right); \;\;\;\;
+              \\gamma_{i}(t)=\\sum_{j=0}^{m}\\gamma_{ij}x(t)^j
+
+    References
+    ----------
+    [1] Dupre la Tour, T. , Grenier, Y., & Gramfort, A. (2017). Parametric
+    estimation of spectrum driven by an exogenous signal. Acoustics, Speech
+    and Signal Processing (ICASSP), 2017 IEEE International Conference on,
+    4301--4305.
+    """
     # ------------------------------------------------ #
     # Functions that overload abstract methods         #
     # ------------------------------------------------ #
