@@ -12,7 +12,7 @@ from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d, next_power2
 from .utils.validation import check_array, check_random_state
-from .utils.validation import check_consistent_shape
+from .utils.validation import check_consistent_shape, check_is_fitted
 from .utils.viz import add_colorbar
 from .bandpass_filter import multiple_band_pass
 from .mne_api import MaskIterator
@@ -322,6 +322,7 @@ class Comodulogram(object):
         tight_layout : boolean
             Use tight_layout or not
         """
+        check_is_fitted(self, 'comod_')
         if self.comod_.ndim == 2:
             self.comod_ = self.comod_[None, :, :]
 
@@ -400,6 +401,7 @@ class Comodulogram(object):
         pac_value : float or array, shape (n_comod, )
             Maximum PAC value
         """
+        check_is_fitted(self, 'comod_')
         # only one comodulogram
         return_array = True
         if self.comod_.ndim == 2:

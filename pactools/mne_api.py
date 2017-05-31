@@ -4,6 +4,13 @@ from mne.io import BaseRaw
 
 def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
     """
+    A function to transform MNE data into pactools input signals.
+    It select the one channel on which you to estimate PAC, or two channels
+    for cross-channel PAC. It also returns a mask generator, that mask the
+    data outside a given window around an event. The mask generator returns
+    a number of masks equal to the number of events times the number of
+    windows (i.e. the number of pairs (tmin, tmax)).
+
     Warning: events is stored in indices, tmin and tmax are stored in seconds.
 
     Parameters

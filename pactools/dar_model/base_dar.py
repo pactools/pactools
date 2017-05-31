@@ -10,6 +10,7 @@ from scipy import stats
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
 from ..utils.validation import check_array, check_consistent_shape
+from ..utils.validation import check_is_fitted
 from ..utils.spectrum import Spectrum
 from ..utils.viz import add_colorbar, compute_vmin_vmax, phase_string
 
@@ -414,6 +415,7 @@ class BaseDAR(object):
         return value
 
     def _compute_criterion(self, train=False):
+        check_is_fitted(self, 'AR_')
         criterions = getattr(self, 'criterions_', None)
         if criterions is not None:
             return criterions
@@ -539,11 +541,8 @@ class BaseDAR(object):
         """AR order of the model, different from self.ordar if a model
         selection has been performed
         """
-        AR_ = getattr(self, 'AR_', None)
-        if AR_ is None:
-            raise NotFittedError('%s is not fitted.' % self)
-        else:
-            return self.AR_.shape[0]
+        check_is_fitted(self, 'AR_')
+        return self.AR_.shape[0]
 
     def estimate_fixed_gain(self):
         """Estimates a fixed gain from the predicton error self.residual_.
@@ -718,9 +717,8 @@ class BaseDAR(object):
                   test_weights=None):
         """Whiten a signal with the already fitted model
         """
+        check_is_fitted(self, 'AR_')
         assert fs == self.fs
-        assert hasattr(self, 'AR_')
-        assert hasattr(self, 'G_')
         self.reset_criterions()
         self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None,
                                test_weights)
@@ -747,6 +745,7 @@ class BaseDAR(object):
 
         skip : how many initial samples to skip
         """
+        check_is_fitted(self, 'residual_')
         if train:
             basis, residual, weights = self._get_train_data(
                 [self.basis_, self.residual_])
@@ -873,6 +872,7 @@ class BaseDAR(object):
         factorisation of the code of methods plot_time_freq and
         plot_drive_freq
         """
+        check_is_fitted(self, 'AR_')
         ordar_ = self.ordar_
 
         AR_cols, G_cols, _, sigdriv = self.develop_all(sigdriv, sigdriv_imag)
@@ -916,6 +916,7 @@ class BaseDAR(object):
         xlim : minimum and maximum amplitude
 
         """
+        check_is_fitted(self, 'AR_')
         xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim)
         sigdriv = np.atleast_2d(sigdriv)
         sigdriv_imag = np.atleast_2d(sigdriv_imag)
@@ -984,6 +985,7 @@ class BaseDAR(object):
         ax    : matplotlib.axes.Axes
         xlim  : force xlim to these values if defined
         """
+        check_is_fitted(self, 'AR_')
         spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
         self.spec_ = spec
@@ -1050,6 +1052,7 @@ class BaseDAR(object):
         vmin    : minimum power to plot (dB)
         vmax    : maximum power to plot (dB)
         """
+        check_is_fitted(self, 'AR_')
         spec, xlim, sigdriv, sigdriv_imag = self._amplitude_frequency(
             mode=mode, xlim=xlim, frange=frange)
         self.spec_ = spec
@@ -1175,7 +1178,3 @@ def wgn_log_likelihood(eps, sigma2, weights=None):
     logL *= -0.5
 
     return logL
-
-
-class NotFittedError(ValueError, AttributeError):
-    """Exception class to raise if estimator is used before fitting."""

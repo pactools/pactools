@@ -5,6 +5,7 @@ import matplotlib
 from .comodulogram import multiple_band_pass
 from .utils.peak_finder import peak_finder
 from .utils.validation import check_consistent_shape, check_array
+from .utils.validation import check_is_fitted
 from .utils.viz import add_colorbar, mpl_palette
 
 
@@ -158,6 +159,7 @@ class PeakLocking(object):
         return self
 
     def plot_peaks(self, ax=None):
+        check_is_fitted(self, 'filtered_low_')
         # plot the filtered_low_real peaks
         if not isinstance(ax, matplotlib.axes.Axes):
             fig = plt.figure(figsize=(16, 5))
@@ -183,6 +185,7 @@ class PeakLocking(object):
         fig : matplotlib.figure.Figure
             Figure instance containing the plot.
         """
+        check_is_fitted(self, 'time_average_')
         if axs is None:
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
             axs = axs.ravel()
