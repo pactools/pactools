@@ -66,12 +66,29 @@ class Carrier:
         """
         Plots the impulse response and the transfer function of the filter.
         """
+        # validate figure
+        if fig is None:
+            fig_passed = False
+            fig, axes = plt.subplots(nrows=2)
+        else:
+            fig_passed = True
+            if not isinstance(fig, plt.Figure):
+                raise TypeError('fig must be matplotlib Figure, got {}'
+                                ' instead.'.format(type(fig)))
+            # test if is figure and has 2 axes
+            n_axes = len(fig.axes)
+            if n_axes < 2:
+                raise ValueError('Passed figure must have at least two axes'
+                                 ', given figure has {}.'.format(n_axes))
+            axes = fig.axes
+
         # compute periodogram
         fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
         s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
                      step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
-        s.plot('Transfer function of FIR filter "Carrier"', fscale=fscale)
+        s.plot('Transfer function of FIR filter "Carrier"', fscale=fscale,
+               axes=axes[0])
 
         # print the frequency and the bandwidth
         if print_width:
@@ -90,15 +107,14 @@ class Carrier:
                   (f0, df, f_low, f_high, df / f0))
 
         # plots
-        if fig is None:
-            fig = plt.figure('Impulse response of FIR filter "Carrier"')
-        ax = fig.gca()
-        ax.plot(self.fir)
+        axes[1].plot(self.fir)
         if self.extract_complex:
-            ax.plot(self.fir_imag)
-        ax.set_title('Impulse response of FIR filter "Carrier"')
-        plt.xlabel('Samples')
-        plt.ylabel('Amplitude')
+            axes[1].plot(self.fir_imag)
+        axes[1].set_title('Impulse response of FIR filter "Carrier"')
+        axes[1].set_xlabel('Samples')
+        axes[1].set_ylabel('Amplitude')
+        if not fig_passed:
+            fig.tight_layout()
         return fig
 
     def direct(self, sigin):
