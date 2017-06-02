@@ -138,12 +138,25 @@ class Spectrum(object):
         plots the power spectral density
         warning: the plot will only appear after plt.show()
 
-        returns the figure instance
+        Parameters
+        ----------
+        title : str
+            Title of the plot (and the window).
+        fscale : str
+            Kind of frequency scale ('lin' or 'log').
+        labels : list of str
+            List of labels for the plots.
+        fig : matplotlib.Figure
+            Specific figure to plot on.
+        axes : matplotlib.Axes
+            Specific axes to draw on. Overrides `fig`.
+        replicate : int
+            Number of replication of the spectrum across frequencies
 
-        title  : title of the plot (and the window)
-        fscale : kind of frequency scale ('lin' or 'log')
-        labels : list of label of the plots
-        replicate: number of replication of the spectrum across frequencies
+        Returns
+        -------
+        fig : matplotlib.Figure
+            Figure instance used in plotting.
         """
         fft_length, _ = self.check_params()
         if labels is None:
