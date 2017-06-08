@@ -286,7 +286,7 @@ class Comodulogram(object):
 
         return self
 
-    def plot(self, titles=None, fig=None, axs=None, cmap=None, vmin=None,
+    def plot(self, titles=None, axs=None, cmap=None, vmin=None,
              vmax=None, unit='', cbar=True, label=True, contours=None,
              tight_layout=True):
         """
