@@ -203,7 +203,7 @@ class Spectrum(object):
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
                 axes.plot(freq + i * fmax, psd.T[::(-1) ** i], label=label,
-                         color=color)
+                          color=color)
 
         axes.grid(True)
         axes.set_title(title)
