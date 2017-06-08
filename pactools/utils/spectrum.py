@@ -133,17 +133,30 @@ class Spectrum(object):
         return psd
 
     def plot(self, title='', fscale='lin', labels=None, fig=None,
-             replicate=None, colors=None):
+             axes=None, replicate=None, colors=None):
         """
         plots the power spectral density
         warning: the plot will only appear after plt.show()
 
-        returns the figure instance
+        Parameters
+        ----------
+        title : str
+            Title of the plot (and the window).
+        fscale : str
+            Kind of frequency scale ('lin' or 'log').
+        labels : list of str
+            List of labels for the plots.
+        fig : matplotlib.Figure
+            Specific figure to plot on.
+        axes : matplotlib.Axes
+            Specific axes to draw on. Overrides `fig`.
+        replicate : int
+            Number of replication of the spectrum across frequencies
 
-        title  : title of the plot (and the window)
-        fscale : kind of frequency scale ('lin' or 'log')
-        labels : list of label of the plots
-        replicate: number of replication of the spectrum across frequencies
+        Returns
+        -------
+        fig : matplotlib.Figure
+            Figure instance used in plotting.
         """
         fft_length, _ = self.check_params()
         if labels is None:
@@ -160,18 +173,27 @@ class Spectrum(object):
         if colors is None:
             colors = ('bgrcmyk' * 100)[:len(self.psd)]
 
-        if fig is None:
-            fig = plt.figure(title).gca()
-        try:
-            fig = fig.gca()
-        except:
-            pass
+        if axes is None:
+            if fig is None:
+                fig = plt.figure(title)
+                axes = fig.gca()
+            else:
+                if not isinstance(fig, plt.Figure):
+                    raise TypeError('fig must be matplotlib Figure, got {}'
+                                    ' instead.'.format(type(fig)))
+                axes = fig.gca()
+        else:
+            # validate if axes is correct
+            if not isinstance(axes, plt.Axes):
+                raise TypeError('axes must be matplotlib Axes, got {}'
+                                ' instead.'.format(type(axes)))
+            fig = axes.figure
 
         self.fscale = fscale
         if self.fscale == 'log':
-            fig.set_xscale('log')
+            axes.set_xscale('log')
         else:
-            fig.set_xscale('linear')
+            axes.set_xscale('linear')
 
         fmax = self.fs / 2
         freq = np.linspace(0, fmax, fft_length // 2 + 1)
@@ -180,15 +202,15 @@ class Spectrum(object):
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
-                fig.plot(freq + i * fmax, psd.T[::(-1) ** i], label=label,
-                         color=color)
+                axes.plot(freq + i * fmax, psd.T[::(-1) ** i], label=label,
+                          color=color)
 
-        fig.grid(True)
-        fig.set_title(title)
-        fig.set_xlabel('Frequency (Hz)')
-        fig.set_ylabel('Amplitude (dB)')
+        axes.grid(True)
+        axes.set_title(title)
+        axes.set_xlabel('Frequency (Hz)')
+        axes.set_ylabel('Amplitude (dB)')
         if plot_legend:
-            fig.legend(loc=0)
+            axes.legend(loc=0)
         return fig
 
     def main_frequency(self):
