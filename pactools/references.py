@@ -22,9 +22,7 @@ class Reference():
         return self.short
 
 
-bispectrum = Reference(
-    short='Bispectrum',
-    full='Bispectrum.')
+bispectrum = Reference(short='Bispectrum', full='Bispectrum.')
 
 sigl = Reference(
     short='[Sigl & al 1994]',

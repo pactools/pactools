@@ -22,6 +22,7 @@ class DAR(BaseDAR):
     and Signal Processing (ICASSP), 2017 IEEE International Conference on,
     4301--4305.
     """
+
     def last_model(self):
         return self._next_model(only_last=True)
 
@@ -69,8 +70,7 @@ class DAR(BaseDAR):
             sigreg = np.empty((K * m, n_epochs, n_points - K))
             for k in range(K):
                 sigreg[k * m:(k + 1) * m, :, :] = (
-                    w_basis[:, :, K:] *
-                    sigin[:, K - 1 - k:n_points - 1 - k])
+                    w_basis[:, :, K:] * sigin[:, K - 1 - k:n_points - 1 - k])
 
             # -------- prepare auto/inter correlations
             scale = 1.0 / n_points
@@ -141,5 +141,6 @@ class AR(DAR):
 
     .. math:: y(t) + \\sum_{i=1}^p a_i y(t-i)= \\varepsilon(t)
     """
+
     def __init__(self, ordar=1, ordriv=0, *args, **kwargs):
         super(AR, self).__init__(ordar=ordar, ordriv=0, *args, **kwargs)

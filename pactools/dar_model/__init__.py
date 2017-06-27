@@ -4,9 +4,10 @@ from .har import HAR
 
 from .preprocess import extract_driver
 
-__all__ = ['DAR',
-           'HAR',
-           'AR',
-           'StableDAR',
-           'extract_driver',
-           ]
+__all__ = [
+    'DAR',
+    'HAR',
+    'AR',
+    'StableDAR',
+    'extract_driver',
+]

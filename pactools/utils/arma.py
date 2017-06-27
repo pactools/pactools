@@ -30,9 +30,8 @@ class Arma(Spectrum):
 
         # -------- estimate AR part
         col1 = correl[self.ordma:self.ordma + nbcorr]
-        row1 = correl[np.abs(np.arange(self.ordma,
-                                       self.ordma - self.ordar,
-                                       -1))]
+        row1 = correl[np.abs(
+            np.arange(self.ordma, self.ordma - self.ordar, -1))]
         R = linalg.toeplitz(col1, row1)
         r = -correl[self.ordma + 1:self.ordma + nbcorr + 1]
         AR = linalg.solve(R, r)

@@ -49,6 +49,7 @@ class PeakLocking(object):
         It can also include 'mean', 'std' or 'ste'
         (resp. mean, standard deviation or standard error).
     """
+
     def __init__(self, fs, low_fq, low_fq_width=1.0, high_fq_range='auto',
                  high_fq_width='auto', t_plot=1.0, filter_method='carrier',
                  peak_or_trough='peak', percentiles=['std+', 'mean', 'std-']):
