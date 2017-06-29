@@ -75,7 +75,7 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     driver_real, driver_imag = fir.direct(rng.randn(n_points))
     driver = driver_real + 1j * driver_imag
     # We scale by sqrt(2) to have correct amplitude in the real-valued driver
-    driver *= low_fq_amp / driver.std() * np.sqrt(2)
+    driver *= 1. / driver.std() * np.sqrt(2)
     if return_driver:
         return driver
 
@@ -93,11 +93,11 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     # create the modulation, with a sigmoid, and a phase lag
     phase = np.exp(1j * phi_0)
-    sigmoid_sharpness = sigmoid_sharpness * low_fq_amp
+    sigmoid_sharpness = sigmoid_sharpness
     modulation = sigmoid(np.real(driver * phase), sharpness=sigmoid_sharpness)
 
     # the slow oscillation is not phased lag
-    theta = np.real(driver)
+    theta = np.real(driver) * low_fq_amp
 
     # add a delay to the slow oscillation theta
     delay_point = int(delay * fs)
