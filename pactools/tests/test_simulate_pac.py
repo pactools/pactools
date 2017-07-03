@@ -46,9 +46,7 @@ def test_amplitude():
 
     sig_1 = simulate_pac_default(high_fq_amp=1, low_fq_amp=0, noise_level=0)
     sig_2 = simulate_pac_default(high_fq_amp=2, low_fq_amp=0, noise_level=0)
-    # with a driver equal to zero at all time, the sigmoid modulates at 0.5
-    assert_almost_equal(sig_1.std(), 0.5, decimal=7)
-    assert_almost_equal(sig_2.std(), 1, decimal=7)
+    assert_almost_equal(sig_1.std() * 2, sig_2.std(), decimal=7)
 
     sig_1 = simulate_pac_default(high_fq_amp=0, low_fq_amp=0, noise_level=1)
     sig_2 = simulate_pac_default(high_fq_amp=0, low_fq_amp=0, noise_level=2)

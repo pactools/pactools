@@ -1,5 +1,10 @@
 language: python
 
+cache:
+  directories:
+  - $HOME/mne_data
+
+
 matrix:
   include:
     # Most recent versions
