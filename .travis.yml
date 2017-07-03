@@ -1,9 +1,10 @@
 language: python
 
 cache:
+  timeout: 1000
   directories:
   - $HOME/mne_data
-
+  # - $HOME/.cache/pip
 
 matrix:
   include:
