@@ -41,12 +41,13 @@ The project was supported by the ERC Starting Grant SLAB ERC-YStG-676943 to Alex
 If you use this code in your project, please cite [this paper](https://hal.archives-ouvertes.fr/hal-01448603v2):
 
 ```
-@inproceedings{duprelatour2017parametric,
-  title={Parametric estimation of spectrum driven by an exogenous signal},
-  author={Dupr{\'e} la Tour, Tom and Grenier, Yves and Gramfort, Alexandre},
-  booktitle={Acoustics, Speech and Signal Processing (ICASSP), 2017 IEEE International Conference on},
-  pages={4301--4305},
-  year={2017},
-  organization={IEEE}
+@article {duprelatour159731,
+    author = {Dupr\'e la Tour, Tom and Tallot, Lucille and Grabot, Laetitia and Doy\`ere, Val\'erie and van Wassenhove, Virginie and Grenier, Yves and Gramfort, Alexandre},
+    title = {Non-linear Auto-Regressive Models for Cross-Frequency Coupling in Neural Time Series},
+    year = {2017},
+    doi = {10.1101/159731},
+    publisher = {Cold Spring Harbor Labs Journals},
+    URL = {http://www.biorxiv.org/content/early/2017/07/06/159731},
+    journal = {bioRxiv}
 }
 ```
