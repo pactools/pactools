@@ -12,22 +12,22 @@ Read more in the [documentation](https://pactools.github.io).
 
 We recommend the [Anaconda Python distribution](https://www.continuum.io/downloads). To install `pactools`, you first need to install its dependencies::
 
-```
-$ pip install numpy matplotlib scipy
+```console
+pip install numpy matplotlib scipy
 ```
 
 Then install pactools::
 
-```
-$ pip install git+https://github.com/pactools/pactools.git#egg=pactools
+```console
+pip install git+https://github.com/pactools/pactools.git#egg=pactools
 ```
 
 If you do not have admin privileges on the computer, use the `--user` flag with `pip`. To upgrade, use the `--upgrade` flag provided by `pip`.
 
 To check if everything worked fine, you can do::
 
-```
-$ python -c 'import pactools'
+```console
+python -c 'import pactools'
 ```
 
 and it should not give any error messages.
