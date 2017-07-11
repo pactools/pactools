@@ -127,7 +127,7 @@ def mpl_palette(name, n_colors=6, extrema=False, cycle=False):
 
 
 def set_style(font_scale=None):
-    # use default Latex font for math even with matplotlib 2.0
+    # use default Latex font for math even with matplotlib 2.0
     mpl.rcParams['mathtext.fontset'] = 'cm'
     if font_scale is not None:
         mpl.rcParams['font.size'] = 10 * font_scale

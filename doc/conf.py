@@ -19,9 +19,10 @@
 #
 # import os
 # import sys
+from datetime import date
 # sys.path.insert(0, os.path.abspath('.'))
 
-import sphinx_bootstrap_theme
+
 # import pactools  # import pactools here will make sphinx-gallery fail !
 
 
@@ -66,7 +67,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'pactools'
-copyright = '2017, Tom Dupre la Tour'
+copyright = u'2017, Tom Dupré la Tour'
+# copyright = u'2017-%s, Tom Dupré la Tour' % date.today().year
 author = 'Tom Dupre la Tour'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -99,27 +101,26 @@ todo_include_todos = False
 
 # -- Options for HTML output ----------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-html_theme = 'bootstrap'
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#
+import sphinx_rtd_theme  # noqa
+html_theme = 'sphinx_rtd_theme'
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_theme_options = {
-    'navbar_sidebarrel': False,
-    'navbar_links': [
-        ("Examples", "auto_examples/index"),
-        ("API", "api"),
-        ("GitHub", "https://github.com/pactools/pactools", True)
-    ],
-    'bootswatch_theme': "united"
+    'navigation_depth': 2,
+    'display_version': False,
 }
 
-# Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+# import sphinx_bootstrap_theme  # noqa
+# html_theme = 'bootstrap'
+# html_theme_options = {
+#     'navbar_sidebarrel': False,
+#     'navbar_links': [
+#         ("Examples", "auto_examples/index"),
+#         ("API", "api"),
+#         ("GitHub", "https://github.com/pactools/pactools", True)
+#     ],
+#     'bootswatch_theme': "united"
+# }
+# html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -190,6 +191,10 @@ intersphinx_mapping = {'https://docs.python.org/': None}
 sphinx_gallery_conf = {
     'examples_dirs': '../examples',
     'gallery_dirs': 'auto_examples',
+    # directory where function granular galleries are stored
+    'backreferences_dir': 'generated/backreferences',
+    # Modules for which function level galleries are created
+    'doc_module': ('pactools', ),
     'reference_url': {
         'mne': 'http://martinos.org/mne/stable',
         'pactools': 'http://pactools.github.io/',

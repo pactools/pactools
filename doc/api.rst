@@ -6,8 +6,8 @@ API Documentation
 
 .. currentmodule:: pactools
 
-Phase amplitude coupling
-========================
+Phase amplitude coupling (PAC)
+==============================
 
 .. autosummary::
    :toctree: generated/
@@ -19,8 +19,8 @@ Phase amplitude coupling
    simulate_pac
 
 
-DAR models
-==========
+Driven auto-regressive (DAR) models
+===================================
 
 .. currentmodule:: pactools.dar_model
 

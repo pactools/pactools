@@ -8,23 +8,26 @@ oscillation which corresponds to the maximum amplitude of the fast oscillation.
 The temporal delay is the delay between the two coupled components. The two
 notions would be identical should the driver be a perfect stationary sinusoid.
 
-- (1st line) When both are equal to zero, the high frequency bursts happen in
+(1st line) When both are equal to zero, the high frequency bursts happen in
 the driver's peaks.
-- (2nd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
+
+(2nd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
 to the driver's peaks, and this shift varies depending on the instantaneous
 frequency of the driver.
-- (3rd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
+
+(3rd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
 to the driver's peaks, and this shift is constant over the signal. In this
 case, note how the driver's phase corresponding to the bursts varies depending
 on the instantaneous frequency of the driver.
-- (4th line) τ and φ can also be both non-zero.
+
+(4th line) τ and φ can also be both non-zero.
 
 The temporal delay is estimated maximizing the likelihood on DAR models.
 The phase shift is extracted from a DAR model fitted with the optimal
 temporal delay.
 
 References
-----------
+==========
 Dupré la Tour et al. (2017). Non-linear Auto-Regressive Models for
 Cross-Frequency Coupling in Neural Time Series. bioRxiv, 159731.
 """

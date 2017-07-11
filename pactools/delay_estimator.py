@@ -43,7 +43,7 @@ class DelayEstimator(object):
 
     References
     ----------
-    Dupré la Tour et al. (2017). Non-linear Auto-Regressive Models for
+    Dupre la Tour et al. (2017). Non-linear Auto-Regressive Models for
     Cross-Frequency Coupling in Neural Time Series. bioRxiv, 159731.
     """
 
@@ -102,7 +102,7 @@ class DelayEstimator(object):
         # window decay of sigdriv for continuity after np.roll
         n_decay = max(int(0.5 * self.fs / self.low_fq), 5)
         window = np.blackman(n_decay * 2 - 1)[:n_decay]
-        self.low_sig = self.low_sig.copy()  # copy to avoid modifying original
+        self.low_sig = self.low_sig.copy()  # copy to avoid modifying original
         self.low_sig[:, :n_decay] *= window
         self.low_sig[:, -n_decay:] *= window[::-1]
 
@@ -129,7 +129,7 @@ class DelayEstimator(object):
 
         neg_log_likelihood = np.zeros(len(delays_point))
         for i_delay, delay in enumerate(delays_point):
-            # add delay
+            # add delay
             sigdriv_ = np.roll(sigdriv, delay, axis=1)
             sigdriv_imag_ = np.roll(sigdriv_imag, delay, axis=1)
 
