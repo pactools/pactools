@@ -126,6 +126,13 @@ def mpl_palette(name, n_colors=6, extrema=False, cycle=False):
         return palette
 
 
+def set_style(font_scale=None):
+    # use default Latex font for math even with matplotlib 2.0
+    mpl.rcParams['mathtext.fontset'] = 'cm'
+    if font_scale is not None:
+        mpl.rcParams['font.size'] = 10 * font_scale
+
+
 def frac_to_str(frac):
     res = ''
     if frac.numerator not in (1, -1):

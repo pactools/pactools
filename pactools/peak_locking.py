@@ -78,7 +78,7 @@ class PeakLocking(object):
 
         mask : array or None, shape (n_epochs, n_points)
             The locking is only evaluated where the mask is False.
-            Masking is done after filtering and Hilbert transform.
+            Masking is done after filtering.
 
         ax_draw_peaks : boolean or matplotlib.axes.Axes instance
             If True, plot the first peaks/troughs in the phase signal

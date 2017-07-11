@@ -13,9 +13,10 @@ Phase amplitude coupling
    :toctree: generated/
 
    Comodulogram
+   DelayEstimator
    PeakLocking
-   simulate_pac
    raw_to_mask
+   simulate_pac
 
 
 DAR models
