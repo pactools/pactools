@@ -9,6 +9,7 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
+from ..utils.deprecation import ignore_warnings
 from ..utils.validation import check_array, check_consistent_shape
 from ..utils.validation import check_is_fitted
 from ..utils.spectrum import Spectrum
@@ -694,8 +695,7 @@ class BaseDAR(object):
 
     def _compute_sigma2(self, basis):
         """Helper to compute the instantaneous variance of the model"""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with ignore_warnings():
             logsigma = np.dot(self.G_, basis)
             sigma2 = np.exp(2 * logsigma) + EPSILON
 

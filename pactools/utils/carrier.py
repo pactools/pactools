@@ -7,7 +7,7 @@ from .deprecation import deprecated
 
 
 @deprecated("Please use pactools.utils.fir.BandPassFilter instead")
-class Carrier:
+class Carrier(object):
     def __init__(self, fir=np.ones(1), fs=1., extract_complex=False):
         self.fir = fir
         self.fs = fs
