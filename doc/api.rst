@@ -40,8 +40,8 @@ Utilities
 .. autosummary::
    :toctree: generated/
 
-   carrier.Carrier
-   carrier.LowPass
+   fir.BandPassFilter
+   fir.LowPassFilter
    spectrum.Spectrum
    spectrum.Coherence
    spectrum.Bicoherence

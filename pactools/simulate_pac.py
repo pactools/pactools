@@ -1,6 +1,6 @@
 import numpy as np
 
-from .utils.carrier import Carrier
+from .utils.fir import BandPassFilter
 from .utils.validation import check_random_state
 
 
@@ -70,9 +70,9 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     if high_fq < 0 or low_fq < 0 or fs < 0:
         raise ValueError('Invalid negative frequency')
 
-    fir = Carrier(extract_complex=True)
-    fir.design(fs, low_fq, n_cycles=None, bandwidth=low_fq_width)
-    driver_real, driver_imag = fir.direct(rng.randn(n_points))
+    fir = BandPassFilter(fs=fs, fc=low_fq, n_cycles=None,
+                         bandwidth=low_fq_width, extract_complex=True)
+    driver_real, driver_imag = fir.transform(rng.randn(n_points))
     driver = driver_real + 1j * driver_imag
     # We scale by sqrt(2) to have correct amplitude in the real-valued driver
     driver *= 1. / driver.std() * np.sqrt(2)

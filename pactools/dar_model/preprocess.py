@@ -3,7 +3,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 from ..utils.spectrum import Spectrum
-from ..utils.carrier import Carrier, LowPass
+from ..utils.fir import BandPassFilter, LowPassFilter
 from ..utils.arma import Arma
 from ..utils.validation import check_random_state
 
@@ -137,20 +137,21 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         random_noise = rng.randn(len(sig))
 
     if low_pass:
-        filt = LowPass().design(fs=fs, fc=fc, bandwidth=bandwidth)
+        filt = LowPassFilter(fs=fs, fc=fc, bandwidth=bandwidth)
         if extract_complex:
             raise NotImplementedError('extract_complex incompatible with '
                                       'low_pass filter.')
     else:
-        filt = Carrier(extract_complex=extract_complex)
-        filt.design(fs, fc, n_cycles, bandwidth, zero_mean=True)
+        filt = BandPassFilter(fs=fs, fc=fc, n_cycles=n_cycles,
+                              bandwidth=bandwidth, zero_mean=True,
+                              extract_complex=extract_complex)
         if 'e' in draw or 'z' in draw:
-            filt.plot(fscale='lin', print_width=True)
+            filt.plot(fscale='lin')
 
     if extract_complex:
-        low_sig, low_sig_imag = filt.direct(sig)
+        low_sig, low_sig_imag = filt.transform(sig)
     else:
-        low_sig = filt.direct(sig)
+        low_sig = filt.transform(sig)
 
     if fill == 0:
         # keeping driver in high_sig
@@ -175,9 +176,9 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         high_sig = sig - low_sig
 
         if extract_complex:
-            fill_sig, _ = filt.direct(random_noise)
+            fill_sig, _ = filt.transform(random_noise)
         else:
-            fill_sig = filt.direct(random_noise)
+            fill_sig = filt.transform(random_noise)
         fill_sig.shape = sig.shape
 
         # adjust the power of the filling signal and add it to high_sig
@@ -186,8 +187,8 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
         if 'z' in draw or 'e' in draw:
             _plot_multiple_spectrum(
-                [sig, low_sig, sig - low_sig, fill_sig, high_sig], labels=None,
-                fs=fs, colors='bggrr')
+                [sig, low_sig, sig - low_sig, fill_sig,
+                 high_sig], labels=None, fs=fs, colors='bggrr')
             plt.legend(['input', 'driver', 'input-driver', 'filling'
                         'output'], loc=0)
     else:
@@ -208,8 +209,8 @@ def low_pass_and_fill(sig, fs, fc=1.0, draw='', bandwidth=1.,
     rng = check_random_state(random_state)
     random_noise = rng.randn(*sig.shape)
 
-    filt = LowPass().design(fs=fs, fc=fc, bandwidth=bandwidth)
-    fill_sig = filt.direct(random_noise)
+    filt = LowPassFilter(fs=fs, fc=fc, bandwidth=bandwidth)
+    fill_sig = filt.transform(random_noise)
     # adjust power of fill_sig and add it to high_sig
     filled_sig = fill_gap(sig=high_sig, fs=fs, fa=fc / 2., dfa=fc / 2.,
                           draw=draw, fill_sig=fill_sig)
@@ -332,9 +333,9 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
     # -------- bandpass filtering of white noise
     if fill_sig is None:
         n_cycles = 1.65 * fa / dfa
-        fir = Carrier()
-        fir.design(fs, fa, n_cycles, None, zero_mean=False)
-        fill_sig = fir.direct(rng.randn(*sig.shape))
+        fir = BandPassFilter(fs=fs, fc=fa, n_cycles=n_cycles, bandwidth=None,
+                             zero_mean=False)
+        fill_sig = fir.transform(rng.randn(*sig.shape))
 
     # -------- compute the scale parameter
     sp.periodogram(fill_sig, hold=True)
@@ -431,11 +432,13 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
     --------
     low_sig, high_sig = extract_driver(sigs, fs, 3.0):
     """
+    frequency_range = [low_fq]
     for sigs in multiple_extract_driver(
-            sigs=sigs, fs=fs, frequency_range=[low_fq], n_cycles=n_cycles,
-            bandwidth=bandwidth, fill=fill, whitening=whitening, ordar=ordar,
-            normalize=normalize, extract_complex=extract_complex,
-            random_state=random_state, draw=draw):
+            sigs=sigs, fs=fs, frequency_range=frequency_range,
+            n_cycles=n_cycles, bandwidth=bandwidth, fill=fill,
+            whitening=whitening, ordar=ordar, normalize=normalize,
+            extract_complex=extract_complex, random_state=random_state,
+            draw=draw):
         pass
     return sigs
 
@@ -528,8 +531,8 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
         random_noise = None
 
     # extract the high frequencies independently of the driver
-    fc_low_pass = frequency_range[-1] + frequency_range[
-        0] + bandwidth  # arbitrary
+    fc_low_pass = (
+        frequency_range[-1] + frequency_range[0] + bandwidth)  # arbitrary
     low_pass_width = bandwidth
     low_and_high = [
         extract_and_fill(sig, fs=fs, fc=fc_low_pass, bandwidth=low_pass_width,

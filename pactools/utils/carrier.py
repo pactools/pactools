@@ -3,13 +3,12 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 from .spectrum import Spectrum
+from .deprecation import deprecated
 
 
+@deprecated("Please use pactools.utils.fir.BandPassFilter instead")
 class Carrier:
     def __init__(self, fir=np.ones(1), fs=1., extract_complex=False):
-        """
-        Initializes a filter with coefficient in a (ndarray).
-        """
         self.fir = fir
         self.fs = fs
         self.extract_complex = extract_complex
@@ -140,6 +139,7 @@ class Carrier:
             return filtered
 
 
+@deprecated("Please use pactools.utils.fir.LowPassFilter instead")
 class LowPass(Carrier):
     def __init__(self, fs=1.):
         self.fir = np.ones(1)

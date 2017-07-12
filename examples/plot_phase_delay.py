@@ -11,16 +11,16 @@ notions would be identical should the driver be a perfect stationary sinusoid.
 (1st line) When both are equal to zero, the high frequency bursts happen in
 the driver's peaks.
 
-(2nd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
-to the driver's peaks, and this shift varies depending on the instantaneous
-frequency of the driver.
+(2nd line) When tau = 0 and phi = 0, the bursts are shifted in time with
+respect to the driver's peaks, and this shift varies depending on the
+instantaneous frequency of the driver.
 
-(3rd line) When τ = 0 and φ = 0, the bursts are shifted in time with respect
-to the driver's peaks, and this shift is constant over the signal. In this
-case, note how the driver's phase corresponding to the bursts varies depending
-on the instantaneous frequency of the driver.
+(3rd line) When tau = 0 and phi = 0, the bursts are shifted in time with
+respect to the driver's peaks, and this shift is constant over the signal. In
+this case, note how the driver's phase corresponding to the bursts varies
+depending on the instantaneous frequency of the driver.
 
-(4th line) τ and φ can also be both non-zero.
+(4th line) tau and phi can also be both non-zero.
 
 The temporal delay is estimated maximizing the likelihood on DAR models.
 The phase shift is extracted from a DAR model fitted with the optimal
@@ -28,7 +28,7 @@ temporal delay.
 
 References
 ==========
-Dupré la Tour et al. (2017). Non-linear Auto-Regressive Models for
+Dupr'e la Tour et al. (2017). Non-linear Auto-Regressive Models for
 Cross-Frequency Coupling in Neural Time Series. bioRxiv, 159731.
 """
 import numpy as np
@@ -92,12 +92,12 @@ def simulate_and_plot(phi_0, delay, ax, rng):
                          sharpness) * high_fq_amp
     gamma *= modulation
 
-    # add a delay
+    # add a delay
     delay_point = int(delay * fs)
     gamma = np.roll(gamma, delay_point)
     modulation = np.roll(modulation, delay_point)
 
-    # plot the beginning of the signal
+    # plot the beginning of the signal
     sel = slice(int(t_plot * fs) + 1)
     lines_theta = ax.plot(time[sel], theta[sel])
     ax.plot(time[sel], gamma[sel])
@@ -137,12 +137,12 @@ def simulate_and_plot(phi_0, delay, ax, rng):
         ax.set_yticks(ticks)
         ax.set_yticklabels(ticklabels)
 
-    # fill the horizontal interval between cos(phi_0) and 1
+    # fill the horizontal interval between cos(phi_0) and 1
     ax.fill_between(time[sel], np.cos(phi_0), 1, color=cyan, alpha=0.5)
-    # plot the squares of the theta peaks
+    # plot the squares of the theta peaks
     ax.plot(time[sel][theta_peak_inds], theta[sel][theta_peak_inds], 's',
             color=lines_theta[0].get_color())
-    # plot the circles of maximum gamma amplitude
+    # plot the circles of maximum gamma amplitude
     ax.plot(time[sel][gamma_peak_inds], modulation[sel][gamma_peak_inds], 'o',
             color=lines_modulation[0].get_color())
 
@@ -180,7 +180,7 @@ rng = np.random.RandomState(3)
 fig, axs = plt.subplots(4, 3, figsize=(18, 12),
                         gridspec_kw={'width_ratios': [3, 1, 1]})
 
-# loop over the four conditions
+# loop over the four conditions
 for phi_0_, delay_, axs_ in zip([0, phi_0, 0, phi_0], [0, 0, delay, delay],
                                 axs):
     sig = simulate_and_plot(phi_0=phi_0_, delay=delay_, ax=axs_[0], rng=rng)

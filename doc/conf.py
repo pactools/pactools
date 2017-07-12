@@ -67,8 +67,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'pactools'
-copyright = u'2017, Tom Dupré la Tour'
-# copyright = u'2017-%s, Tom Dupré la Tour' % date.today().year
+copyright = u"2017, Tom Dupre la Tour"
+# copyright = u"2017-%s, Tom Dupre la Tour" % date.today().year
 author = 'Tom Dupre la Tour'
 
 # The version info for the project you're documenting, acts as replacement for

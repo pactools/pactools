@@ -9,35 +9,35 @@ from .viz import compute_vmin_vmax
 
 
 class Spectrum(object):
+    """Spectral estimator following Welch's method
+
+    Parameters
+    ----------
+    block_length : int
+        Length of each signal block, on which we estimate the spectrum
+
+    fft_length : int or None
+        Length of FFT, should be greater or equal to block_length.
+        If None, it is set to block_length
+
+    step : int or None
+        Step between successive blocks
+        If None, it is set to half the block length (i.e. 0.5 overlap)
+
+    wfunc : function
+        Function used to compute the weitghting window on each block.
+        Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+    fs : float
+        Sampling frequency
+
+    donorm : boolean
+        If True, the amplitude is normalized
+
+    """
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1., donorm=True):
-        """
-        Spectral estimator
 
-        Parameters
-        ----------
-        block_length : int
-            Length of each signal block, on which we estimate the spectrum
-
-        fft_length : int or None
-            Length of FFT, should be greater or equal to block_length.
-            If None, it is set to block_length
-
-        step : int or None
-            Step between successive blocks
-            If None, it is set to half the block length (i.e. 0.5 overlap)
-
-        wfunc : function
-            Function used to compute the weitghting window on each block.
-            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
-
-        fs : float
-            Sampling frequency
-
-        donorm : boolean
-            If True, the amplitude is normalized
-
-        """
         self.block_length = block_length
         self.fft_length = fft_length
         self.step = step
@@ -223,34 +223,33 @@ class Spectrum(object):
 
 
 class Coherence(Spectrum):
+    """Coherence estimator
+
+    Parameters
+    ----------
+    block_length : int
+        Length of each signal block, on which we estimate the spectrum
+
+    fft_length : int or None
+        Length of FFT, should be greater or equal to block_length.
+        If None, it is set to block_length
+
+    step : int or None
+        Step between successive blocks
+        If None, it is set to half the block length (i.e. 0.5 overlap)
+
+    wfunc : function
+        Function used to compute the weitghting window on each block.
+        Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+    fs : float
+        Sampling frequency
+
+    donorm : boolean
+        If True, the amplitude is normalized
+    """
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
-        """
-        Coherence estimator
-
-        Parameters
-        ----------
-        block_length : int
-            Length of each signal block, on which we estimate the spectrum
-
-        fft_length : int or None
-            Length of FFT, should be greater or equal to block_length.
-            If None, it is set to block_length
-
-        step : int or None
-            Step between successive blocks
-            If None, it is set to half the block length (i.e. 0.5 overlap)
-
-        wfunc : function
-            Function used to compute the weitghting window on each block.
-            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
-
-        fs : float
-            Sampling frequency
-
-        donorm : boolean
-            If True, the amplitude is normalized
-        """
         super(Coherence, self).__init__(block_length=block_length,
                                         fft_length=fft_length, step=step,
                                         wfunc=wfunc, fs=fs)
@@ -261,7 +260,6 @@ class Coherence(Spectrum):
         """
         Computes the coherence for two signals.
         It is symmetrical, and slightly faster if n_signals_a < n_signals_b.
-
 
         Parameters
         ----------
@@ -337,34 +335,34 @@ class Coherence(Spectrum):
 
 
 class Bicoherence(Spectrum):
+    """Bicoherence estimator
+
+    Parameters
+    ----------
+    block_length : int
+        Length of each signal block, on which we estimate the spectrum
+
+    fft_length : int or None
+        Length of FFT, should be greater or equal to block_length.
+        If None, it is set to block_length
+
+    step : int or None
+        Step between successive blocks
+        If None, it is set to half the block length (i.e. 0.5 overlap)
+
+    wfunc : function
+        Function used to compute the weitghting window on each block.
+        Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
+
+    fs : float
+        Sampling frequency
+
+    donorm : boolean
+        If True, the amplitude is normalized
+    """
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
-        """
-        Bicoherence estimator
 
-        Parameters
-        ----------
-        block_length : int
-            Length of each signal block, on which we estimate the spectrum
-
-        fft_length : int or None
-            Length of FFT, should be greater or equal to block_length.
-            If None, it is set to block_length
-
-        step : int or None
-            Step between successive blocks
-            If None, it is set to half the block length (i.e. 0.5 overlap)
-
-        wfunc : function
-            Function used to compute the weitghting window on each block.
-            Examples: np.ones, np.hamming, np.bartlett, np.blackman, ...
-
-        fs : float
-            Sampling frequency
-
-        donorm : boolean
-            If True, the amplitude is normalized
-        """
         super(Bicoherence, self).__init__(block_length=block_length,
                                           fft_length=fft_length, step=step,
                                           wfunc=wfunc, fs=fs)
@@ -509,8 +507,7 @@ def phase_amplitude(signals, phase=True, amplitude=True):
 
 
 def crop_for_fast_hilbert(signals):
-    """
-    Crop the signal to have a good prime decomposition, for hilbert filter.
+    """Crop the signal to have a good prime decomposition, for hilbert filter.
     """
     if signals.ndim < 2:
         tmax = signals.shape[0]

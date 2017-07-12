@@ -35,10 +35,10 @@ class PeakLocking(object):
     t_plot : float
         Time to plot around the peaks (in second)
 
-    filter_method : in {'mne', 'carrier'}
+    filter_method : in {'mne', 'pactools'}
         Choose band pass filtering method (in multiple_band_pass)
         'mne': with mne.filter.band_pass_filter
-        'carrier': with pactools.Carrier (default)
+        'pactools': with pactools.fir.BandPassFilter (default)
 
     peak_or_trough: in {'peak', 'trough'}
         Lock to the maximum (peak) of minimum (trough) of the slow
@@ -51,7 +51,7 @@ class PeakLocking(object):
     """
 
     def __init__(self, fs, low_fq, low_fq_width=1.0, high_fq_range='auto',
-                 high_fq_width='auto', t_plot=1.0, filter_method='carrier',
+                 high_fq_width='auto', t_plot=1.0, filter_method='pactools',
                  peak_or_trough='peak', percentiles=['std+', 'mean', 'std-']):
         self.fs = fs
         self.low_fq = low_fq

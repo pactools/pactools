@@ -3,10 +3,11 @@ from scipy.signal import hilbert
 
 from .utils.spectrum import compute_n_fft
 from .utils.carrier import Carrier
+from .utils.fir import BandPassFilter
 
 
 def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
-                       filter_method='carrier'):
+                       filter_method='pactools'):
     """
     Band-pass filter the signal at multiple frequencies
 
@@ -31,9 +32,9 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
         Use it to have a bandwidth proportional to the center frequency.
         Should be None if bandwidth is not None.
 
-    filter_method : string, in {'mne', 'carrier'}
+    filter_method : string, in {'mne', 'pactools'}
         Method to bandpass filter.
-        - 'carrier' uses internal wavelet-based bandpass filter. (default)
+        - 'pactools' uses internal wavelet-based bandpass filter. (default)
         - 'mne' uses mne.filter.band_pass_filter in MNE-python package
 
     Returns
@@ -55,30 +56,41 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
 
     filtered = np.zeros((n_frequencies, n_epochs, n_points),
                         dtype=np.complex128)
-    for ii in range(n_epochs):
-        for jj, frequency in enumerate(frequency_range):
-            if frequency <= 0:
-                raise ValueError("Center frequency for bandpass filter should"
-                                 "be non-negative. Got %s." % (frequency, ))
-            # evaluate the number of cycle for this bandwidth and frequency
-            if fixed_n_cycles is None:
-                n_cycles = 1.65 * frequency / bandwidth
 
-            # --------- with mne.filter.band_pass_filter
-            if filter_method == 'mne':
-                from mne.filter import band_pass_filter
+    for jj, frequency in enumerate(frequency_range):
+
+        if frequency <= 0:
+            raise ValueError("Center frequency for bandpass filter should"
+                             "be non-negative. Got %s." % (frequency, ))
+        # evaluate the number of cycle for this bandwidth and frequency
+        if fixed_n_cycles is None:
+            n_cycles = 1.65 * frequency / bandwidth
+
+        # --------- with mne.filter.band_pass_filter
+        if filter_method == 'mne':
+            from mne.filter import band_pass_filter
+            for ii in range(n_epochs):
                 low_sig = band_pass_filter(
                     sigs[ii, :], Fs=fs, Fp1=frequency - bandwidth / 2.0,
                     Fp2=frequency + bandwidth / 2.0,
                     l_trans_bandwidth=bandwidth / 4.0,
                     h_trans_bandwidth=bandwidth / 4.0, n_jobs=1, method='iir')
 
-            # --------- with pactools.Carrier
-            if filter_method == 'carrier':
+                filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
+
+        # --------- with pactools.utils.Carrier (deprecated)
+        elif filter_method == 'carrier':
+            for ii in range(n_epochs):
                 fir.design(fs, frequency, n_cycles, None, zero_mean=True)
                 low_sig = fir.direct(sigs[ii, :])
+                filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
 
-            # common to the two methods
-            filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
+        # --------- with pactools.utils.BandPassFilter
+        elif filter_method == 'pactools':
+            fir = BandPassFilter(fs, fc=frequency, n_cycles=n_cycles,
+                                 bandwidth=None, zero_mean=True,
+                                 extract_complex=True)
+            low_sig, low_sig_imag = fir.transform(sigs)
+            filtered[jj, :, :] = low_sig + 1j * low_sig_imag
 
     return filtered
