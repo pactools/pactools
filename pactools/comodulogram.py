@@ -106,6 +106,14 @@ class Comodulogram(object):
         Bandwidth of the band-pass filters centered on low_fq_range, for
         the amplitude signal. Used only with 'vanwijk' method.
 
+    Examples
+    --------
+    >>> from pactools.comodulogram import Comodulogram
+    >>> c = Comodulogram(fs=200., low_fq_range=np.arange(1, 5, 0.2),
+                         low_fq_width=2.)
+    >>> c.fit(input)
+    >>> c.plot()
+    >>> comod = c.comod_
     """
 
     def __init__(self, fs, low_fq_range, low_fq_width=2., high_fq_range='auto',
@@ -866,8 +874,11 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
               train_weights=train_weights)
 
     # estimate the length of the padding for the FFT
-    delta_f = np.diff(high_fq_range).mean()
-    n_fft = next_power2(fs / delta_f)
+    if len(high_fq_range) > 1:
+        delta_f = np.diff(high_fq_range).mean()
+        n_fft = next_power2(fs / delta_f)
+    else:
+        n_fft = 1024
     # get PSD difference
     spec, _, _, _ = model._amplitude_frequency(n_fft=n_fft)
 
