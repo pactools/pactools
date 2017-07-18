@@ -56,10 +56,11 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
 
     Examples
     --------
+    >>> from pactools import raw_to_mask
     >>> low_sig, high_sig, mask = raw_to_mask(raw, ixs, events, tmin, tmax)
     >>> n_masks = len(mask)
     >>> for one_mask in mask:
-    >>>     pass
+    ...     pass
     """
     if not isinstance(raw, BaseRaw):
         raise ValueError('Must supply Raw as input')
@@ -85,10 +86,11 @@ class MaskIterator(object):
 
     Examples
     --------
+    >>> from pactools import MaskIterator
     >>> all_masks = MaskIterator(events, tmin, tmax, n_points, fs)
     >>> n_masks = len(all_masks)
     >>> for one_mask in all_masks:
-    >>>     pass
+    ...     pass
     """
 
     def __init__(self, events, tmin, tmax, n_points, fs):

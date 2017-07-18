@@ -11,7 +11,7 @@ class StableDAR(BaseLattice):
 
     This model uses the parametrization:
 
-    .. math:: y(t) + \\sum_{i=1}^p a_i(t) y(t-i)= \\varepsilon(t)
+    .. math:: y(t) + \\sum_{i=1}^p a_i(t) y(t-i)= \\sigma(t)\\varepsilon(t)
 
     with:
 
@@ -20,12 +20,45 @@ class StableDAR(BaseLattice):
     .. math:: \\gamma_i = \\log\\left(\\frac{1+k_i}{1-k_i}\\right); \;\;\;\;
               \\gamma_{i}(t)=\\sum_{j=0}^{m}\\gamma_{ij}x(t)^j
 
+    and:
+
+    .. math:: \\log{\\sigma(t)} = \\sum_{k=0}^m b_{k} x(t)^k
+
     References
     ----------
     [1] Dupre la Tour, T. , Grenier, Y., & Gramfort, A. (2017). Parametric
     estimation of spectrum driven by an exogenous signal. Acoustics, Speech
     and Signal Processing (ICASSP), 2017 IEEE International Conference on,
     4301--4305.
+
+    Parameters
+    ----------
+    ordar : int > 0
+        Order of the autoregressive model (p)
+
+    ordriv : int >= 0
+        Order of the taylor expansion for sigdriv (m)
+
+    criterion : None or string in ('bic', 'aic', 'logl')
+        If not None, select the criterion used for model selection.
+
+    normalize : boolean
+        If True, the basis vectors are normalized to unit energy.
+
+    ortho : boolean
+        If True, the basis vectors are orthogonalized.
+
+    center : boolean
+        If True, we subtract the mean in sigin
+
+    iter_gain : int >=0
+        Maximum number of iteration in gain estimation
+
+    eps_gain : float >= 0
+        Threshold to stop iterations in gain estimation
+
+    use_driver_phase : boolean
+        If True, we divide the driver by its instantaneous amplitude.
     """
     # ------------------------------------------------ #
     # Functions that overload abstract methods         #

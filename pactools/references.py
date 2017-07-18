@@ -89,10 +89,10 @@ jiang = Reference(
 
 duprelatour = Reference(
     short='[Dupre la Tour & al 2017]',
-    full='Dupre la Tour, T. , Grenier, Y., & Gramfort, A. (2017). Parametric '
-    'estimation of spectrum driven by an exogenous signal. Acoustics, Speech '
-    'and Signal Processing (ICASSP), 2017 IEEE International Conference on,'
-    '4301--4305.')
+    full='Dupre la Tour, T. , Tallot, L., Grabot, L., Doyere, V., '
+    'van Wassenhove, V., Grenier, Y., & Gramfort, A. (2017). '
+    'Non-linear Auto-Regressive Models for Cross-Frequency Coupling in Neural '
+    'Time Series. bioRxiv, 159731.')
 
 REFERENCES = {
     'bispectrum': bispectrum,

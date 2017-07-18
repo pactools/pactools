@@ -24,37 +24,6 @@ class BaseDAR(object):
     def __init__(self, ordar=1, ordriv=0, criterion=None, normalize=True,
                  ortho=True, center=True, iter_gain=10, eps_gain=1.0e-4,
                  progress_bar=False, use_driver_phase=False):
-        """
-        Parameters
-        ----------
-        ordar : int > 0
-            Order of the autoregressive model (p)
-
-        ordriv : int >= 0
-            Order of the taylor expansion for sigdriv (m)
-
-        criterion : None or string in ('bic', 'aic', 'logl')
-            If not None, select the criterion used for model selection.
-
-        normalize : boolean
-            If True, the basis vectors are normalized to unit energy.
-
-        ortho : boolean
-            If True, the basis vectors are orthogonalized.
-
-        center : boolean
-            If True, we subtract the mean in sigin
-
-        iter_gain : int >=0
-            Maximum number of iteration in gain estimation
-
-        eps_gain : float >= 0
-            Threshold to stop iterations in gain estimation
-
-        use_driver_phase : boolean
-            If True, we divide the driver by its instantaneous amplitude.
-
-        """
         # -------- save parameters
         self.ordar = ordar
         self.criterion = criterion

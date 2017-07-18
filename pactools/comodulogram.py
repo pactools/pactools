@@ -109,11 +109,11 @@ class Comodulogram(object):
     Examples
     --------
     >>> from pactools.comodulogram import Comodulogram
-    >>> c = Comodulogram(fs=200., low_fq_range=np.arange(1, 5, 0.2),
-                         low_fq_width=2.)
-    >>> c.fit(input)
+    >>> c = Comodulogram(fs=200., low_fq_range=np.arange(2, 4, 0.2),
+    ...                  low_fq_width=2.)
+    >>> c.fit(signal_in)
     >>> c.plot()
-    >>> comod = c.comod_
+    >>> comod_array = c.comod_
     """
 
     def __init__(self, fs, low_fq_range, low_fq_width=2., high_fq_range='auto',

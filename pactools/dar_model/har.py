@@ -4,6 +4,47 @@ from .base_dar import BaseDAR
 
 
 class HAR(BaseDAR):
+    """
+    A heteroskedastic (driven) auto-regressive (HAR) model.
+
+    This model uses the parametrization:
+
+    .. math:: y(t) + \\sum_{i=1}^p a_i y(t-i)= \\sigma(t)\\varepsilon(t)
+
+    with:
+
+    .. math:: \\log{\\sigma(t)} = \\sum_{k=0}^m b_{k} x(t)^k
+
+    Parameters
+    ----------
+    ordar : int > 0
+        Order of the autoregressive model (p)
+
+    ordriv : int >= 0
+        Order of the taylor expansion for sigdriv (m)
+
+    criterion : None or string in ('bic', 'aic', 'logl')
+        If not None, select the criterion used for model selection.
+
+    normalize : boolean
+        If True, the basis vectors are normalized to unit energy.
+
+    ortho : boolean
+        If True, the basis vectors are orthogonalized.
+
+    center : boolean
+        If True, we subtract the mean in sigin
+
+    iter_gain : int >=0
+        Maximum number of iteration in gain estimation
+
+    eps_gain : float >= 0
+        Threshold to stop iterations in gain estimation
+
+    use_driver_phase : boolean
+        If True, we divide the driver by its instantaneous amplitude.
+    """
+
     def last_model(self):
         return self._next_model(only_last=True)
 

@@ -18,7 +18,7 @@ class FIR(object):
     >>> from pactools.utils.fir import FIR
     >>> f = FIR(fir=[0.2, 0.6, 0.2])
     >>> f.plot()
-    >>> output = f.transform(input)
+    >>> signal_out = f.transform(signal_in)
     """
 
     def __init__(self, fir=np.ones(1)):
@@ -116,7 +116,7 @@ class BandPassFilter(FIR):
     >>> from pactools.utils import BandPassFilter
     >>> f = BandPassFilter(fs=100., fc=5., bandwidth=1., n_cycles=None)
     >>> f.plot()
-    >>> output = f.transform(input)
+    >>> signal_out = f.transform(signal_in)
     """
 
     def __init__(self, fs, fc, n_cycles=7.0, bandwidth=None, zero_mean=True,
@@ -232,7 +232,7 @@ class LowPassFilter(FIR):
     >>> from pactools.utils import LowPassFilter
     >>> f = LowPassFilter(fs=100., fc=5., bandwidth=1.)
     >>> f.plot()
-    >>> output = f.transform(input)
+    >>> signal_out = f.transform(signal_in)
     """
 
     def __init__(self, fs, fc, bandwidth, ripple_db=60.0):
