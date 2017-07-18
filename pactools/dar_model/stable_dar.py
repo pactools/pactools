@@ -1,6 +1,6 @@
 import numpy as np
 
-from .baseLattice import BaseLattice
+from .base_lattice import BaseLattice
 
 
 class StableDAR(BaseLattice):
@@ -88,7 +88,7 @@ class StableDAR(BaseLattice):
         lar = np.log((1.0 + ki) / (1.0 - ki))
         return lar
 
-    def common_gradient(self, p, ki):
+    def _common_gradient(self, p, ki):
         """Compute common factor in gradient. The gradient is computed as
         G[p] = sum from t=1 to T {g[p,t] * F(t)}
         where F(t) is the vector of driving signal and its powers
@@ -112,7 +112,7 @@ class StableDAR(BaseLattice):
         g *= 0.5 * (1.0 - ki[:, 1:n_points] ** 2)   # phi'[k[p,t]])
         return np.reshape(g, (n_epochs, n_points - 1))
 
-    def common_hessian(self, p, ki):
+    def _common_hessian(self, p, ki):
         """Compute common factor in Hessian. The Hessian is computed as
         H[p] = sum from t=1 to T {F(t) * h[p,t] * F(t).T}
         where F(t) is the vector of driving signal and its powers

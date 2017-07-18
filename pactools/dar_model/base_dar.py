@@ -102,7 +102,7 @@ class BaseDAR(object):
 
     def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, train_weights=None,
             test_weights=None):
-        """Estimate a DAR model from input signals.
+        """Estimate the model from input signals
 
         Parameters
         ----------
@@ -129,10 +129,16 @@ class BaseDAR(object):
         -------
         self
         """
-        self.reset_criterions()
+        self._reset_criterions()
         self._check_all_arrays(sigin, sigdriv, sigdriv_imag, train_weights,
                                test_weights)
         self.fs = fs
+
+        # -------- check parameters
+        if self.ordar < 1:
+            raise ValueError('self.ordar is zero or negative')
+        if self.ordriv < 0:
+            raise ValueError('self.ordriv is negative')
 
         # -------- prepare the estimates
         self.AR_ = np.ndarray(0)
@@ -142,8 +148,8 @@ class BaseDAR(object):
         if self.criterion:
             # -------- select the best order
             self._order_selection()
-            self.estimate_error(recompute=True)
-            self.estimate_gain()
+            self._estimate_error(recompute=True)
+            self._estimate_gain()
 
         else:
             self._fit()
@@ -154,9 +160,9 @@ class BaseDAR(object):
         # -------- estimate a single model
         self.ordriv_ = self.ordriv
         self._make_basis()
-        self.estimate_ar()
-        self.estimate_error(recompute=self.test_weights is not None)
-        self.estimate_gain()
+        self._estimate_ar()
+        self._estimate_error(recompute=self.test_weights is not None)
+        self._estimate_gain()
 
     def _compute_cross_orders(self, ordriv):
         power_list_re, power_list_im = [], []
@@ -274,25 +280,17 @@ class BaseDAR(object):
                 basis = np.dot(self.alpha_, basis)
             return basis.reshape(-1, n_epochs, n_points)
 
-    def estimate_ar(self):
+    def _estimate_ar(self):
         """Estimates the AR model on a signal
 
         uses self.sigin, self.sigdriv and self.basis_ (which must be
-        computed with _make_basis before calling estimate_ar)
+        computed with _make_basis before calling _estimate_ar)
         self.ordar defines the order
         """
-        # -------- verify all parameters for the estimator
-        if self.ordar < 1:
-            raise ValueError('self.ordar is zero or negative')
-        if self.ordriv < 0:
-            raise ValueError('self.ordriv is negative')
-        if self.basis_ is None:
-            raise ValueError('basis does not yet exist')
-
         # -------- compute the final estimate
         if self.progress_bar:
             bar = ProgressBar(title=self.get_title(name=True))
-        for AR_ in self.last_model():
+        for AR_ in self._last_model():
             self.AR_ = AR_
             if self.progress_bar:
                 bar.update(
@@ -354,9 +352,11 @@ class BaseDAR(object):
         return sig_list
 
     def degrees_of_freedom(self):
+        """Number of parameters of the fitted model"""
         return ((self.ordar_ + 1) * self.n_basis)
 
-    def get_title(self, name=False, criterion=None):
+    def get_title(self, name=True, criterion=None):
+        """Get the name and orders of the model"""
         title = ''
         if name:
             title += self.__class__.__name__
@@ -378,6 +378,12 @@ class BaseDAR(object):
         return title
 
     def get_criterion(self, criterion, train=False):
+        """Get the criterion (logL, AIC, BIC) of the fitted model
+
+        If a self.criterion is not None, the fit performs a grid-search over
+        the parameter ordar and ordriv. In such case, this method returns the
+        array of value of the criterion over each parameter.
+        """
         criterion = criterion.lower()
         try:
             value = self._compute_criterion(train=train)[criterion]
@@ -392,7 +398,8 @@ class BaseDAR(object):
             return criterions
 
         # else compute the criterions base on the log likelihood
-        logl, tmax = self.log_likelihood(train=train, skip=self.ordar_)
+        logl, tmax = self._estimate_log_likelihood(train=train,
+                                                   skip=self.ordar_)
         degrees = self.degrees_of_freedom()
 
         # Akaike Information Criterion
@@ -428,7 +435,7 @@ class BaseDAR(object):
         """Bayesian information criterion (BIC) of the model"""
         return self._compute_criterion()['bic']
 
-    def reset_criterions(self):
+    def _reset_criterions(self):
         """Reset stored criterions (negative log_likelihood, AIC or BIC)"""
         self.model_selection_criterions_ = None
         self.criterions_ = None
@@ -473,16 +480,16 @@ class BaseDAR(object):
             model.basis_ = self.basis_[:n_basis]
 
             # -------- estimate the best AR order for this value of ordriv
-            for AR_ in model.next_model():
+            for AR_ in model._next_model():
                 model.AR_ = AR_
                 if self.progress_bar:
                     title = model.get_title(name=True)
                     bar_k += 1
                     bar.update(bar_k, title=title)
 
-                model.estimate_error(recompute=self.test_weights is not None)
-                model.estimate_gain()
-                model.reset_criterions()
+                model._estimate_error(recompute=self.test_weights is not None)
+                model._estimate_gain()
+                model._reset_criterions()
                 this_criterion = model._compute_criterion()
                 logl[model.ordar_, model.ordriv_] = this_criterion['logl']
                 aic[model.ordar_, model.ordriv_] = this_criterion['aic']
@@ -515,7 +522,7 @@ class BaseDAR(object):
         check_is_fitted(self, 'AR_')
         return self.AR_.shape[0]
 
-    def estimate_fixed_gain(self):
+    def _estimate_fixed_gain(self):
         """Estimates a fixed gain from the predicton error self.residual_.
         """
         # -------- get the training data
@@ -538,16 +545,16 @@ class BaseDAR(object):
         self.G_ = np.zeros((1, self.n_basis))
         self.G_[0, 0] = np.log(sigma)
 
-    def estimate_gain(self, regul=0.01):
+    def _estimate_gain(self, regul=0.01):
         """helper to handle failure in gain estimation"""
         try:
-            self._estimate_gain(regul=regul)
+            self._estimate_driven_gain(regul=regul)
         except Exception as e:
             msg = 'Gain estimation failed, fixed gain used. Error: %s' % e
             warnings.warn(msg)
-            self.estimate_fixed_gain()
+            self._estimate_fixed_gain()
 
-    def _estimate_gain(self, regul=0.01):
+    def _estimate_driven_gain(self, regul=0.01):
         """Estimate the gain expressed over the basis by maximizing
         the likelihood, through a Newton-Raphson procedure
 
@@ -671,13 +678,12 @@ class BaseDAR(object):
 
         if sigma2.max() > 1e5:
             raise RuntimeError(
-                'estimate_gain: sigma2.max() = %f' % sigma2.max())
+                '_estimate_gain: sigma2.max() = %f' % sigma2.max())
         return sigma2
 
     def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
                       train_weights=None, test_weights=None):
-        """Same as fit, but return the residual instead of the model object
-        """
+        """Same as fit, but returns the residual instead of the model object"""
         self.fit(sigin=sigin, sigdriv=sigdriv, fs=fs,
                  sigdriv_imag=sigdriv_imag, train_weights=train_weights,
                  test_weights=test_weights)
@@ -685,20 +691,19 @@ class BaseDAR(object):
 
     def transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
                   test_weights=None):
-        """Whiten a signal with the already fitted model
-        """
+        """Whiten a signal with the already fitted model"""
         check_is_fitted(self, 'AR_')
         assert fs == self.fs
-        self.reset_criterions()
+        self._reset_criterions()
         self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None,
                                test_weights)
         self.basis_ = self._make_basis(
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
-        self.estimate_error(recompute=True)
+        self._estimate_error(recompute=True)
         return self.residual_
 
-    def develop_gain(self, basis, sigdriv=None, squared=False, log=False):
+    def _develop_gain(self, basis, sigdriv=None, squared=False, log=False):
         # n_basis, n_epochs, n_points = basis.shape
         # 1, n_basis = self.G_.shape
         # n_epochs, n_points = gain.shape
@@ -709,9 +714,10 @@ class BaseDAR(object):
             G_cols = np.exp(G_cols)
         return G_cols
 
-    def log_likelihood(self, train=False, skip=0):
+    def _estimate_log_likelihood(self, train=False, skip=0):
         """Approximate computation of the logarithm of the likelihood
-        the computation uses self.residual_, self.basis_ and self.G_
+
+        The computation uses self.residual_, self.basis_ and self.G_
 
         skip : how many initial samples to skip
         """
@@ -730,7 +736,7 @@ class BaseDAR(object):
             weights = weights[:, skip:]
 
         # -------- estimate the gain
-        gain2 = self.develop_gain(basis, squared=True)
+        gain2 = self._develop_gain(basis, squared=True)
         gain2 += EPSILON
 
         # -------- compute the log likelihood from the residual
@@ -742,23 +748,29 @@ class BaseDAR(object):
 
     def likelihood_ratio(self, ar0):
         """Computation of the likelihood ratio test
-        the null hypothesis H0 is given by model ar0; the current
+
+        The null hypothesis H0 is given by model ar0; the current
         model (self) is tested against this model ar0 which may be
         either an invariant AR model (ordriv=0) or a hybrid one
         (invariant AR part, with driven gain).
 
-        ar0 : model representing the null hypothesis
+        Parameters
+        ----------
+        ar0 : DAR model instance (fitted)
+            Model representing the null hypothesis
 
-        returns:
-        p_value : the p-value for the test (1-  F(chi2(ratio)))
+        Returns:
+        --------
+        p_value : float
+            The p-value for the test (1-  F(chi2(ratio)))
         """
         # -------- verify that the models have been fitted
         ordar_1 = self.ordar_
         ordar_0 = ar0.ordar_
 
         # -------- compute the log likelihood for the models
-        logL1, _ = self.log_likelihood(skip=ordar_1)
-        logL0, _ = ar0.log_likelihood(skip=ordar_0)
+        logL1, _ = self._estimate_log_likelihood(skip=ordar_1)
+        logL0, _ = ar0._estimate_log_likelihood(skip=ordar_0)
 
         # -------- compute the log likelihood ratio
         test = 2.0 * (logL1 - logL0)
@@ -776,20 +788,20 @@ class BaseDAR(object):
     # Functions that should be overloaded              #
     # ------------------------------------------------ #
     @abstractmethod
-    def next_model(self):
+    def _next_model(self):
         """Compute the AR model at successive orders
 
         Acts as a generator that stores the result in self.AR_
         Creates the models with orders from 0 to self.ordar
 
         Typical usage:
-        for AR_ in A.next_model():
+        for AR_ in A._next_model():
             A.AR_ = AR_
         """
         pass
 
     @abstractmethod
-    def estimate_error(self, recompute=False):
+    def _estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_
@@ -797,7 +809,7 @@ class BaseDAR(object):
         pass
 
     @abstractmethod
-    def develop(self, basis):
+    def _develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:
@@ -809,11 +821,11 @@ class BaseDAR(object):
         """
         pass
 
-    def last_model(self):
+    def _last_model(self):
         """overload if it's faster to get only last model"""
-        return self.next_model()
+        return self._next_model()
 
-    def develop_all(self, sigdriv=None, sigdriv_imag=None):
+    def _develop_all(self, sigdriv=None, sigdriv_imag=None):
         """
         Compute the AR models and gains for every instant of sigdriv
         """
@@ -828,7 +840,7 @@ class BaseDAR(object):
                                      sigdriv_imag=sigdriv_imag,
                                      ordriv=self.ordriv_)
 
-        AR_cols, G_cols = self.develop(basis=basis)
+        AR_cols, G_cols = self._develop(basis=basis)
 
         return AR_cols, G_cols, np.arange(sigdriv.size), sigdriv
 
@@ -846,7 +858,7 @@ class BaseDAR(object):
         check_is_fitted(self, 'AR_')
         ordar_ = self.ordar_
 
-        AR_cols, G_cols, _, sigdriv = self.develop_all(sigdriv, sigdriv_imag)
+        AR_cols, G_cols, _, sigdriv = self._develop_all(sigdriv, sigdriv_imag)
         # keep the only epoch
         AR_cols = AR_cols[:, 0, :]
         G_cols = G_cols[:1, :]
@@ -943,8 +955,7 @@ class BaseDAR(object):
 
     def plot(self, title=None, frange=None, mode='c', vmin=None, vmax=None,
              ax=None, xlim=None, cmap=None, colorbar=True):
-        """
-        Represent the power spectral density as a function of the driver
+        """Plot the PSD as a function of the driver
 
         self  : the AR model to plot
         title : title of the plot
@@ -1010,9 +1021,7 @@ class BaseDAR(object):
 
     def plot_lines(self, title='', frange=None, mode='', ax=None, xlim=None,
                    vmin=None, vmax=None):
-        """
-        Represent the power spectral density as a function of
-        the amplitude of the driving signal
+        """Plot the PSD as a function of the driver
 
         self    : the AR model to plot
         title   : title of the plot
@@ -1052,9 +1061,9 @@ class BaseDAR(object):
 
             # build label
             if sigdriv_imag is not None:
-                sig_complex = sigdriv[...,
-                                      i_amplitude] + 1j * sigdriv_imag[...,
-                                                                       i_amplitude]
+                sig_complex = (sigdriv[..., i_amplitude] +
+                               1j * sigdriv_imag[..., i_amplitude])
+
                 label = r'$\phi_x=%s$' % phase_string(sig_complex)
             else:
                 label = r'$x=%.2f$' % sigdriv_imag[i_amplitude]
@@ -1094,7 +1103,7 @@ class BaseDAR(object):
         return fig
 
     # ------------------------------------------------ #
-    def to_dict(self):
+    def _to_dict(self):
         """Convert the model attributes to dict"""
 
         data = self.__dict__
@@ -1115,7 +1124,7 @@ class BaseDAR(object):
             None
 
         # -------- copy other attributes
-        data = self.to_dict()
+        data = self._to_dict()
         for k in data.keys():
             if k not in ('AR_', 'G_') and k[0] != '_':
                 setattr(A, k, data[k])
@@ -1129,11 +1138,25 @@ class BaseDAR(object):
 
 
 def wgn_log_likelihood(eps, sigma2, weights=None):
-    """Returns the likelihood of a gaussian uncorrelated signal
-    given a model of its variance
+    """Returns the log-likelihood of a white Gaussian noise (WGN)
 
-    eps    : gaussian signal (residual or innovation)
-    sigma2 : variance of this signal
+    (given a model of its variance)
+
+    Parameters
+    ----------
+    eps : array, shape (n_epochs, n_points)
+        Residual of the fit (a.k.a. innovation)
+
+    sigma2 : array, shape (n_epochs, n_points)
+        Estimated variance of eps
+
+    weights : array, shape (n_epochs, n_points), or None (default None)
+        Weights to apply to the log-likelihood for each time points
+
+    Returns
+    -------
+    logL : float
+        Log-likelihood of the residual as a white Gaussian noise (WGN)
     """
     if weights is not None:
         weights_sum = weights.sum()

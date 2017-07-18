@@ -113,7 +113,7 @@ def test_make_basis_new_sigdriv():
                     ortho=ortho, normalize=normalize, sigdriv=this_sigdriv,
                     sigdriv_imag=this_sigdriv_imag, **model_params)
                 newbasis = dar._make_basis(sigdriv=this_sigdriv,
-                                          sigdriv_imag=this_sigdriv_imag)
+                                           sigdriv_imag=this_sigdriv_imag)
                 assert_array_almost_equal(newbasis, dar.basis_)
 
                 # Different result if we change a parameter
@@ -179,11 +179,11 @@ def test_weighting_with_ones():
         assert_array_almost_equal(model_2.G_, model_0.G_, decimal=5)
         for train in [False, True]:
             assert_array_almost_equal(
-                model_0.log_likelihood(train=train)[0] * factor,
-                model_1.log_likelihood(train=train)[0], decimal=4)
+                model_0._estimate_log_likelihood(train=train)[0] * factor,
+                model_1._estimate_log_likelihood(train=train)[0], decimal=4)
             assert_array_almost_equal(
-                model_1.log_likelihood(train=train)[0],
-                model_2.log_likelihood(train=train)[0], decimal=4)
+                model_1._estimate_log_likelihood(train=train)[0],
+                model_2._estimate_log_likelihood(train=train)[0], decimal=4)
 
 
 def test_weighting_with_zeros():
@@ -204,5 +204,5 @@ def test_weighting_with_zeros():
         assert_array_almost_equal(model_1.G_, model_0.G_)
         for train in [False, True]:
             assert_array_almost_equal(
-                model_0.log_likelihood(train=train),
-                model_1.log_likelihood(train=train), decimal=5)
+                model_0._estimate_log_likelihood(train=train),
+                model_1._estimate_log_likelihood(train=train), decimal=5)

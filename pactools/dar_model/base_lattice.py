@@ -101,10 +101,10 @@ class BaseLattice(BaseDAR):
         e_backward = np.zeros(n_epochs, ordar + 1)
 
         # -------- prepare parcor coefficients
-        parcor_list = self.develop_parcor(self.AR_, basis)
+        parcor_list = self._develop_parcor(self.AR_, basis)
         parcor_list = self.decode(parcor_list)
 
-        gain = self.develop_gain(basis, squared=False, log=False)
+        gain = self._develop_gain(basis, squared=False, log=False)
 
         # -------- create the output signal
         sigout = np.zeros(n_epochs, n_points_minus_ordar_)
@@ -167,13 +167,13 @@ class BaseLattice(BaseDAR):
         residual = np.copy(sigin)
         backward = np.copy(sigin)
         for k in range(ordar):
-            parcor_list = self.develop_parcor(self.AR_[k], basis)
+            parcor_list = self._develop_parcor(self.AR_[k], basis)
             parcor_list = self.decode(parcor_list)
             residual, backward = self.cell(parcor_list, residual, backward)
 
         return residual, backward
 
-    def develop_parcor(self, LAR, basis):
+    def _develop_parcor(self, LAR, basis):
         single_dim = LAR.ndim == 1
         LAR = np.atleast_2d(LAR)
         # n_basis, n_epochs, n_points = basis.shape
@@ -215,7 +215,7 @@ class BaseLattice(BaseDAR):
         pass
 
     @abstractmethod
-    def common_gradient(self, p, ki):
+    def _common_gradient(self, p, ki):
         """Compute common factor in gradient. The gradient is computed as
         G[p] = sum from t=1 to T {g[p,t] * F(t)}
         where F(t) is the vector of driving signal and its powers
@@ -233,7 +233,7 @@ class BaseLattice(BaseDAR):
         pass
 
     @abstractmethod
-    def common_hessian(self, p, ki):
+    def _common_hessian(self, p, ki):
         """Compute common factor in Hessian. The Hessian is computed as
         H[p] = sum from t=1 to T {F(t) * h[p,t] * F(t).T}
         where F(t) is the vector of driving signal and its powers
@@ -256,14 +256,14 @@ class BaseLattice(BaseDAR):
     # ------------------------------------------------ #
     # Functions that overload abstract methods         #
     # ------------------------------------------------ #
-    def next_model(self):
+    def _next_model(self):
         """Compute the AR model at successive orders
 
         Acts as a generator that stores the result in self.AR_
         Creates the models with orders from 0 to self.ordar
 
         Typical usage:
-        for AR_ in A.next_model():
+        for AR_ in A._next_model():
             A.AR_ = AR_
             A.ordar_ = AR_.shape[0]
 
@@ -329,7 +329,7 @@ class BaseLattice(BaseDAR):
 
             # n_basis, n_epochs, n_points = basis.shape
             # n_epochs, n_points = parcor_list.shape
-            parcor_list = self.develop_parcor(parcor.ravel(), basis)
+            parcor_list = self._develop_parcor(parcor.ravel(), basis)
             parcor_list = np.maximum(parcor_list, -0.999999)
             parcor_list = np.minimum(parcor_list, 0.999999)
 
@@ -351,7 +351,7 @@ class BaseLattice(BaseDAR):
                 itnum += 1
 
                 # -------- compute next residual
-                lar_list = self.develop_parcor(LAR.ravel(), basis)
+                lar_list = self._develop_parcor(LAR.ravel(), basis)
                 parcor_list = self.decode(lar_list)
                 forward_res_next, backward_res_next = self.cell(
                     parcor_list, self.forward_residual[k],
@@ -360,7 +360,7 @@ class BaseLattice(BaseDAR):
                 self.backward_residual[k + 1] = backward_res_next
 
                 # -------- correct the current vector
-                g = self.common_gradient(k + 1, parcor_list)
+                g = self._common_gradient(k + 1, parcor_list)
                 if weights is not None:
                     g *= weights[:, 1:n_points]
                 # n_epochs, n_points - 1 = g.shape = h.shape
@@ -370,7 +370,7 @@ class BaseLattice(BaseDAR):
                     g.reshape(-1, 1))
                 gradient.shape = (n_basis, 1)
 
-                h = self.common_hessian(k + 1, parcor_list)
+                h = self._common_hessian(k + 1, parcor_list)
                 hessian = 2.0 * np.dot(
                     (w_basis[:, :, 1:n_points] * h).reshape(n_basis, -1),
                     w_basis[:, :, 1:n_points].reshape(n_basis, -1).T)
@@ -380,7 +380,7 @@ class BaseLattice(BaseDAR):
                 LAR -= dLAR
 
             # -------- save current cell and residuals
-            lar_list = self.develop_parcor(LAR.ravel(), basis)
+            lar_list = self._develop_parcor(LAR.ravel(), basis)
             parcor_list = self.decode(lar_list)
 
             forward_res, backward_res = self.cell(parcor_list,
@@ -392,7 +392,7 @@ class BaseLattice(BaseDAR):
             AR_ = np.vstack((AR_, np.reshape(LAR, (1, n_basis))))
             yield AR_
 
-    def estimate_error(self, recompute=False):
+    def _estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_
@@ -409,7 +409,7 @@ class BaseLattice(BaseDAR):
         if recompute:
             self.residual_, _ = self.whiten()
 
-    def develop(self, basis):
+    def _develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:
@@ -426,9 +426,9 @@ class BaseLattice(BaseDAR):
         # -------- expand on the basis
         AR_cols = np.ones((1, n_epochs, n_points))
         if ordar > 0:
-            parcor_list = self.develop_parcor(self.AR_, basis)
+            parcor_list = self._develop_parcor(self.AR_, basis)
             parcor_list = self.decode(parcor_list)
             AR_cols = np.vstack((AR_cols, ki2ai(parcor_list)))
-        G_cols = self.develop_gain(basis, squared=False, log=False)
+        G_cols = self._develop_gain(basis, squared=False, log=False)
 
         return AR_cols, G_cols

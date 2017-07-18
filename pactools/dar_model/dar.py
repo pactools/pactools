@@ -55,13 +55,13 @@ class DAR(BaseDAR):
         If True, we divide the driver by its instantaneous amplitude.
     """
 
-    def last_model(self):
-        return self._next_model(only_last=True)
+    def _last_model(self):
+        return self._estimate_model(only_last=True)
 
-    def next_model(self):
-        return self._next_model(only_last=False)
+    def _next_model(self):
+        return self._estimate_model(only_last=False)
 
-    def _next_model(self, only_last=False):
+    def _estimate_model(self, only_last=False):
         """Compute the AR model at successive orders
 
         Acts as a generator that returns AR_
@@ -69,7 +69,7 @@ class DAR(BaseDAR):
 
         Example
         -------
-        for AR_ in A.next_model():
+        for AR_ in A._estimate_model():
             A.AR_ = AR_
             A.ordar_ = AR_.shape[0]
         """
@@ -122,7 +122,7 @@ class DAR(BaseDAR):
                 AR_ = np.reshape(AR_, (k + 1, m))
                 yield AR_
 
-    def estimate_error(self, recompute=False):
+    def _estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and self.AR_
@@ -142,7 +142,7 @@ class DAR(BaseDAR):
         residual += np.einsum('i...,i...', prediction, basis)
         self.residual_ = residual
 
-    def develop(self, basis):
+    def _develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:
@@ -163,7 +163,7 @@ class DAR(BaseDAR):
             AR_cols = np.vstack((AR_cols_ones, AR_cols))
         else:
             AR_cols = AR_cols_ones
-        G_cols = self.develop_gain(basis, squared=False, log=False)
+        G_cols = self._develop_gain(basis, squared=False, log=False)
         return (AR_cols, G_cols)
 
 

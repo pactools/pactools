@@ -45,20 +45,20 @@ class HAR(BaseDAR):
         If True, we divide the driver by its instantaneous amplitude.
     """
 
-    def last_model(self):
-        return self._next_model(only_last=True)
+    def _last_model(self):
+        return self.__next_model(only_last=True)
 
-    def next_model(self):
-        return self._next_model(only_last=False)
+    def _next_model(self):
+        return self.__next_model(only_last=False)
 
-    def _next_model(self, only_last=False):
+    def __next_model(self, only_last=False):
         """Compute the AR model at successive orders
 
         Acts as a generator that stores the result in self.AR_
         Creates the models with orders from 0 to self.ordar
 
         Typical usage:
-        for AR_ in A.next_model():
+        for AR_ in A._next_model():
             A.AR_ = AR_
             A.ordar_ = AR_.shape[0]
 
@@ -104,7 +104,7 @@ class HAR(BaseDAR):
 
             yield AR_
 
-    def estimate_error(self, recompute=False):
+    def _estimate_error(self, recompute=False):
         """Estimates the prediction error
 
         uses self.sigin, self.basis_ and AR_
@@ -120,7 +120,7 @@ class HAR(BaseDAR):
                                             sigin[:, 0:n_points - k - 1])
         self.residual_ = residual
 
-    def develop(self, basis):
+    def _develop(self, basis):
         """Compute the AR models and gains at instants fixed by newcols
 
         returns:
@@ -142,7 +142,7 @@ class HAR(BaseDAR):
         AR_cols = this_AR[:, None, None] * np.ones((1, n_epochs, n_points))
 
         # -------- expand the gain on the basis
-        G_cols = self.develop_gain(basis, squared=False, log=False)
+        G_cols = self._develop_gain(basis, squared=False, log=False)
         return (AR_cols, G_cols)
 
     def degrees_of_freedom(self):
