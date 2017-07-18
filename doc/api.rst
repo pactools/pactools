@@ -11,10 +11,13 @@ Phase amplitude coupling (PAC)
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
+   :template: class.rst
 
    Comodulogram
    DelayEstimator
    PeakLocking
+   :template: function.rst
    raw_to_mask
    simulate_pac
 
@@ -26,9 +29,12 @@ Driven auto-regressive (DAR) models
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
 
+   :template: class.rst
    DAR
    StableDAR
+   :template: function.rst
    extract_driver
 
 
@@ -39,10 +45,13 @@ Utilities
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
 
+   :template: class.rst
    fir.BandPassFilter
    fir.LowPassFilter
    spectrum.Spectrum
    spectrum.Coherence
    spectrum.Bicoherence
+   :template: function.rst
    peak_finder.peak_finder

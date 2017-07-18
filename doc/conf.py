@@ -54,7 +54,7 @@ numpydoc_show_class_members = False
 autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['templates']
+templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
@@ -97,6 +97,9 @@ pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
+
+# keep_warnings = True
+# nitpicky = True
 
 
 # -- Options for HTML output ----------------------------------------------
