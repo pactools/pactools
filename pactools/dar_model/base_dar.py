@@ -102,7 +102,7 @@ class BaseDAR(object):
 
     def fit(self, sigin, sigdriv, fs, sigdriv_imag=None, train_weights=None,
             test_weights=None):
-        """ Estimate a DAR model from input signals.
+        """Estimate a DAR model from input signals.
 
         Parameters
         ----------
@@ -153,7 +153,7 @@ class BaseDAR(object):
     def _fit(self):
         # -------- estimate a single model
         self.ordriv_ = self.ordriv
-        self.make_basis()
+        self._make_basis()
         self.estimate_ar()
         self.estimate_error(recompute=self.test_weights is not None)
         self.estimate_gain()
@@ -170,9 +170,10 @@ class BaseDAR(object):
         self.n_basis = len(power_list_re)
         return power_list_re, power_list_im, self.n_basis
 
-    def make_basis(self, sigdriv=None, sigdriv_imag=None, ordriv=None):
-        """Creates a basis from the driving signal, with the successive
-        powers of sigdriv and sigdriv_imag.
+    def _make_basis(self, sigdriv=None, sigdriv_imag=None, ordriv=None):
+        """Creates a basis from the driving signal
+
+        Creates a basis with the successive powers of sigdriv and sigdriv_imag.
 
         If self.normalize is True, each component of the basis will be
         normalized by its standard deviation.
@@ -252,8 +253,8 @@ class BaseDAR(object):
             if ortho:
                 # correct current component with corrected components
                 for m in range(k):
-                    alpha[k, m] = -(np.sum(basis[k] * basis[m]) /
-                                    np.sum(basis[m] * basis[m]))
+                    alpha[k, m] = -(np.sum(basis[k] * basis[m]) / np.sum(
+                        basis[m] * basis[m]))
                 basis[k] += np.dot(alpha[k, :k], basis[:k, :])
                 # recompute the expression over initial components
                 alpha[k, :k] = np.dot(alpha[k, :k], alpha[:k, :k])
@@ -277,7 +278,7 @@ class BaseDAR(object):
         """Estimates the AR model on a signal
 
         uses self.sigin, self.sigdriv and self.basis_ (which must be
-        computed with make_basis before calling estimate_ar)
+        computed with _make_basis before calling estimate_ar)
         self.ordar defines the order
         """
         # -------- verify all parameters for the estimator
@@ -295,8 +296,8 @@ class BaseDAR(object):
             self.AR_ = AR_
             if self.progress_bar:
                 bar.update(
-                    float(self.ordar_) / self.ordar,
-                    title=self.get_title(name=True))
+                    float(self.ordar_) / self.ordar, title=self.get_title(
+                        name=True))
 
     def _remove_far_masked_data(self, mask, list_signals):
         """Remove unnecessary data which is masked
@@ -438,7 +439,7 @@ class BaseDAR(object):
         self.criterion (negative log_likelihood, AIC or BIC)
         """
         # compute the basis once and for all
-        self.make_basis()
+        self._make_basis()
 
         criterion = self.criterion
         # -------- prepare the estimates
@@ -669,8 +670,8 @@ class BaseDAR(object):
             sigma2 = np.exp(2 * logsigma) + EPSILON
 
         if sigma2.max() > 1e5:
-            raise RuntimeError('estimate_gain: sigma2.max() = %f' %
-                               sigma2.max())
+            raise RuntimeError(
+                'estimate_gain: sigma2.max() = %f' % sigma2.max())
         return sigma2
 
     def fit_transform(self, sigin, sigdriv, fs, sigdriv_imag=None,
@@ -691,7 +692,7 @@ class BaseDAR(object):
         self.reset_criterions()
         self._check_all_arrays(sigin, sigdriv, sigdriv_imag, None,
                                test_weights)
-        self.basis_ = self.make_basis(
+        self.basis_ = self._make_basis(
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
         self.estimate_error(recompute=True)
@@ -821,10 +822,11 @@ class BaseDAR(object):
             try:
                 basis = self.basis_
             except:
-                basis = self.make_basis(ordriv=self.ordriv_)
+                basis = self._make_basis(ordriv=self.ordriv_)
         else:
-            basis = self.make_basis(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
-                                    ordriv=self.ordriv_)
+            basis = self._make_basis(sigdriv=sigdriv,
+                                     sigdriv_imag=sigdriv_imag,
+                                     ordriv=self.ordriv_)
 
         AR_cols, G_cols = self.develop(basis=basis)
 
@@ -1050,8 +1052,9 @@ class BaseDAR(object):
 
             # build label
             if sigdriv_imag is not None:
-                sig_complex = sigdriv[..., i_amplitude] + 1j * sigdriv_imag[
-                    ..., i_amplitude]
+                sig_complex = sigdriv[...,
+                                      i_amplitude] + 1j * sigdriv_imag[...,
+                                                                       i_amplitude]
                 label = r'$\phi_x=%s$' % phase_string(sig_complex)
             else:
                 label = r'$x=%.2f$' % sigdriv_imag[i_amplitude]

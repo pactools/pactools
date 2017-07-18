@@ -33,9 +33,9 @@ class BaseLattice(BaseDAR):
             try:
                 newbasis = self.basis_
             except:
-                newbasis = self.make_basis()
+                newbasis = self._make_basis()
         else:
-            newbasis = self.make_basis(sigdriv=sigdriv)
+            newbasis = self._make_basis(sigdriv=sigdriv)
 
         n_epochs, n_points = sigdriv.shape
 
@@ -51,7 +51,7 @@ class BaseLattice(BaseDAR):
         signal[:ordar_] = sigin_init[0, -ordar_:]
 
         # compute basis corresponding to sigdriv
-        newbasis = self.make_basis(sigdriv=sigdriv)
+        newbasis = self._make_basis(sigdriv=sigdriv)
 
         # synthesis of the signal
         random_sig = np.random.randn(n_epochs, n_points - ordar_)

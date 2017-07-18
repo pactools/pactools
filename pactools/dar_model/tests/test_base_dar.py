@@ -97,12 +97,12 @@ def dar_no_fit(ortho, normalize, sigdriv=_sigdriv, sigdriv_imag=_sigdriv_imag,
     dar.sigin = _sigin[None, :]
     dar.sigdriv = sigdriv[None, :]
     dar.sigdriv_imag = sigdriv_imag[None, :]
-    dar.make_basis()
+    dar._make_basis()
     return dar
 
 
 def test_make_basis_new_sigdriv():
-    # Test that make_basis works the same with a new sigdriv,
+    # Test that _make_basis works the same with a new sigdriv,
     # using stored orthonormalization transform.
     model_params = {'ordar': 5, 'ordriv': 2, 'criterion': False}
     for normalize in (True, False):
@@ -112,7 +112,7 @@ def test_make_basis_new_sigdriv():
                 dar = dar_no_fit(
                     ortho=ortho, normalize=normalize, sigdriv=this_sigdriv,
                     sigdriv_imag=this_sigdriv_imag, **model_params)
-                newbasis = dar.make_basis(sigdriv=this_sigdriv,
+                newbasis = dar._make_basis(sigdriv=this_sigdriv,
                                           sigdriv_imag=this_sigdriv_imag)
                 assert_array_almost_equal(newbasis, dar.basis_)
 
