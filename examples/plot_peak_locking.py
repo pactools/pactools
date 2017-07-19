@@ -12,6 +12,10 @@ import matplotlib.pyplot as plt
 from pactools import PeakLocking
 from pactools import simulate_pac
 
+
+###############################################################################
+# Let's first create an artificial signal with PAC.
+
 fs = 200.  # Hz
 high_fq = 50.0  # Hz
 low_fq = 3.0  # Hz
@@ -24,6 +28,9 @@ t_plot = 2.0  # sec
 signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=low_fq_width, noise_level=noise_level,
                       random_state=0)
+
+###############################################################################
+# Plot the amplitude of each frequency, locked with the peak of the slow wave
 
 estimator = PeakLocking(fs=fs, low_fq=low_fq, low_fq_width=2.0, t_plot=t_plot)
 estimator.fit(signal)

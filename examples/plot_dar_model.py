@@ -14,7 +14,7 @@ from pactools import simulate_pac
 from pactools.dar_model import DAR, extract_driver
 
 ###############################################################################
-# Create the artificial signal with PAC
+# Let's first create an artificial signal with PAC.
 
 fs = 200.  # Hz
 high_fq = 50.0  # Hz

@@ -1,26 +1,27 @@
-"""
+r"""
 Phase shift and temporal delay in PAC
 -------------------------------------
 
 This example disantangles the two distinct notions of phase shift and temporal
-delay in phase-amplitude coupling. The phase shift is the phase of the slow
-oscillation which corresponds to the maximum amplitude of the fast oscillation.
-The temporal delay is the delay between the two coupled components. The two
-notions would be identical should the driver be a perfect stationary sinusoid.
+delay in phase-amplitude coupling. The phase shift ($\phi$) is the phase of the
+slow oscillation which corresponds to the maximum amplitude of the fast
+oscillation. The temporal delay ($\tau$) is the delay between the two coupled
+components. The two notions would be identical should the driver be a perfect
+stationary sinusoid.
 
 (1st line) When both are equal to zero, the high frequency bursts happen in
 the driver's peaks.
 
-(2nd line) When tau = 0 and phi = 0, the bursts are shifted in time with
+(2nd line) When $\tau = 0$ and $\phi != 0$, the bursts are shifted in time with
 respect to the driver's peaks, and this shift varies depending on the
 instantaneous frequency of the driver.
 
-(3rd line) When tau = 0 and phi = 0, the bursts are shifted in time with
+(3rd line) When $\tau != 0$ and $\phi = 0$, the bursts are shifted in time with
 respect to the driver's peaks, and this shift is constant over the signal. In
 this case, note how the driver's phase corresponding to the bursts varies
 depending on the instantaneous frequency of the driver.
 
-(4th line) tau and phi can also be both non-zero.
+(4th line) Both $\tau$ and $\phi$ can also be both non-zero.
 
 The temporal delay is estimated maximizing the likelihood on DAR models.
 The phase shift is extracted from a DAR model fitted with the optimal
@@ -28,7 +29,7 @@ temporal delay.
 
 References
 ==========
-Dupr'e la Tour et al. (2017). Non-linear Auto-Regressive Models for
+Dupre la Tour et al. (2017). Non-linear Auto-Regressive Models for
 Cross-Frequency Coupling in Neural Time Series. bioRxiv, 159731.
 """
 import numpy as np

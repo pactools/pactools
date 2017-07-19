@@ -16,7 +16,8 @@ import matplotlib.pyplot as plt
 
 from pactools import raw_to_mask, Comodulogram
 
-# load the dataset
+###############################################################################
+# Load the dataset
 data_path = mne.datasets.sample.data_path()
 raw_fname = data_path + '/MEG/sample/sample_audvis_filt-0-40_raw.fif'
 event_fname = data_path + ('/MEG/sample/sample_audvis_filt-0-40_raw-'
@@ -24,10 +25,20 @@ event_fname = data_path + ('/MEG/sample/sample_audvis_filt-0-40_raw-'
 raw = mne.io.read_raw_fif(raw_fname, preload=True)
 events = mne.read_events(event_fname)
 
+###############################################################################
+# Here we define how to build the epochs: which channels will be selected, and
+# on which time window around each event.
+
 # select the time interval around the events
 tmin, tmax = -5, 15
 # select the channels (phase_channel, amplitude_channel)
 ixs = (8, 10)
+
+###############################################################################
+# Then, we create the inputs with the function raw_to_mask, which creates the
+# input arrays and the mask arrays. These arrays are then given to a
+# comodulogram instance with the `fit` method, and the `plot` method draws the
+# results.
 
 # create the input array for Comodulogram.fit
 low_sig, high_sig, mask = raw_to_mask(raw, ixs=ixs, events=events, tmin=tmin,
