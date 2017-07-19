@@ -2,10 +2,14 @@ import numpy as np
 
 from .utils.fir import BandPassFilter
 from .utils.validation import check_random_state
+from .utils.deprecation import ignore_warnings
 
 
+@ignore_warnings(category=RuntimeWarning)
 def sigmoid(array, sharpness):
-    return 1. / (1. + np.exp(-sharpness * array))
+    result = 1. / (1. + np.exp(-sharpness * array))
+    assert np.all(np.isfinite(result))
+    return result
 
 
 def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
