@@ -5,7 +5,7 @@ from scipy.signal import hilbert
 import matplotlib.pyplot as plt
 
 from .maths import square, is_power2, prime_factors, compute_n_fft, next_power2
-from .viz import compute_vmin_vmax
+from .viz import compute_vmin_vmax, mpl_palette
 
 
 class Spectrum(object):
@@ -171,7 +171,7 @@ class Spectrum(object):
             replicate = 0
 
         if colors is None:
-            colors = ('bgrcmyk' * 100)[:len(self.psd)]
+            colors = mpl_palette('deep', cycle=True)
 
         if axes is None:
             if fig is None:
