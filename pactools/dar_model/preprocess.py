@@ -182,7 +182,13 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         fill_sig.shape = sig.shape
 
         # adjust the power of the filling signal and add it to high_sig
-        high_sig = fill_gap(high_sig, fs, fa=fc, dfa=bandwidth, draw=draw,
+        if low_pass:
+            fa = fc / 2.
+            dfa = fc / 2.
+        else:
+            fa = fc
+            dfa = bandwidth
+        high_sig = fill_gap(high_sig, fs, fa=fa, dfa=dfa, draw=draw,
                             fill_sig=fill_sig)
 
         if 'z' in draw or 'e' in draw:
@@ -202,9 +208,9 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
 
 def low_pass_and_fill(sig, fs, fc=1.0, draw='', bandwidth=1.,
                       random_state=None):
-    low_sig, high_sig = extract_and_fill(sig, fs, fc, fill=1, low_pass=True,
-                                         bandwidth=bandwidth,
-                                         random_state=random_state)
+    low_sig, high_sig = extract_and_fill(
+        sig, fs, fc, fill=1, low_pass=True, bandwidth=bandwidth,
+        random_state=random_state, extract_complex=False)
 
     rng = check_random_state(random_state)
     random_noise = rng.randn(*sig.shape)
