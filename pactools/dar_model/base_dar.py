@@ -9,7 +9,7 @@ from scipy import stats
 
 from ..utils.progress_bar import ProgressBar
 from ..utils.maths import squared_norm
-from ..utils.deprecation import ignore_warnings
+# from ..utils.deprecation import ignore_warnings
 from ..utils.validation import check_array, check_consistent_shape
 from ..utils.validation import check_is_fitted
 from ..utils.spectrum import Spectrum
@@ -51,7 +51,7 @@ class BaseDAR(object):
         # -------- transform the signals to 2d array of float64
         sigin = check_array(sigin)
         sigdriv = check_array(sigdriv)
-        sigdriv_imag = check_array(sigdriv_imag)
+        sigdriv_imag = check_array(sigdriv_imag, accept_none=True)
         check_consistent_shape(sigin, sigdriv, sigdriv_imag)
         check_consistent_shape(sigdriv, sigdriv_imag)
 
@@ -86,6 +86,9 @@ class BaseDAR(object):
             self.test_mask_ = None
 
         if self.use_driver_phase and self.ordriv > 0:
+            if sigdriv_imag is None:
+                raise ValueError('Impossible to use use_driver_phase=True '
+                                 'without giving sigdriv_imag.')
             amplitude = np.sqrt(sigdriv ** 2 + sigdriv_imag ** 2)
             sigdriv = sigdriv / amplitude
             sigdriv_imag = sigdriv_imag / amplitude
@@ -230,6 +233,7 @@ class BaseDAR(object):
             power_list_re = np.arange(ordriv + 1)
             power_list_im = np.zeros(ordriv + 1)
             n_basis = ordriv + 1
+            self.n_basis = ordriv + 1
         else:
             power_list_re, power_list_im, n_basis = self._compute_cross_orders(
                 ordriv)
@@ -672,9 +676,9 @@ class BaseDAR(object):
 
     def _compute_sigma2(self, basis):
         """Helper to compute the instantaneous variance of the model"""
-        with ignore_warnings():
-            logsigma = np.dot(self.G_, basis)
-            sigma2 = np.exp(2 * logsigma) + EPSILON
+        # with ignore_warnings():
+        logsigma = np.dot(self.G_, basis)
+        sigma2 = np.exp(2 * logsigma) + EPSILON
 
         if sigma2.max() > 1e5:
             raise RuntimeError(
