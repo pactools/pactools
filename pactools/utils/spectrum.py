@@ -5,7 +5,7 @@ from scipy.signal import hilbert
 import matplotlib.pyplot as plt
 
 from .maths import square, is_power2, prime_factors, compute_n_fft, next_power2
-from .viz import compute_vmin_vmax, mpl_palette
+from .viz import compute_vmin_vmax
 
 
 class Spectrum(object):
