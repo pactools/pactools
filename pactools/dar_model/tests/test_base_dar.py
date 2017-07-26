@@ -90,6 +90,14 @@ def test_degrees_of_freedom():
     har = fast_fitted_model(HAR, model_params=model_params)
     assert_equal(har.degrees_of_freedom(), 10 + 6)
 
+    model_params = {'ordar': 5, 'ordriv': 2, 'criterion': False}
+    har = fast_fitted_model(model_params=model_params, sigdriv_imag=None)
+    assert_equal(har.degrees_of_freedom(), 6 * 3)
+
+    model_params = {'ordar': 10, 'ordriv': 2, 'criterion': False}
+    har = fast_fitted_model(HAR, model_params=model_params, sigdriv_imag=None)
+    assert_equal(har.degrees_of_freedom(), 10 + 3)
+
 
 def dar_no_fit(ortho, normalize, sigdriv=_sigdriv, sigdriv_imag=_sigdriv_imag,
                **model_params):
@@ -157,6 +165,11 @@ def test_make_basis_ortho_normalize():
 def test_plot_comodulogram():
     # Smoke test with the standard plotting function
     model = fast_fitted_model()
+    model.plot_lines()
+    model.plot()
+    plt.close('all')
+
+    model = fast_fitted_model(sigdriv_imag=None)
     model.plot_lines()
     model.plot()
     plt.close('all')

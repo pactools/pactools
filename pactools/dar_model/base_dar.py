@@ -905,8 +905,8 @@ class BaseDAR(object):
         """
         check_is_fitted(self, 'AR_')
         xlim, sigdriv, sigdriv_imag = self._driver_range(nbcols, xlim)
-        sigdriv = np.atleast_2d(sigdriv)
-        sigdriv_imag = np.atleast_2d(sigdriv_imag)
+        sigdriv = check_array(sigdriv)
+        sigdriv_imag = check_array(sigdriv_imag, accept_none=True)
 
         # -------- compute spectra
         spec = self._basis2spec(sigdriv=sigdriv, sigdriv_imag=sigdriv_imag,
@@ -928,7 +928,10 @@ class BaseDAR(object):
         # full oscillation for derivative
         phase = np.linspace(-np.pi, np.pi, nbcols, endpoint=False)
         sigdriv = xlim[1] * np.cos(phase)
-        sigdriv_imag = xlim[1] * np.sin(phase)
+        if self.sigdriv_imag is None:
+            sigdriv_imag = None
+        else:
+            sigdriv_imag = xlim[1] * np.sin(phase)
 
         return xlim, sigdriv, sigdriv_imag
 
@@ -990,6 +993,7 @@ class BaseDAR(object):
             ax = fig.gca()
         else:
             fig = ax.figure
+            ax.cla()
 
         if sigdriv_imag is not None:
             extent = (-np.pi, np.pi, frange[0], frange[-1])
@@ -1070,7 +1074,7 @@ class BaseDAR(object):
 
                 label = r'$\phi_x=%s$' % phase_string(sig_complex)
             else:
-                label = r'$x=%.2f$' % sigdriv_imag[i_amplitude]
+                label = r'$x=%.2f$' % sigdriv[0, i_amplitude]
 
             ax.plot(frequencies, spec[:, i_amplitude], label=label)
 
