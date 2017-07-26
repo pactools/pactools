@@ -21,8 +21,9 @@ class FIR(object):
     >>> signal_out = f.transform(signal_in)
     """
 
-    def __init__(self, fir=np.ones(1)):
+    def __init__(self, fir=np.ones(1), fs=1.0):
         self.fir = fir
+        self.fs = fs
 
     def transform(self, sigin):
         """Apply this filter to a signal
@@ -68,7 +69,7 @@ class FIR(object):
             fig = axs[0].figure
 
         # compute periodogram
-        fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 1024)
+        fft_length = max(int(2 ** np.ceil(np.log2(self.fir.shape[0]))), 2048)
         s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
                      step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
@@ -133,16 +134,8 @@ class BandPassFilter(FIR):
     def _design(self):
         """Designs the FIR filter"""
         # the length of the filter
-        if self.bandwidth is None and self.n_cycles is not None:
-            half_order = int(float(self.n_cycles) / self.fc * self.fs / 2)
-            order = 2 * half_order + 1
-        elif self.bandwidth is not None and self.n_cycles is None:
-            half_order = int(1.65 * self.fs / self.bandwidth) // 2
-            order = half_order * 2 + 1
-        else:
-            raise ValueError('fir.BandPassFilter: n_cycles and bandwidth '
-                             'cannot be both None, or both not None. Got '
-                             '%s and %s' % (self.n_cycles, self.bandwidth, ))
+        order = self._get_order()
+        half_order = (order - 1) // 2
 
         w = np.blackman(order)
         t = np.linspace(-half_order, half_order, order)
@@ -168,6 +161,19 @@ class BandPassFilter(FIR):
             self.fir_imag = fir_imag * (1.0 / gain)
         return self
 
+    def _get_order(self):
+        if self.bandwidth is None and self.n_cycles is not None:
+            half_order = int(float(self.n_cycles) / self.fc * self.fs / 2)
+        elif self.bandwidth is not None and self.n_cycles is None:
+            half_order = int(1.65 * self.fs / self.bandwidth) // 2
+        else:
+            raise ValueError('fir.BandPassFilter: n_cycles and bandwidth '
+                             'cannot be both None, or both not None. Got '
+                             '%s and %s' % (self.n_cycles, self.bandwidth, ))
+
+        order = half_order * 2 + 1
+        return order
+
     def transform(self, sigin):
         """Apply this filter to a signal
 
@@ -188,9 +194,8 @@ class BandPassFilter(FIR):
         filtered = super(BandPassFilter, self).transform(sigin)
 
         if self.extract_complex:
-            self.fir, self.fir_imag = self.fir_imag, self.fir  # swap
-            filtered_imag = super(BandPassFilter, self).transform(sigin)
-            self.fir, self.fir_imag = self.fir_imag, self.fir  # swap back
+            fir = FIR(fir=self.fir_imag, fs=self.fs)
+            filtered_imag = fir.transform(sigin)
             return filtered, filtered_imag
         else:
             return filtered
@@ -204,7 +209,9 @@ class BandPassFilter(FIR):
         if self.extract_complex:
             if axs is None:
                 axs = fig.axes
-            axs[1].plot(self.fir_imag)
+
+            fir = FIR(fir=self.fir_imag, fs=self.fs)
+            fir.plot(axs=axs, fscale=fscale)
 
 
 class LowPassFilter(FIR):

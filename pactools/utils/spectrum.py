@@ -35,6 +35,7 @@ class Spectrum(object):
         If True, the amplitude is normalized
 
     """
+
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1., donorm=True):
 
@@ -111,8 +112,8 @@ class Spectrum(object):
             # iterate on blocks
             count = 0
             while block[-1] < sig.size:
-                psd[i] += np.abs(sp.fft(window * sig[block], fft_length,
-                                        0))[:n_freq] ** 2
+                psd[i] += np.abs(
+                    sp.fft(window * sig[block], fft_length, 0))[:n_freq] ** 2
                 count = count + 1
                 block = block + step
             if count == 0:
@@ -132,8 +133,8 @@ class Spectrum(object):
         self.psd.append(psd)
         return psd
 
-    def plot(self, title='', fscale='lin', labels=None, fig=None,
-             axes=None, replicate=None, colors=None):
+    def plot(self, title='', fscale='lin', labels=None, fig=None, axes=None,
+             replicate=None, colors=None):
         """
         plots the power spectral density
         warning: the plot will only appear after plt.show()
@@ -171,7 +172,7 @@ class Spectrum(object):
             replicate = 0
 
         if colors is None:
-            colors = mpl_palette('deep', cycle=True)
+            colors = [None] * len(self.psd)
 
         if axes is None:
             if fig is None:
@@ -200,10 +201,12 @@ class Spectrum(object):
 
         for label_, color, psd in zip(labels, colors, self.psd):
             psd = 10.0 * np.log10(np.maximum(psd, 1.0e-16))
+            color_ = color
             for i in range(replicate + 1):
                 label = label_ if i == 0 else ''
-                axes.plot(freq + i * fmax, psd.T[::(-1) ** i], label=label,
-                          color=color)
+                lines = axes.plot(freq + i * fmax, psd.T[::(-1) ** i],
+                                  label=label, color=color_)
+                color_ = lines[-1].get_color()
 
         axes.grid(True)
         axes.set_title(title)
@@ -248,11 +251,12 @@ class Coherence(Spectrum):
     donorm : boolean
         If True, the amplitude is normalized
     """
+
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
-        super(Coherence, self).__init__(block_length=block_length,
-                                        fft_length=fft_length, step=step,
-                                        wfunc=wfunc, fs=fs)
+        super(Coherence,
+              self).__init__(block_length=block_length, fft_length=fft_length,
+                             step=step, wfunc=wfunc, fs=fs)
 
         self.coherence = None
 
@@ -360,12 +364,13 @@ class Bicoherence(Spectrum):
     donorm : boolean
         If True, the amplitude is normalized
     """
+
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
 
-        super(Bicoherence, self).__init__(block_length=block_length,
-                                          fft_length=fft_length, step=step,
-                                          wfunc=wfunc, fs=fs)
+        super(Bicoherence,
+              self).__init__(block_length=block_length, fft_length=fft_length,
+                             step=step, wfunc=wfunc, fs=fs)
 
     def fit(self, sigs, method='hagihira'):
         """
