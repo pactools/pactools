@@ -549,7 +549,7 @@ class BaseDAR(object):
         self.G_ = np.zeros((1, self.n_basis))
         self.G_[0, 0] = np.log(sigma)
 
-    def _estimate_gain(self, regul=0.01):
+    def _estimate_gain(self, regul=0.):
         """helper to handle failure in gain estimation"""
         try:
             self._estimate_driven_gain(regul=regul)
@@ -558,7 +558,7 @@ class BaseDAR(object):
             warnings.warn(msg)
             self._estimate_fixed_gain()
 
-    def _estimate_driven_gain(self, regul=0.01):
+    def _estimate_driven_gain(self, regul=0.):
         """Estimate the gain expressed over the basis by maximizing
         the likelihood, through a Newton-Raphson procedure
 
