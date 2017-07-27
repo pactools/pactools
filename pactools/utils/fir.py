@@ -73,12 +73,12 @@ class FIR(object):
         s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
                      step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
-        s.plot('Transfer function of FIR filter "Carrier"', fscale=fscale,
+        s.plot('Transfer function of FIR filter', fscale=fscale,
                axes=axs[0])
 
         # plots
         axs[1].plot(self.fir)
-        axs[1].set_title('Impulse response of FIR filter "Carrier"')
+        axs[1].set_title('Impulse response of FIR filter')
         axs[1].set_xlabel('Samples')
         axs[1].set_ylabel('Amplitude')
         if not fig_passed:
