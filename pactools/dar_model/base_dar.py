@@ -993,6 +993,10 @@ class BaseDAR(object):
             ax = fig.gca()
         else:
             fig = ax.figure
+
+            # clean colorbar and image
+            if ax.images != []:
+                ax.images[-1].colorbar.remove()
             ax.cla()
 
         if sigdriv_imag is not None:
