@@ -1006,7 +1006,7 @@ class BaseDAR(object):
             extent = (xlim[0], xlim[1], frange[0], frange[-1])
 
         # -------- plot spectrum
-        vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, tick=1, percentile=0)
+        vmin, vmax = compute_vmin_vmax(spec, vmin, vmax, tick=.1, percentile=0)
         if 'c' in mode:
             vmax = max(vmax, -vmin)
             vmin = -vmax
