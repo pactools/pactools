@@ -927,37 +927,38 @@ class BaseDAR(object):
 
         # full oscillation for derivative
         phase = np.linspace(-np.pi, np.pi, nbcols, endpoint=False)
-        sigdriv = xlim[1] * np.cos(phase)
         if self.sigdriv_imag is None:
+            sigdriv = xlim[1] * np.cos(phase)
             sigdriv_imag = None
         else:
+            sigdriv = xlim[0] * np.cos(phase)
             sigdriv_imag = xlim[1] * np.sin(phase)
 
         return xlim, sigdriv, sigdriv_imag
 
     def _get_sigdriv_bounds(self, sigdriv=None, sigdriv_imag=None):
         if self.use_driver_phase:
-            bounds = [-1, 1]
+            return [-1, 1]
 
+        if sigdriv is None:
+            sigdriv = self.sigdriv
+        if sigdriv_imag is None:
+            sigdriv_imag = self.sigdriv_imag
+
+        if self.train_weights is not None:
+            sigdriv = sigdriv[self.train_weights != 0]
+            if sigdriv_imag is not None:
+                sigdriv_imag = sigdriv_imag[self.train_weights != 0]
+
+        if sigdriv_imag is None:
+            bounds = np.percentile(sigdriv, [5, 95])
+            bound_min = min(-bounds[0], bounds[1])
+            bounds = (-bound_min, bound_min)
         else:
-            if sigdriv is None:
-                sigdriv = self.sigdriv
-            if sigdriv_imag is None:
-                sigdriv_imag = self.sigdriv_imag
+            bounds_real = np.sqrt(np.median(sigdriv ** 2))
+            bounds_imag = np.sqrt(np.median(sigdriv_imag ** 2))
+            bounds = (bounds_real, bounds_imag)
 
-            if self.train_weights is not None:
-                sigdriv = sigdriv[self.train_weights != 0]
-                if sigdriv_imag is not None:
-                    sigdriv_imag = sigdriv_imag[self.train_weights != 0]
-
-            if sigdriv_imag is None:
-                bounds = np.percentile(sigdriv, [5, 95])
-                bound_min = min(-bounds[0], bounds[1])
-            else:
-                squared_abs = sigdriv ** 2 + sigdriv_imag ** 2
-                bound_min = np.sqrt(np.median(squared_abs))
-
-        bounds = (-bound_min, bound_min)
         return bounds
 
     def plot(self, title=None, frange=None, mode='c', vmin=None, vmax=None,
