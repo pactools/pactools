@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.signal import hilbert
 
-from .utils.spectrum import compute_n_fft
+from .utils.maths import compute_n_fft
 from .utils.carrier import Carrier
 from .utils.fir import BandPassFilter
 
