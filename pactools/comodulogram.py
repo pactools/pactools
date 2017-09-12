@@ -884,7 +884,7 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
 
     # KL divergence for each phase, as in [Tort & al 2010]
     n_freq, n_phases = spec.shape
-    spec = 10 ** (spec / 20)
+    spec = 10. ** (spec / 20.)
     spec = spec / np.sum(spec, axis=1)[:, None]
     spec_diff = np.sum(spec * np.log(spec * n_phases), axis=1)
     spec_diff /= np.log(n_phases)
@@ -900,7 +900,7 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
 
 
 def _get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
-    """ Compute the shifts for the surrogate analysis"""
+    """Compute the shifts for the surrogate analysis"""
     n_minimum_shift = max(1, int(fs * minimum_shift))
     # shift at least minimum_shift seconds, i.e. n_minimum_shift points
     if n_iterations > 1:
@@ -923,7 +923,7 @@ def _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
                         random_state, n_surrogates):
     """Call the comod function for several random time shifts,
     then compute the z-score of the result distribution."""
-    # number of  surrogates MIs
+    # number of surrogates MIs
     n_iterations = max(1, 1 + n_surrogates)
 
     # pre compute all the random time shifts
