@@ -5,6 +5,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d, interp2d
 
+try:
+    from sklearn.externals.joblib import Parallel, delayed
+    sklearn_installed = True
+except ImportError:
+    sklearn_installed = False
+
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
 from .dar_model.preprocess import multiple_extract_driver
@@ -20,7 +26,7 @@ from .mne_api import MaskIterator
 N_BINS_TORT = 18
 
 STANDARD_PAC_METRICS = ['ozkurt', 'canolty', 'tort', 'penny', 'vanwijk']
-DAR_BASED_PAC_METRICS = ['duprelatour', ]
+DAR_BASED_PAC_METRICS = ['duprelatour']
 COHERENCE_PAC_METRICS = ['jiang', 'colgin']
 BICOHERENCE_PAC_METRICS = ['sigl', 'nagashima', 'hagihira', 'bispectrum']
 
@@ -106,6 +112,10 @@ class Comodulogram(object):
         Bandwidth of the band-pass filters centered on low_fq_range, for
         the amplitude signal. Used only with 'vanwijk' method.
 
+    n_jobs : int
+        Number of jobs to use in parallel computations.
+        Recquires scikit-learn installed.
+
     Examples
     --------
     >>> from pactools.comodulogram import Comodulogram
@@ -120,7 +130,7 @@ class Comodulogram(object):
                  high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, ax_special=None,
                  minimum_shift=1.0, random_state=None, coherence_params=dict(),
-                 extract_params=dict(), low_fq_width_2=4.0):
+                 extract_params=dict(), low_fq_width_2=4.0, n_jobs=1):
         self.fs = fs
         self.low_fq_range = low_fq_range
         self.low_fq_width = low_fq_width
@@ -137,6 +147,7 @@ class Comodulogram(object):
         self.coherence_params = coherence_params
         self.extract_params = extract_params
         self.low_fq_width_2 = low_fq_width_2
+        self.n_jobs = n_jobs
 
     def _check_params(self):
         high_fq_range = self.high_fq_range
@@ -265,8 +276,8 @@ class Comodulogram(object):
                     "is not implemented." % self.method)
 
             if self.progress_bar:
-                self.progress_bar = ProgressBar('bicoherence: %s' %
-                                                self.method, max_value=n_masks)
+                self.progress_bar = ProgressBar(
+                    'bicoherence: %s' % self.method, max_value=n_masks)
 
             comod_list = []
             for this_mask in mask:
@@ -294,9 +305,8 @@ class Comodulogram(object):
 
         return self
 
-    def plot(self, titles=None, axs=None, cmap=None, vmin=None,
-             vmax=None, unit='', cbar=True, label=True, contours=None,
-             tight_layout=True):
+    def plot(self, titles=None, axs=None, cmap=None, vmin=None, vmax=None,
+             unit='', cbar=True, label=True, contours=None, tight_layout=True):
         """
         Plot one or more comodulograms.
 
@@ -339,8 +349,8 @@ class Comodulogram(object):
         if axs is None:
             n_lines = int(np.sqrt(n_comod))
             n_columns = int(np.ceil(n_comod / float(n_lines)))
-            fig, axs = plt.subplots(n_lines, n_columns,
-                                    figsize=(4 * n_columns, 3 * n_lines))
+            fig, axs = plt.subplots(n_lines, n_columns, figsize=(4 * n_columns,
+                                                                 3 * n_lines))
         else:
             fig = axs[0].figure
         axs = np.array(axs).ravel()
@@ -487,29 +497,43 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
         elif estimator.method == 'penny':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
-                filtered_low[i]), np.sin(filtered_low[i])]
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
+                                       np.cos(filtered_low[i]),
+                                       np.sin(filtered_low[i])]
         elif estimator.method == 'vanwijk':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
-                filtered_low[i]), np.sin(filtered_low[i]), filtered_low_2[i]]
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
+                                       np.cos(filtered_low[i]),
+                                       np.sin(filtered_low[i]),
+                                       filtered_low_2[i]]  # yapf: disable
         elif estimator.method in ('canolty', 'ozkurt'):
             phase_preprocessed = np.exp(1j * filtered_low[i])
         else:
             raise ValueError('Unknown method %s.' % estimator.method)
 
-        for j in range(n_high):
+        if sklearn_installed and estimator.n_jobs != 1:
+            delayed_func = delayed(_surrogate_analysis)
+            results = Parallel(n_jobs=estimator.n_jobs)(delayed_func(
+                _one_modulation_index,
+                dict(amplitude=filtered_high[j],
+                     phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
+                     method=estimator.method, ax_special=estimator.ax_special),
+                estimator.fs, n_points, estimator.minimum_shift,
+                estimator.random_state, estimator.n_surrogates)
+                for j in range(n_high))  # yapf: disable
 
-            def comod_function(shift):
-                return _one_modulation_index(
+            comod[i, :] = np.array(results)
+        else:
+            for j in range(n_high):
+
+                function_kwargs = dict(
                     amplitude=filtered_high[j],
                     phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
-                    method=estimator.method, shift=shift,
-                    ax_special=estimator.ax_special)
+                    method=estimator.method, ax_special=estimator.ax_special)
 
-            comod[i, j] = _surrogate_analysis(
-                comod_function, estimator.fs, n_points,
-                estimator.minimum_shift, estimator.random_state,
-                estimator.n_surrogates)
+                comod[i, j] = _surrogate_analysis(
+                    _one_modulation_index, function_kwargs, estimator.fs,
+                    n_points, estimator.minimum_shift, estimator.random_state,
+                    estimator.n_surrogates)
 
         if estimator.progress_bar:
             estimator.progress_bar.update_with_increment_value(1)
@@ -567,8 +591,8 @@ def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
 
         # Kullback-Leibler divergence of the distribution vs uniform
         amplitude_dist /= np.sum(amplitude_dist)
-        divergence_kl = np.sum(amplitude_dist *
-                               np.log(amplitude_dist * n_bins))
+        divergence_kl = np.sum(
+            amplitude_dist * np.log(amplitude_dist * n_bins))
 
         MI = divergence_kl / np.log(n_bins)
 
@@ -599,9 +623,8 @@ def _same_mask_on_all_epochs(sig, mask, method):
         warnings.warn("For coherence methods (e.g. %s) the mask has "
                       "to be unidimensional, and the same mask is "
                       "applied on all epochs. Got shape %s, so only the "
-                      "first row of the mask is used." % (
-                          method,
-                          mask.shape, ), UserWarning)
+                      "first row of the mask is used." %
+                      (method, mask.shape, ), UserWarning)
         mask = mask[0, :]
     sig = sig[..., ~mask]
     return sig
@@ -693,12 +716,13 @@ def _coherence(estimator, low_sig, filtered_high, mask):
 
     n_epochs, n_points = low_sig.shape
 
-    def comod_function(shift):
-        return _one_coherence_modulation_index(
-            estimator.fs, low_sig, filtered_high, estimator.method,
-            estimator.low_fq_range, coherence_params, shift)
+    function_kwargs = dict(
+        fs=estimator.fs, low_sig=low_sig, filtered_high=filtered_high,
+        method=estimator.method, low_fq_range=estimator.low_fq_range,
+        coherence_params=coherence_params)
 
-    comod = _surrogate_analysis(comod_function, estimator.fs, n_points,
+    comod = _surrogate_analysis(_one_coherence_modulation_index,
+                                function_kwargs, estimator.fs, n_points,
                                 estimator.minimum_shift,
                                 estimator.random_state, estimator.n_surrogates)
 
@@ -789,72 +813,103 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     if model == 'duprelatour':
         model = DAR(ordar=10, ordriv=1)
 
-    sigdriv_imag = None
+    n_epochs = low_sig.shape[0]
     if high_sig is None:
         sigs = low_sig
     else:
         # hack to call only once extract
         high_sig = np.atleast_2d(high_sig)
         sigs = np.r_[low_sig, high_sig]
-        n_epochs = low_sig.shape[0]
 
-    extract_complex = estimator.extract_params.get('extract_complex', True)
-
-    comod_list = None
     if estimator.progress_bar:
         bar = ProgressBar(max_value=len(estimator.low_fq_range) * len(mask),
                           title='comodulogram: %s' %
-                          model.get_title(name=True))
-    for j, filtered_signals in enumerate(
-            multiple_extract_driver(
+                          (model.get_title(name=True), ))
+    else:
+        bar = None
+
+    if sklearn_installed and estimator.n_jobs != 1:
+        all_results = Parallel(n_jobs=estimator.n_jobs)(
+            delayed(_driven_comodulogram_column)(estimator, filtered_signals,
+                                                 high_sig, mask, n_epochs, bar)
+            for filtered_signals in multiple_extract_driver(
                 sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
                 frequency_range=estimator.low_fq_range, random_state=estimator.
-                random_state, **estimator.extract_params)):
+                random_state, **estimator.extract_params))
+    else:
+        all_results = []
+        for filtered_signals in multiple_extract_driver(
+                sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
+                frequency_range=estimator.low_fq_range,
+                random_state=estimator.random_state,
+                **estimator.extract_params):
 
-        if extract_complex:
-            filtered_low, filtered_high, filtered_low_imag = filtered_signals
-        else:
-            filtered_low, filtered_high = filtered_signals
+            all_results.append(
+                _driven_comodulogram_column(estimator, filtered_signals,
+                                            high_sig, mask, n_epochs, bar))
 
-        if high_sig is None:
-            sigin = np.array(filtered_high)
-            sigdriv = np.array(filtered_low)
-            if extract_complex:
-                sigdriv_imag = np.array(filtered_low_imag)
-        else:
-            sigin = np.array(filtered_high[n_epochs:])
-            sigdriv = np.array(filtered_low[:n_epochs])
-            if extract_complex:
-                sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
+    if estimator.progress_bar:
+        bar.update(cur_value=bar.max_value)
 
-        sigin /= np.std(sigin)
-        n_epochs, n_points = sigdriv.shape
-
-        for i_mask, this_mask in enumerate(mask):
-
-            def comod_function(shift):
-                return _one_driven_modulation_index(
-                    estimator.fs, sigin, sigdriv, sigdriv_imag, model,
-                    this_mask, estimator.high_fq_range, estimator.ax_special,
-                    shift)
-
-            comod = _surrogate_analysis(comod_function, estimator.fs, n_points,
-                                        estimator.minimum_shift,
-                                        estimator.random_state,
-                                        estimator.n_surrogates)
-
-            # initialize the comodulogram arrays
-            if comod_list is None:
-                comod_list = []
-                for _ in range(len(mask)):
-                    comod_list.append(
-                        np.zeros((estimator.low_fq_range.size, comod.size)))
+    # change the results structure into a list of comodulograms
+    comod_list = []
+    for _ in range(len(mask)):
+        comod_list.append(
+            np.zeros((estimator.low_fq_range.size, all_results[0][0].size)))
+    for j, results in enumerate(all_results):
+        for i_mask, comod in enumerate(results):
             comod_list[i_mask][j, :] = comod
 
-            if estimator.progress_bar:
-                bar.update_with_increment_value(1)
-
     return comod_list
+
+
+def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
+                                n_epochs, bar):
+    extract_complex = estimator.extract_params.get('extract_complex', True)
+
+    model = estimator.method
+    if model == 'duprelatour':
+        model = DAR(ordar=10, ordriv=1)
+
+    if extract_complex:
+        filtered_low, filtered_high, filtered_low_imag = filtered_signals
+    else:
+        filtered_low, filtered_high = filtered_signals
+
+    sigdriv_imag = None
+    if high_sig is None:
+        sigin = np.array(filtered_high)
+        sigdriv = np.array(filtered_low)
+        if extract_complex:
+            sigdriv_imag = np.array(filtered_low_imag)
+    else:
+        sigin = np.array(filtered_high[n_epochs:])
+        sigdriv = np.array(filtered_low[:n_epochs])
+        if extract_complex:
+            sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
+
+    sigin /= np.std(sigin)
+    n_epochs, n_points = sigdriv.shape
+
+    results = []
+    for i_mask, this_mask in enumerate(mask):
+
+        function_kwargs = dict(fs=estimator.fs, sigin=sigin, sigdriv=sigdriv,
+                               sigdriv_imag=sigdriv_imag, model=model,
+                               mask=this_mask,
+                               high_fq_range=estimator.high_fq_range,
+                               ax_special=estimator.ax_special)
+
+        comod = _surrogate_analysis(
+            _one_driven_modulation_index, function_kwargs, estimator.fs,
+            n_points, estimator.minimum_shift, estimator.random_state,
+            estimator.n_surrogates)
+
+        results.append(comod)
+
+    if bar is not None:
+        bar.update_with_increment_value(1)
+    return results
 
 
 def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
@@ -919,8 +974,8 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
     return shifts
 
 
-def _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
-                        random_state, n_surrogates):
+def _surrogate_analysis(comod_function, function_kwargs, fs, n_points,
+                        minimum_shift, random_state, n_surrogates):
     """Call the comod function for several random time shifts,
     then compute the z-score of the result distribution."""
     # number of surrogates MIs
@@ -931,8 +986,8 @@ def _surrogate_analysis(comod_function, fs, n_points, minimum_shift,
                          n_iterations)
 
     comod_list = []
-    for s, shift in enumerate(shifts):
-        comod_list.append(comod_function(shift))
+    for shift in shifts:
+        comod_list.append(comod_function(shift=shift, **function_kwargs))
     comod_list = np.array(comod_list)
 
     # the first has no shift
