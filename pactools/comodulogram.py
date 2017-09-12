@@ -240,10 +240,16 @@ class Comodulogram(object):
                 filtered_low_2 = None
 
             comod_list = []
+            comod_z_score_list = []
             for this_mask in mask:
-                comod = _comodulogram(self, filtered_low, filtered_high,
-                                      this_mask, filtered_low_2)
+                comod, comod_z_score = _comodulogram(self, filtered_low,
+                                                     filtered_high, this_mask,
+                                                     filtered_low_2)
                 comod_list.append(comod)
+                comod_z_score_list.append(comod_z_score)
+
+            if comod_z_score_list[0] is None:
+                comod_z_score_list = None
 
         elif self.method in COHERENCE_PAC_METRICS:
             if high_sig is None:
@@ -258,11 +264,18 @@ class Comodulogram(object):
                 high_sig, self.fs, self.high_fq_range, self.high_fq_width)
 
             comod_list = []
+            comod_z_score_list = []
             for this_mask in mask:
-                comod = _coherence(self, low_sig, filtered_high, this_mask)
+                comod, comod_z_score = _coherence(self, low_sig, filtered_high,
+                                                  this_mask)
                 comod_list.append(comod)
+                comod_z_score_list.append(comod_z_score)
+
                 if self.progress_bar:
                     self.progress_bar.update_with_increment_value(1)
+
+            if comod_z_score_list[0] is None:
+                comod_z_score_list = None
 
         # compute PAC with the bispectrum/bicoherence
         elif self.method in BICOHERENCE_PAC_METRICS:
@@ -274,6 +287,7 @@ class Comodulogram(object):
                 raise NotImplementedError(
                     "Surrogate analysis with a bicoherence method (%s) "
                     "is not implemented." % self.method)
+            comod_z_score_list = None
 
             if self.progress_bar:
                 self.progress_bar = ProgressBar(
@@ -289,8 +303,8 @@ class Comodulogram(object):
         elif isinstance(self.method,
                         BaseDAR) or self.method in DAR_BASED_PAC_METRICS:
 
-            comod_list = _driven_comodulogram(self, low_sig=low_sig,
-                                              high_sig=high_sig, mask=mask)
+            comod_list, comod_z_score_list = _driven_comodulogram(
+                self, low_sig=low_sig, high_sig=high_sig, mask=mask)
         else:
             raise ValueError('unknown method: %s' % self.method)
 
@@ -300,8 +314,16 @@ class Comodulogram(object):
 
         if not multiple_masks:
             self.comod_ = comod_list[0]
+            if comod_z_score_list is not None:
+                self.comod_z_score_ = comod_z_score_list[0]
+            else:
+                self.comod_z_score_ = None
         else:
             self.comod_ = np.array(comod_list)
+            if comod_z_score_list is not None:
+                self.comod_z_score_ = np.array(comod_z_score_list)
+            else:
+                self.comod_z_score_ = None
 
         return self
 
@@ -334,8 +356,9 @@ class Comodulogram(object):
             Display labels or not
 
         contours : None or float
-            If not None, contours will be added around values above contours
-            value.
+            If not None, contours will be added around values where the z-score
+            is above contours value. z-score is computed only when
+            n_surrogates > 2.
 
         tight_layout : boolean
             Use tight_layout or not
@@ -385,7 +408,11 @@ class Comodulogram(object):
                 axs[i].set_title(titles[i], fontsize=12)
 
             if contours is not None:
-                axs[i].contour(self.comod_[i].T,
+                if self.comod_z_score_ is None:
+                    raise ValueError("Impossible to show contours since the "
+                                     "z-score was not computed. Try to refit "
+                                     "the estimator with n_surrogates > 2.")
+                axs[i].contour(self.comod_z_score_[i].T,
                                levels=np.atleast_1d(contours), colors='w',
                                origin='lower', extent=extent)
 
@@ -489,6 +516,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
 
     # Calculate the modulation index for each couple
     comod = np.zeros((n_low, n_high))
+    comod_z_score = np.zeros((n_low, n_high))
     for i in range(n_low):
         # preproces the phase array
         if estimator.method == 'tort':
@@ -521,7 +549,12 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                 estimator.random_state, estimator.n_surrogates)
                 for j in range(n_high))  # yapf: disable
 
-            comod[i, :] = np.array(results)
+            comod[i, :] = np.array([c for c, c_z_score in results])
+            if results[0][1] is not None:
+                comod_z_score[i, :] = np.array(
+                    [c_z_score for c, c_z_score in results])
+            else:
+                comod_z_score = None
         else:
             for j in range(n_high):
 
@@ -530,15 +563,21 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                     phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
                     method=estimator.method, ax_special=estimator.ax_special)
 
-                comod[i, j] = _surrogate_analysis(
+                mi, mi_z_score = _surrogate_analysis(
                     _one_modulation_index, function_kwargs, estimator.fs,
                     n_points, estimator.minimum_shift, estimator.random_state,
                     estimator.n_surrogates)
 
+                comod[i, j] = mi
+                if mi_z_score is not None:
+                    comod_z_score[i, j] = mi_z_score
+                else:
+                    comod_z_score = None
+
         if estimator.progress_bar:
             estimator.progress_bar.update_with_increment_value(1)
 
-    return comod
+    return comod, comod_z_score
 
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
@@ -721,12 +760,12 @@ def _coherence(estimator, low_sig, filtered_high, mask):
         method=estimator.method, low_fq_range=estimator.low_fq_range,
         coherence_params=coherence_params)
 
-    comod = _surrogate_analysis(_one_coherence_modulation_index,
-                                function_kwargs, estimator.fs, n_points,
-                                estimator.minimum_shift,
-                                estimator.random_state, estimator.n_surrogates)
+    comod, comod_z_score = _surrogate_analysis(
+        _one_coherence_modulation_index, function_kwargs, estimator.fs,
+        n_points, estimator.minimum_shift, estimator.random_state,
+        estimator.n_surrogates)
 
-    return comod
+    return comod, comod_z_score
 
 
 def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
@@ -852,15 +891,26 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
         bar.update(cur_value=bar.max_value)
 
     # change the results structure into a list of comodulograms
+    n_low_fq = estimator.low_fq_range.size
+    n_high_fq = all_results[0][0][0].size
     comod_list = []
     for _ in range(len(mask)):
-        comod_list.append(
-            np.zeros((estimator.low_fq_range.size, all_results[0][0].size)))
-    for j, results in enumerate(all_results):
-        for i_mask, comod in enumerate(results):
-            comod_list[i_mask][j, :] = comod
+        comod_list.append(np.zeros((n_low_fq, n_high_fq)))
 
-    return comod_list
+    if all_results[0][0][1] is not None:
+        comod_z_score_list = []
+        for _ in range(len(mask)):
+            comod_z_score_list.append(np.zeros((n_low_fq, n_high_fq)))
+    else:
+        comod_z_score_list = None
+
+    for j, results in enumerate(all_results):
+        for i_mask, (comod, comod_z_score) in enumerate(results):
+            comod_list[i_mask][j, :] = comod
+            if comod_z_score_list is not None:
+                comod_z_score_list[i_mask][j, :] = comod_z_score
+
+    return comod_list, comod_z_score_list
 
 
 def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
@@ -900,12 +950,12 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
                                high_fq_range=estimator.high_fq_range,
                                ax_special=estimator.ax_special)
 
-        comod = _surrogate_analysis(
+        comod, comod_z_score = _surrogate_analysis(
             _one_driven_modulation_index, function_kwargs, estimator.fs,
             n_points, estimator.minimum_shift, estimator.random_state,
             estimator.n_surrogates)
 
-        results.append(comod)
+        results.append((comod, comod_z_score))
 
     if bar is not None:
         bar.update_with_increment_value(1)
@@ -994,8 +1044,10 @@ def _surrogate_analysis(comod_function, function_kwargs, fs, n_points,
     comod = comod_list[0, ...]
 
     # here we compute the z-score
+    comod_z_score = None
     if n_iterations > 2:
-        comod -= np.mean(comod_list[1:, ...], axis=0)
-        comod /= np.std(comod_list[1:, ...], axis=0)
+        comod_z_score = comod.copy()
+        comod_z_score -= np.mean(comod_list[1:, ...], axis=0)
+        comod_z_score /= np.std(comod_list[1:, ...], axis=0)
 
-    return comod
+    return comod, comod_z_score
