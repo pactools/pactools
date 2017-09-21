@@ -219,6 +219,12 @@ class Comodulogram(object):
             mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
         n_masks = len(mask)
 
+        # pre compute all the random time shifts
+        n_epochs, n_points = low_sig.shape
+        self.shifts_ = _get_shifts(self.random_state, n_points,
+                                   self.minimum_shift, self.fs,
+                                   self.n_surrogates)
+
         if self.method in STANDARD_PAC_METRICS:
             if high_sig is None:
                 high_sig = low_sig
@@ -493,7 +499,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             filtered_low_2 = filtered_low_2.reshape(filtered_low_2.shape[0],
                                                     -1)
 
-    n_low, n_points = filtered_low.shape
+    n_low, _ = filtered_low.shape
     n_high, _ = filtered_high.shape
 
     # phase of the low frequency signals
@@ -525,9 +531,8 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
         elif estimator.method == 'penny':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
-                                       np.cos(filtered_low[i]),
-                                       np.sin(filtered_low[i])]
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
+                filtered_low[i]), np.sin(filtered_low[i])]
         elif estimator.method == 'vanwijk':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
                                        np.cos(filtered_low[i]),
@@ -545,8 +550,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                 dict(amplitude=filtered_high[j],
                      phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
                      method=estimator.method, ax_special=estimator.ax_special),
-                estimator.fs, n_points, estimator.minimum_shift,
-                estimator.random_state, estimator.n_surrogates)
+                estimator.shifts_)
                 for j in range(n_high))  # yapf: disable
 
             comod[i, :] = np.array([c for c, c_z_score in results])
@@ -564,9 +568,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                     method=estimator.method, ax_special=estimator.ax_special)
 
                 mi, mi_z_score = _surrogate_analysis(
-                    _one_modulation_index, function_kwargs, estimator.fs,
-                    n_points, estimator.minimum_shift, estimator.random_state,
-                    estimator.n_surrogates)
+                    _one_modulation_index, function_kwargs, estimator.shifts_)
 
                 comod[i, j] = mi
                 if mi_z_score is not None:
@@ -753,17 +755,13 @@ def _coherence(estimator, low_sig, filtered_high, mask):
         estimator.fs, estimator.low_fq_width, estimator.method,
         **estimator.coherence_params)
 
-    n_epochs, n_points = low_sig.shape
-
     function_kwargs = dict(
         fs=estimator.fs, low_sig=low_sig, filtered_high=filtered_high,
         method=estimator.method, low_fq_range=estimator.low_fq_range,
         coherence_params=coherence_params)
 
     comod, comod_z_score = _surrogate_analysis(
-        _one_coherence_modulation_index, function_kwargs, estimator.fs,
-        n_points, estimator.minimum_shift, estimator.random_state,
-        estimator.n_surrogates)
+        _one_coherence_modulation_index, function_kwargs, estimator.shifts_)
 
     return comod, comod_z_score
 
@@ -873,8 +871,8 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
                                                  high_sig, mask, n_epochs, bar)
             for filtered_signals in multiple_extract_driver(
                 sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
-                frequency_range=estimator.low_fq_range, random_state=estimator.
-                random_state, **estimator.extract_params))
+                frequency_range=estimator.low_fq_range, random_state=
+                estimator.random_state, **estimator.extract_params))
     else:
         all_results = []
         for filtered_signals in multiple_extract_driver(
@@ -939,7 +937,6 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
             sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
 
     sigin /= np.std(sigin)
-    n_epochs, n_points = sigdriv.shape
 
     results = []
     for i_mask, this_mask in enumerate(mask):
@@ -951,9 +948,7 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
                                ax_special=estimator.ax_special)
 
         comod, comod_z_score = _surrogate_analysis(
-            _one_driven_modulation_index, function_kwargs, estimator.fs,
-            n_points, estimator.minimum_shift, estimator.random_state,
-            estimator.n_surrogates)
+            _one_driven_modulation_index, function_kwargs, estimator.shifts_)
 
         results.append((comod, comod_z_score))
 
@@ -1004,8 +999,10 @@ def _one_driven_modulation_index(fs, sigin, sigdriv, sigdriv_imag, model, mask,
     return spec_diff
 
 
-def _get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
+def _get_shifts(random_state, n_points, minimum_shift, fs, n_surrogates):
     """Compute the shifts for the surrogate analysis"""
+    n_iterations = max(1, 1 + n_surrogates)
+
     n_minimum_shift = max(1, int(fs * minimum_shift))
     # shift at least minimum_shift seconds, i.e. n_minimum_shift points
     if n_iterations > 1:
@@ -1024,16 +1021,9 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_iterations):
     return shifts
 
 
-def _surrogate_analysis(comod_function, function_kwargs, fs, n_points,
-                        minimum_shift, random_state, n_surrogates):
+def _surrogate_analysis(comod_function, function_kwargs, shifts):
     """Call the comod function for several random time shifts,
     then compute the z-score of the result distribution."""
-    # number of surrogates MIs
-    n_iterations = max(1, 1 + n_surrogates)
-
-    # pre compute all the random time shifts
-    shifts = _get_shifts(random_state, n_points, minimum_shift, fs,
-                         n_iterations)
 
     comod_list = []
     for shift in shifts:
@@ -1045,7 +1035,7 @@ def _surrogate_analysis(comod_function, function_kwargs, fs, n_points,
 
     # here we compute the z-score
     comod_z_score = None
-    if n_iterations > 2:
+    if shift.size > 2:
         comod_z_score = comod.copy()
         comod_z_score -= np.mean(comod_list[1:, ...], axis=0)
         comod_z_score /= np.std(comod_list[1:, ...], axis=0)
