@@ -302,6 +302,7 @@ class Comodulogram(object):
             raise ValueError('unknown method: %s' % self.method)
 
         # remove very small values
+        all_results = np.asarray(all_results)
         all_results[np.abs(all_results) < 10 * np.finfo(np.float64).eps] = 0
 
         self.comod_ = all_results[:, 0, :, :]
@@ -315,21 +316,41 @@ class Comodulogram(object):
     @property
     def comod_z_score_(self):
         check_is_fitted(self, 'comod_surrogates_')
+
+        comod_ = self.comod_.copy()
+        comod_surrogates_ = self.comod_surrogates_
+        ndim = comod_surrogates_.ndim
+        if ndim == 3:
+            comod_surrogates_ = comod_surrogates_[None, ...]
+            comod_ = comod_[None, ...]
         # n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
-        if self.comod_surrogates_.shape[1] > 2:
-            comod_z_score = self.comod_.copy()
-            comod_z_score -= np.mean(self.comod_surrogates_, axis=1)
-            comod_z_score /= np.std(self.comod_surrogates_, axis=1)
+
+        if comod_surrogates_.shape[1] > 2:
+            comod_z_score = comod_
+            comod_z_score -= np.mean(comod_surrogates_, axis=1)
+            comod_z_score /= np.std(comod_surrogates_, axis=1)
+            if ndim == 3:
+                comod_z_score = comod_z_score[0]
             return comod_z_score
         else:
             return None
 
+    @property
     def surrogate_max_(self):
         check_is_fitted(self, 'comod_surrogates_')
-        if self.comod_surrogates_.shape[1] > 2:
-            n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
-            tmp = self.comod_surrogates_.reshape(n_masks, n_surrogates, -1)
+
+        comod_surrogates_ = self.comod_surrogates_
+        ndim = comod_surrogates_.ndim
+        if ndim == 3:
+            comod_surrogates_ = comod_surrogates_[None, ...]
+        # n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
+
+        if comod_surrogates_.shape[1] > 2:
+            n_masks, n_surrogates, n_low, n_high = comod_surrogates_.shape
+            tmp = comod_surrogates_.reshape(n_masks, n_surrogates, -1)
             surrogate_max = np.max(tmp, axis=2)
+            if ndim == 3:
+                surrogate_max = surrogate_max[0]
             return surrogate_max
         else:
             return None
@@ -889,15 +910,16 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     if estimator.progress_bar:
         bar.update(cur_value=bar.max_value)
 
-    results = np.array(results)
-    # From: n_masks * n_low_fq * n_shifts * n_high_fq
+    all_results = np.array(results)
+    # From: n_low_fq * n_masks * n_shifts * n_high_fq
     # Into: n_masks * n_shifts * n_low_fq * n_high_fq
-    results = np.swapaxes(results, 1, 2)
-    assert results.shape[0] == len(mask)
-    assert results.shape[1] == len(estimator.shifts_)
-    assert results.shape[2] == estimator.low_fq_range.size
+    all_results = np.swapaxes(all_results, 0, 2)
+    all_results = np.swapaxes(all_results, 0, 1)
+    assert all_results.shape[0] == len(mask)
+    assert all_results.shape[1] == len(estimator.shifts_)
+    assert all_results.shape[2] == estimator.low_fq_range.size
 
-    return results
+    return all_results
 
 
 def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
