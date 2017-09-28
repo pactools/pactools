@@ -245,20 +245,11 @@ class Comodulogram(object):
             else:
                 filtered_low_2 = None
 
-            comod_list = []
-            comod_z_score_list = []
-            surrogate_max_list = []
+            all_results = []
             for this_mask in mask:
-                comod, comod_z_score, surrogate_max = _comodulogram(
-                    self, filtered_low, filtered_high, this_mask,
-                    filtered_low_2)
-                comod_list.append(comod)
-                comod_z_score_list.append(comod_z_score)
-                surrogate_max_list.append(surrogate_max)
-
-            if comod_z_score_list[0] is None:
-                comod_z_score_list = None
-                surrogate_max_list = None
+                results = _comodulogram(self, filtered_low, filtered_high,
+                                        this_mask, filtered_low_2)
+                all_results.append(results)
 
         elif self.method in COHERENCE_PAC_METRICS:
             if high_sig is None:
@@ -272,22 +263,13 @@ class Comodulogram(object):
             filtered_high = multiple_band_pass(
                 high_sig, self.fs, self.high_fq_range, self.high_fq_width)
 
-            comod_list = []
-            comod_z_score_list = []
-            surrogate_max_list = []
+            all_results = []
             for this_mask in mask:
-                comod, comod_z_score, surrogate_max = _coherence(
-                    self, low_sig, filtered_high, this_mask)
-                comod_list.append(comod)
-                comod_z_score_list.append(comod_z_score)
-                surrogate_max_list.append(surrogate_max)
+                results = _coherence(self, low_sig, filtered_high, this_mask)
+                all_results.append(results)
 
                 if self.progress_bar:
                     self.progress_bar.update_with_increment_value(1)
-
-            if comod_z_score_list[0] is None:
-                comod_z_score_list = None
-                surrogate_max_list = None
 
         # compute PAC with the bispectrum/bicoherence
         elif self.method in BICOHERENCE_PAC_METRICS:
@@ -299,42 +281,58 @@ class Comodulogram(object):
                 raise NotImplementedError(
                     "Surrogate analysis with a bicoherence method (%s) "
                     "is not implemented." % self.method)
-            comod_z_score_list = None
 
             if self.progress_bar:
                 self.progress_bar = ProgressBar(
                     'bicoherence: %s' % self.method, max_value=n_masks)
 
-            comod_list = []
+            all_results = []
             for this_mask in mask:
-                comod = _bicoherence(self, sig=low_sig, mask=this_mask)
-                comod_list.append(comod)
+                results = _bicoherence(self, sig=low_sig, mask=this_mask)
+                all_results.append([results])
                 if self.progress_bar:
                     self.progress_bar.update_with_increment_value(1)
 
         elif isinstance(self.method,
                         BaseDAR) or self.method in DAR_BASED_PAC_METRICS:
 
-            tmp = _driven_comodulogram(self, low_sig=low_sig,
-                                       high_sig=high_sig, mask=mask)
-            comod_list, comod_z_score_list, surrogate_max_list = tmp
+            all_results = _driven_comodulogram(self, low_sig=low_sig,
+                                               high_sig=high_sig, mask=mask)
         else:
             raise ValueError('unknown method: %s' % self.method)
 
         # remove very small values
-        for comod in comod_list:
-            comod[np.abs(comod) < 10 * np.finfo(np.float64).eps] = 0
+        all_results[np.abs(all_results) < 10 * np.finfo(np.float64).eps] = 0
 
-        self.comod_ = np.array(comod_list)
-        self.comod_z_score_ = np.array(comod_z_score_list)
-        self.surrogate_max_ = np.array(surrogate_max_list)
-
+        self.comod_ = all_results[:, 0, :, :]
+        self.comod_surrogates_ = all_results[:, 1:, :, :]
         if not multiple_masks:
             self.comod_ = self.comod_[0]
-            self.comod_z_score_ = _safe_first(self.comod_z_score_)
-            self.surrogate_max_ = _safe_first(self.surrogate_max_)
+            self.comod_surrogates_ = self.comod_surrogates_[0]
 
         return self
+
+    @property
+    def comod_z_score_(self):
+        check_is_fitted(self, 'comod_surrogates_')
+        # n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
+        if self.comod_surrogates_.shape[1] > 2:
+            comod_z_score = self.comod_.copy()
+            comod_z_score -= np.mean(self.comod_surrogates_, axis=1)
+            comod_z_score /= np.std(self.comod_surrogates_, axis=1)
+            return comod_z_score
+        else:
+            return None
+
+    def surrogate_max_(self):
+        check_is_fitted(self, 'comod_surrogates_')
+        if self.comod_surrogates_.shape[1] > 2:
+            n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
+            tmp = self.comod_surrogates_.reshape(n_masks, n_surrogates, -1)
+            surrogate_max = np.max(tmp, axis=2)
+            return surrogate_max
+        else:
+            return None
 
     def plot(self, titles=None, axs=None, cmap=None, vmin=None, vmax=None,
              unit='', cbar=True, label=True, contours=None, tight_layout=True):
@@ -369,14 +367,18 @@ class Comodulogram(object):
             is above contours value. z-score is computed only when
             n_surrogates > 2.
 
+        contours_mode : str in ('comod_max', 'z-score'), (default: 'comod_max')
+            Choose the method used to represent the surrogate
+
         tight_layout : boolean
             Use tight_layout or not
         """
         check_is_fitted(self, 'comod_')
-        if self.comod_.ndim == 2:
-            self.comod_ = self.comod_[None, :, :]
+        comod_ = self.comod_
+        if comod_.ndim == 2:
+            comod_ = comod_[None, :, :]
 
-        n_comod, n_low, n_high = self.comod_.shape
+        n_comod, n_low, n_high = comod_.shape
 
         if axs is None:
             n_lines = int(np.sqrt(n_comod))
@@ -388,8 +390,8 @@ class Comodulogram(object):
         axs = np.array(axs).ravel()
 
         if vmin is None and vmax is None:
-            vmin = min(0, self.comod_.min())
-            vmax = max(0, self.comod_.max())
+            vmin = min(0, comod_.min())
+            vmax = max(0, comod_.max())
             if vmin < 0 and vmax > 0:
                 vmax = max(vmax, -vmin)
                 vmin = -vmax
@@ -399,7 +401,7 @@ class Comodulogram(object):
         if cmap is None:
             cmap = plt.get_cmap('viridis')
 
-        n_channels, n_low_fq, n_high_fq = self.comod_.shape
+        n_channels, n_low_fq, n_high_fq = comod_.shape
         extent = [
             self.low_fq_range[0],
             self.low_fq_range[-1],
@@ -409,9 +411,9 @@ class Comodulogram(object):
 
         # plot the image
         for i in range(n_channels):
-            cax = axs[i].imshow(self.comod_[i].T, cmap=cmap, vmin=vmin,
-                                vmax=vmax, aspect='auto', origin='lower',
-                                extent=extent, interpolation='none')
+            cax = axs[i].imshow(comod_[i].T, cmap=cmap, vmin=vmin, vmax=vmax,
+                                aspect='auto', origin='lower', extent=extent,
+                                interpolation='none')
 
             if titles is not None:
                 axs[i].set_title(titles[i], fontsize=12)
@@ -483,10 +485,6 @@ class Comodulogram(object):
             return low_fq[0], high_fq[0], max_pac_value[0]
 
 
-def _safe_first(array):
-    return np.atleast_1d(array)[0]
-
-
 def _comodulogram(estimator, filtered_low, filtered_high, mask,
                   filtered_low_2):
     """
@@ -508,6 +506,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
 
     n_low, _ = filtered_low.shape
     n_high, _ = filtered_high.shape
+    n_shifts = estimator.shifts_.size
 
     # phase of the low frequency signals
     for i in range(n_low):
@@ -528,9 +527,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
         filtered_low_2 = np.real(filtered_low_2)
 
     # Calculate the modulation index for each couple
-    comod = np.zeros((n_low, n_high))
-    comod_z_score = np.zeros((n_low, n_high))
-    surrogate_max = np.zeros(estimator.shifts_.size - 1)
+    comod_list = np.zeros((n_shifts, n_low, n_high))
     for i in range(n_low):
         # preproces the phase array
         if estimator.method == 'tort':
@@ -539,8 +536,9 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
         elif estimator.method == 'penny':
-            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]), np.cos(
-                filtered_low[i]), np.sin(filtered_low[i])]
+            phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
+                                       np.cos(filtered_low[i]),
+                                       np.sin(filtered_low[i])]
         elif estimator.method == 'vanwijk':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
                                        np.cos(filtered_low[i]),
@@ -553,7 +551,7 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
 
         if sklearn_installed and estimator.n_jobs != 1:
             delayed_func = delayed(_surrogate_analysis)
-            results = Parallel(n_jobs=estimator.n_jobs)(delayed_func(
+            mi_list = Parallel(n_jobs=estimator.n_jobs)(delayed_func(
                 _one_modulation_index,
                 dict(amplitude=filtered_high[j],
                      phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
@@ -561,16 +559,9 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                 estimator.shifts_)
                 for j in range(n_high))  # yapf: disable
 
-            comod[i, :] = np.array([c for c, _, _ in results])
-            if results[0][1] is not None:
-                comod_z_score[i, :] = np.array(
-                    [c_z_score for _, c_z_score, _ in results])
-                this_surrogate_max = np.max(
-                    np.array([surr_max for _, _, surr_max in results]), axis=0)
-                surrogate_max = np.maximum(surrogate_max, this_surrogate_max)
-            else:
-                comod_z_score = None
-                surrogate_max = None
+            mi_list = np.array(mi_list).T
+            assert mi_list.shape == (n_shifts, n_high)
+            comod_list[:, i, :] = mi_list
 
         else:
             for j in range(n_high):
@@ -580,22 +571,15 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
                     phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
                     method=estimator.method, ax_special=estimator.ax_special)
 
-                mi, mi_z_score, this_surrogate_max = _surrogate_analysis(
+                mi_list = _surrogate_analysis(
                     _one_modulation_index, function_kwargs, estimator.shifts_)
 
-                comod[i, j] = mi
-                if mi_z_score is not None:
-                    comod_z_score[i, j] = mi_z_score
-                    surrogate_max = np.maximum(surrogate_max,
-                                               this_surrogate_max)
-                else:
-                    comod_z_score = None
-                    surrogate_max = None
+                comod_list[:, i, j] = mi_list
 
         if estimator.progress_bar:
             estimator.progress_bar.update_with_increment_value(1)
 
-    return comod, comod_z_score, surrogate_max
+    return comod_list
 
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
@@ -776,10 +760,10 @@ def _coherence(estimator, low_sig, filtered_high, mask):
         method=estimator.method, low_fq_range=estimator.low_fq_range,
         coherence_params=coherence_params)
 
-    comod, comod_z_score, surrogate_max = _surrogate_analysis(
-        _one_coherence_modulation_index, function_kwargs, estimator.shifts_)
+    comod_list = _surrogate_analysis(_one_coherence_modulation_index,
+                                     function_kwargs, estimator.shifts_)
 
-    return comod, comod_z_score, surrogate_max
+    return comod_list
 
 
 def _one_coherence_modulation_index(fs, low_sig, filtered_high, method,
@@ -882,7 +866,7 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
         bar = None
 
     if sklearn_installed and estimator.n_jobs != 1:
-        all_results = Parallel(n_jobs=estimator.n_jobs)(
+        results = Parallel(n_jobs=estimator.n_jobs)(
             delayed(_driven_comodulogram_column)(estimator, filtered_signals,
                                                  high_sig, mask, n_epochs, bar)
             for filtered_signals in multiple_extract_driver(
@@ -891,48 +875,29 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
                 random_state=estimator.random_state,
                 **estimator.extract_params))  # yapf: disable
     else:
-        all_results = []
+        results = []
         for filtered_signals in multiple_extract_driver(
                 sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
                 frequency_range=estimator.low_fq_range,
                 random_state=estimator.random_state,
                 **estimator.extract_params):
 
-            all_results.append(
+            results.append(
                 _driven_comodulogram_column(estimator, filtered_signals,
                                             high_sig, mask, n_epochs, bar))
 
     if estimator.progress_bar:
         bar.update(cur_value=bar.max_value)
 
-    # change the results structure into a list of comodulograms
-    n_low_fq = estimator.low_fq_range.size
-    n_high_fq = all_results[0][0][0].size
-    comod_list = []
-    for _ in range(len(mask)):
-        comod_list.append(np.zeros((n_low_fq, n_high_fq)))
+    results = np.array(results)
+    # From: n_masks * n_low_fq * n_shifts * n_high_fq
+    # Into: n_masks * n_shifts * n_low_fq * n_high_fq
+    results = np.swapaxes(results, 1, 2)
+    assert results.shape[0] == len(mask)
+    assert results.shape[1] == len(estimator.shifts_)
+    assert results.shape[2] == estimator.low_fq_range.size
 
-    if all_results[0][0][1] is not None:
-        comod_z_score_list = []
-        surrogate_max_list = []
-        n_surrogates = all_results[0][0][2].size
-        for _ in range(len(mask)):
-            comod_z_score_list.append(np.zeros((n_low_fq, n_high_fq)))
-            surrogate_max_list.append(np.zeros(n_surrogates))
-    else:
-        comod_z_score_list = None
-        surrogate_max_list = None
-
-    for j, results in enumerate(all_results):
-        for i_mask, (comod, comod_z_score,
-                     surrogate_max) in enumerate(results):
-            comod_list[i_mask][j, :] = comod
-            if comod_z_score_list is not None:
-                comod_z_score_list[i_mask][j, :] = comod_z_score
-                surrogate_max_list[i_mask] = np.maximum(
-                    surrogate_max_list[i_mask], surrogate_max)
-
-    return comod_list, comod_z_score_list, surrogate_max_list
+    return results
 
 
 def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
@@ -971,10 +936,10 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
                                high_fq_range=estimator.high_fq_range,
                                ax_special=estimator.ax_special)
 
-        comod, comod_z_score, surrogate_max = _surrogate_analysis(
-            _one_driven_modulation_index, function_kwargs, estimator.shifts_)
+        comod_list = _surrogate_analysis(_one_driven_modulation_index,
+                                         function_kwargs, estimator.shifts_)
 
-        results.append((comod, comod_z_score, surrogate_max))
+        results.append(comod_list)
 
     if bar is not None:
         bar.update_with_increment_value(1)
@@ -1054,19 +1019,19 @@ def _surrogate_analysis(comod_function, function_kwargs, shifts):
         comod_list.append(comod_function(shift=sh, **function_kwargs))
     comod_list = np.array(comod_list)
 
-    # the first has no shift
-    comod = comod_list[0, ...]
+    # # the first has no shift
+    # comod = comod_list[0, ...]
 
-    # here we compute the z-score
-    comod_z_score, surrogate_max = None, None
-    if shifts.size > 2:
-        comod_z_score = comod.copy()
-        comod_z_score -= np.mean(comod_list[1:, ...], axis=0)
-        comod_z_score /= np.std(comod_list[1:, ...], axis=0)
+    # # here we compute the z-score
+    # comod_z_score, surrogate_max = None, None
+    # if shifts.size > 2:
+    #     comod_z_score = comod.copy()
+    #     comod_z_score -= np.mean(comod_list[1:, ...], axis=0)
+    #     comod_z_score /= np.std(comod_list[1:, ...], axis=0)
+    #
+    #     tmp = comod_list[1:]
+    #     tmp = tmp.reshape(tmp.shape[0], -1)
+    #     surrogate_max = np.max(tmp, axis=1)
+    #     assert surrogate_max.size == shifts.size - 1
 
-        tmp = comod_list[1:]
-        tmp = tmp.reshape(tmp.shape[0], -1)
-        surrogate_max = np.max(tmp, axis=1)
-        assert surrogate_max.size == shifts.size - 1
-
-    return comod, comod_z_score, surrogate_max
+    return comod_list
