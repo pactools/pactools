@@ -1,5 +1,4 @@
 import numpy as np
-from mne.io import BaseRaw
 
 
 def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
@@ -62,6 +61,11 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
     >>> for one_mask in mask:
     ...     pass
     """
+    try:
+        from mne.io import BaseRaw
+    except ImportError:
+        raise ImportError('Please install MNE-python to use raw_to_mask.')
+
     if not isinstance(raw, BaseRaw):
         raise ValueError('Must supply Raw as input')
 
