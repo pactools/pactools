@@ -225,7 +225,7 @@ class Comodulogram(object):
             mask = [check_array(m, dtype=bool, accept_none=True) for m in mask]
         n_masks = len(mask)
 
-        # pre compute all the random time shifts
+        # pre-compute all the random time shifts
         n_epochs, n_points = low_sig.shape
         self.shifts_ = _get_shifts(self.random_state, n_points,
                                    self.minimum_shift, self.fs,
@@ -1097,20 +1097,5 @@ def _surrogate_analysis(comod_function, function_kwargs, shifts):
     for sh in shifts:
         comod_list.append(comod_function(shift=sh, **function_kwargs))
     comod_list = np.array(comod_list)
-
-    # # the first has no shift
-    # comod = comod_list[0, ...]
-
-    # # here we compute the z-score
-    # comod_z_score, surrogate_max = None, None
-    # if shifts.size > 2:
-    #     comod_z_score = comod.copy()
-    #     comod_z_score -= np.mean(comod_list[1:, ...], axis=0)
-    #     comod_z_score /= np.std(comod_list[1:, ...], axis=0)
-    #
-    #     tmp = comod_list[1:]
-    #     tmp = tmp.reshape(tmp.shape[0], -1)
-    #     surrogate_max = np.max(tmp, axis=1)
-    #     assert surrogate_max.size == shifts.size - 1
 
     return comod_list
