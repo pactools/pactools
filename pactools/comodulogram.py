@@ -434,29 +434,22 @@ class Comodulogram(object):
         """
         check_is_fitted(self, 'comod_')
         comod_ = self.comod_
-        surrogate_max_, comod_z_score_ = None, None
-        if contour_level is not None:
-            surrogate_max_ = self.surrogate_max_
-            comod_z_score_ = self.comod_z_score_
-
+        # resize for generality
         if comod_.ndim == 2:
             comod_ = comod_[None, :, :]
-            if surrogate_max_ is not None:
-                surrogate_max_ = surrogate_max_[None, :]
-            if comod_z_score_ is not None:
-                comod_z_score_ = comod_z_score_[None, :, :]
+        n_comod, n_low_fq, n_high_fq = comod_.shape
 
-        n_comod, n_low, n_high = comod_.shape
-
+        # generate a new figure if no axes is provided
         if axs is None:
             n_lines = int(np.sqrt(n_comod))
             n_columns = int(np.ceil(n_comod / float(n_lines)))
-            fig, axs = plt.subplots(n_lines, n_columns, figsize=(4 * n_columns,
-                                                                 3 * n_lines))
+            figsize = (4 * n_columns, 3 * n_lines)
+            fig, axs = plt.subplots(n_lines, n_columns, figsize=figsize)
         else:
             fig = axs[0].figure
         axs = np.array(axs).ravel()
 
+        # Get auto values for vmin, vmax
         if vmin is None and vmax is None:
             vmin = min(0, comod_.min())
             vmax = max(0, comod_.max())
@@ -469,7 +462,6 @@ class Comodulogram(object):
         if cmap is None:
             cmap = plt.get_cmap('viridis')
 
-        n_comod, n_low_fq, n_high_fq = comod_.shape
         extent = [
             self.low_fq_range[0],
             self.low_fq_range[-1],
@@ -483,10 +475,33 @@ class Comodulogram(object):
                                 aspect='auto', origin='lower', extent=extent,
                                 interpolation='none')
 
-            if titles is not None:
+        # optional parameter
+        if titles is not None:
+            for i in range(n_comod):
                 axs[i].set_title(titles[i], fontsize=12)
 
-            if contour_level is not None:
+        if label:
+            axs[-1].set_xlabel('Driver frequency (Hz)')
+            axs[0].set_ylabel('Signal frequency (Hz)')
+
+        if tight_layout:
+            fig.tight_layout()
+
+        if cbar:
+            # plot the colorbar once
+            ax = axs[0] if len(axs) == 1 else None
+            add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
+
+        # plot the contours
+        if contour_level is not None:
+            surrogate_max_ = self.surrogate_max_
+            comod_z_score_ = self.comod_z_score_
+            # resize for generality
+            if surrogate_max_.ndim == 1:
+                surrogate_max_ = surrogate_max_[None, :]
+                comod_z_score_ = comod_z_score_[None, :, :]
+
+            for i in range(n_comod):
                 if contour_method == 'comod_max':
                     p_values = np.atleast_1d(contour_level)
                     percentiles = 100. * (1 - p_values)
@@ -503,18 +518,6 @@ class Comodulogram(object):
                     raise ValueError(
                         "contour_method has to be one of ('comod_max', "
                         "'z_score'), got %s" % (contour_method, ))
-
-        if label:
-            axs[-1].set_xlabel('Driver frequency (Hz)')
-            axs[0].set_ylabel('Signal frequency (Hz)')
-
-        if tight_layout:
-            fig.tight_layout()
-
-        if cbar:
-            # plot the colorbar once
-            ax = axs[0] if len(axs) == 1 else None
-            add_colorbar(fig, cax, vmin, vmax, unit=unit, ax=ax)
 
         return fig
 
