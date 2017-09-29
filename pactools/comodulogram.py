@@ -5,15 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d, interp2d
 
-try:
-    from sklearn.externals.joblib import Parallel, delayed
-    sklearn_installed = True
-except ImportError:
-    sklearn_installed = False
-
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
 from .dar_model.preprocess import multiple_extract_driver
+from .utils.parallel import Parallel, delayed
 from .utils.progress_bar import ProgressBar
 from .utils.spectrum import Bicoherence, Coherence
 from .utils.maths import norm, argmax_2d, next_power2
@@ -439,7 +434,7 @@ class Comodulogram(object):
             comod_ = comod_[None, :, :]
         n_comod, n_low_fq, n_high_fq = comod_.shape
 
-        # generate a new figure if no axes is provided
+        # generate a new figure if no axes is provided
         if axs is None:
             n_lines = int(np.sqrt(n_comod))
             n_columns = int(np.ceil(n_comod / float(n_lines)))
@@ -475,7 +470,7 @@ class Comodulogram(object):
                                 aspect='auto', origin='lower', extent=extent,
                                 interpolation='none')
 
-        # optional parameter
+        # optional parameter
         if titles is not None:
             for i in range(n_comod):
                 axs[i].set_title(titles[i], fontsize=12)
@@ -627,30 +622,16 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
         else:
             raise ValueError('Unknown method %s.' % estimator.method)
 
-        if sklearn_installed and estimator.n_jobs != 1:
-            delayed_func = delayed(_one_modulation_index)
-            mi_list = Parallel(n_jobs=estimator.n_jobs)(
-                delayed_func(shift=sh, amplitude=filtered_high[j],
-                             phase_preprocessed=phase_preprocessed,
-                             norm_a=norm_a[j], method=estimator.method,
-                             ax_special=estimator.ax_special)
-                for j in range(n_high) for sh in estimator.shifts_)
+        delayed_func = delayed(_one_modulation_index)
+        mi_list = Parallel(n_jobs=estimator.n_jobs)(
+            delayed_func(shift=sh, amplitude=filtered_high[j],
+                         phase_preprocessed=phase_preprocessed,
+                         norm_a=norm_a[j], method=estimator.method,
+                         ax_special=estimator.ax_special)
+            for j in range(n_high) for sh in estimator.shifts_)
 
-            mi_list = np.array(mi_list).reshape(n_high, n_shifts).T
-            comod_list[:, i, :] = mi_list
-
-        else:
-            for j in range(n_high):
-                mi_list = []
-                for sh in estimator.shifts_:
-                    mi = _one_modulation_index(
-                        shift=sh, amplitude=filtered_high[j],
-                        phase_preprocessed=phase_preprocessed,
-                        norm_a=norm_a[j], method=estimator.method,
-                        ax_special=estimator.ax_special)
-                    mi_list.append(mi)
-
-                comod_list[:, i, j] = np.array(mi_list)
+        mi_list = np.array(mi_list).reshape(n_high, n_shifts).T
+        comod_list[:, i, :] = mi_list
 
         if estimator.progress_bar:
             estimator.progress_bar.update_with_increment_value(1)
@@ -943,26 +924,13 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     else:
         bar = None
 
-    if sklearn_installed and estimator.n_jobs != 1:
-        results = Parallel(n_jobs=estimator.n_jobs)(
-            delayed(_driven_comodulogram_column)(estimator, filtered_signals,
-                                                 high_sig, mask, n_epochs, bar)
-            for filtered_signals in multiple_extract_driver(
-                sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
-                frequency_range=estimator.low_fq_range,
-                random_state=estimator.random_state,
-                **estimator.extract_params))  # yapf: disable
-    else:
-        results = []
+    results = Parallel(n_jobs=estimator.n_jobs)(
+        delayed(_driven_comodulogram_column)(estimator, filtered_signals,
+                                             high_sig, mask, n_epochs, bar)
         for filtered_signals in multiple_extract_driver(
-                sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
-                frequency_range=estimator.low_fq_range,
-                random_state=estimator.random_state,
-                **estimator.extract_params):
-
-            results.append(
-                _driven_comodulogram_column(estimator, filtered_signals,
-                                            high_sig, mask, n_epochs, bar))
+            sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
+            frequency_range=estimator.low_fq_range,
+            random_state=estimator.random_state, **estimator.extract_params))
 
     if estimator.progress_bar:
         bar.update(cur_value=bar.max_value)
