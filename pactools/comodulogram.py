@@ -628,31 +628,29 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             raise ValueError('Unknown method %s.' % estimator.method)
 
         if sklearn_installed and estimator.n_jobs != 1:
-            delayed_func = delayed(_surrogate_analysis)
-            mi_list = Parallel(n_jobs=estimator.n_jobs)(delayed_func(
-                _one_modulation_index,
-                dict(amplitude=filtered_high[j],
-                     phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
-                     method=estimator.method, ax_special=estimator.ax_special),
-                estimator.shifts_)
-                for j in range(n_high))  # yapf: disable
+            delayed_func = delayed(_one_modulation_index)
+            mi_list = Parallel(n_jobs=estimator.n_jobs)(
+                delayed_func(shift=sh, amplitude=filtered_high[j],
+                             phase_preprocessed=phase_preprocessed,
+                             norm_a=norm_a[j], method=estimator.method,
+                             ax_special=estimator.ax_special)
+                for j in range(n_high) for sh in estimator.shifts_)
 
-            mi_list = np.array(mi_list).T
-            assert mi_list.shape == (n_shifts, n_high)
+            mi_list = np.array(mi_list).reshape(n_high, n_shifts).T
             comod_list[:, i, :] = mi_list
 
         else:
             for j in range(n_high):
+                mi_list = []
+                for sh in estimator.shifts_:
+                    mi = _one_modulation_index(
+                        shift=sh, amplitude=filtered_high[j],
+                        phase_preprocessed=phase_preprocessed,
+                        norm_a=norm_a[j], method=estimator.method,
+                        ax_special=estimator.ax_special)
+                    mi_list.append(mi)
 
-                function_kwargs = dict(
-                    amplitude=filtered_high[j],
-                    phase_preprocessed=phase_preprocessed, norm_a=norm_a[j],
-                    method=estimator.method, ax_special=estimator.ax_special)
-
-                mi_list = _surrogate_analysis(
-                    _one_modulation_index, function_kwargs, estimator.shifts_)
-
-                comod_list[:, i, j] = mi_list
+                comod_list[:, i, j] = np.array(mi_list)
 
         if estimator.progress_bar:
             estimator.progress_bar.update_with_increment_value(1)
@@ -833,13 +831,15 @@ def _coherence(estimator, low_sig, filtered_high, mask):
         estimator.fs, estimator.low_fq_width, estimator.method,
         **estimator.coherence_params)
 
-    function_kwargs = dict(
-        fs=estimator.fs, low_sig=low_sig, filtered_high=filtered_high,
-        method=estimator.method, low_fq_range=estimator.low_fq_range,
-        coherence_params=coherence_params)
-
-    comod_list = _surrogate_analysis(_one_coherence_modulation_index,
-                                     function_kwargs, estimator.shifts_)
+    comod_list = []
+    for sh in estimator.shifts_:
+        comod = _one_coherence_modulation_index(
+            shift=sh, fs=estimator.fs, low_sig=low_sig,
+            filtered_high=filtered_high, method=estimator.method,
+            low_fq_range=estimator.low_fq_range,
+            coherence_params=coherence_params)
+        comod_list.append(comod)
+    comod_list = np.array(comod_list)
 
     return comod_list
 
@@ -1008,17 +1008,15 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
 
     results = []
     for i_mask, this_mask in enumerate(mask):
-
-        function_kwargs = dict(fs=estimator.fs, sigin=sigin, sigdriv=sigdriv,
-                               sigdriv_imag=sigdriv_imag, model=model,
-                               mask=this_mask,
-                               high_fq_range=estimator.high_fq_range,
-                               ax_special=estimator.ax_special)
-
-        comod_list = _surrogate_analysis(_one_driven_modulation_index,
-                                         function_kwargs, estimator.shifts_)
-
-        results.append(comod_list)
+        comod_list = []
+        for sh in estimator.shifts_:
+            comod = _one_driven_modulation_index(
+                shift=sh, fs=estimator.fs, sigin=sigin, sigdriv=sigdriv,
+                sigdriv_imag=sigdriv_imag, model=model, mask=this_mask,
+                high_fq_range=estimator.high_fq_range,
+                ax_special=estimator.ax_special)
+            comod_list.append(comod)
+        results.append(np.array(comod_list))
 
     if bar is not None:
         bar.update_with_increment_value(1)
@@ -1087,15 +1085,3 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_surrogates):
     shifts[0] = 0
 
     return shifts
-
-
-def _surrogate_analysis(comod_function, function_kwargs, shifts):
-    """Call the comod function for several random time shifts,
-    then compute the z-score of the result distribution."""
-
-    comod_list = []
-    for sh in shifts:
-        comod_list.append(comod_function(shift=sh, **function_kwargs))
-    comod_list = np.array(comod_list)
-
-    return comod_list
