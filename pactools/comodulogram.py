@@ -622,13 +622,12 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
         else:
             raise ValueError('Unknown method %s.' % estimator.method)
 
-        delayed_func = delayed(_one_modulation_index)
-        mi_list = Parallel(n_jobs=estimator.n_jobs)(
-            delayed_func(shift=sh, amplitude=filtered_high[j],
-                         phase_preprocessed=phase_preprocessed,
-                         norm_a=norm_a[j], method=estimator.method,
-                         ax_special=estimator.ax_special)
-            for j in range(n_high) for sh in estimator.shifts_)
+        delayed_func = delayed(_loop_over_shifts)
+        mi_list = Parallel(n_jobs=estimator.n_jobs)(delayed_func(
+            _one_modulation_index, estimator.shifts_,
+            amplitude=filtered_high[j], phase_preprocessed=phase_preprocessed,
+            norm_a=norm_a[j], method=estimator.method,
+            ax_special=estimator.ax_special) for j in range(n_high))
 
         mi_list = np.array(mi_list).reshape(n_high, n_shifts).T
         comod_list[:, i, :] = mi_list
@@ -637,6 +636,11 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             estimator.progress_bar.update_with_increment_value(1)
 
     return comod_list
+
+
+def _loop_over_shifts(func, shifts, **kwargs):
+    """Helper to loop over shifts inside a single job"""
+    return [func(shift=sh, **kwargs) for sh in shifts]
 
 
 def _one_modulation_index(amplitude, phase_preprocessed, norm_a, method, shift,
