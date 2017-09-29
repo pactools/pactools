@@ -201,8 +201,14 @@ class Comodulogram(object):
         ----------
         comod_ : array, shape (len(low_fq_range), len(high_fq_range))
             Comodulogram for each couple of frequencies.
-            If a list of mask is given, it returns a list of comodulograms.
+            If a list of mask is given, it returns a array of shape
+            (n_masks, len(low_fq_range), len(high_fq_range))
 
+        surrogates_ : array, shape (n_surrogates, len(low_fq_range),
+                      len(high_fq_range)) or None
+            Comodulograms for each time shift of the surrogate analysis.
+            If a list of mask is given, it returns a array of shape
+            (n_masks, n_surrogates, len(low_fq_range), len(high_fq_range))
         """
         self._check_params()
         low_sig = check_array(low_sig)
@@ -306,29 +312,42 @@ class Comodulogram(object):
         all_results[np.abs(all_results) < 10 * np.finfo(np.float64).eps] = 0
 
         self.comod_ = all_results[:, 0, :, :]
-        self.comod_surrogates_ = all_results[:, 1:, :, :]
+        self.surrogates_ = all_results[:, 1:, :, :]
         if not multiple_masks:
             self.comod_ = self.comod_[0]
-            self.comod_surrogates_ = self.comod_surrogates_[0]
+            self.surrogates_ = self.surrogates_[0]
 
         return self
 
     @property
     def comod_z_score_(self):
-        check_is_fitted(self, 'comod_surrogates_')
+        """Compute the z-score based on the comodulogram and the surrogates
+
+        Returns
+        -------
+        comod_z_score_: array, shape (len(low_fq_range), len(high_fq_range))
+            If self.comod_ is an array of n_masks comodulograms, so does this
+            array: shape (n_masks, len(low_fq_range), len(high_fq_range))
+        """
+        check_is_fitted(self, 'surrogates_')
 
         comod_ = self.comod_.copy()
-        comod_surrogates_ = self.comod_surrogates_
-        ndim = comod_surrogates_.ndim
+        surrogates_ = self.surrogates_
+        if surrogates_ is None:
+            raise ValueError(
+                "Impossible to compute comod_z_score_ since the surrogate "
+                "comodulograms were not computed. Try to refit the "
+                "estimator with n_surrogates > 2.")
+        ndim = surrogates_.ndim
         if ndim == 3:
-            comod_surrogates_ = comod_surrogates_[None, ...]
+            surrogates_ = surrogates_[None, ...]
             comod_ = comod_[None, ...]
-        # n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
+        # n_masks, n_surrogates, n_low, n_high = self.surrogates_.shape
 
-        if comod_surrogates_.shape[1] > 2:
+        if surrogates_.shape[1] > 2:
             comod_z_score = comod_
-            comod_z_score -= np.mean(comod_surrogates_, axis=1)
-            comod_z_score /= np.std(comod_surrogates_, axis=1)
+            comod_z_score -= np.mean(surrogates_, axis=1)
+            comod_z_score /= np.std(surrogates_, axis=1)
             if ndim == 3:
                 comod_z_score = comod_z_score[0]
             return comod_z_score
@@ -337,17 +356,30 @@ class Comodulogram(object):
 
     @property
     def surrogate_max_(self):
-        check_is_fitted(self, 'comod_surrogates_')
+        """Compute the distribution of maxima of the surrogates comodulograms
 
-        comod_surrogates_ = self.comod_surrogates_
-        ndim = comod_surrogates_.ndim
+        Returns
+        -------
+        surrogate_max_: array, shape (n_surrogates, )
+            If self.comod_ is an array of n_masks comodulograms, the shape will
+            be: shape (n_masks, n_surrogates)
+        """
+        check_is_fitted(self, 'surrogates_')
+
+        surrogates_ = self.surrogates_
+        if surrogates_ is None:
+            raise ValueError(
+                "Impossible to compute surrogate_max_ since the surrogate "
+                "comodulograms were not computed. Try to refit the "
+                "estimator with n_surrogates > 2.")
+        ndim = surrogates_.ndim
         if ndim == 3:
-            comod_surrogates_ = comod_surrogates_[None, ...]
-        # n_masks, n_surrogates, n_low, n_high = self.comod_surrogates_.shape
+            surrogates_ = surrogates_[None, ...]
+        # n_masks, n_surrogates, n_low, n_high = self.surrogates_.shape
 
-        if comod_surrogates_.shape[1] > 2:
-            n_masks, n_surrogates, n_low, n_high = comod_surrogates_.shape
-            tmp = comod_surrogates_.reshape(n_masks, n_surrogates, -1)
+        if surrogates_.shape[1] > 2:
+            n_masks, n_surrogates, n_low, n_high = surrogates_.shape
+            tmp = surrogates_.reshape(n_masks, n_surrogates, -1)
             surrogate_max = np.max(tmp, axis=2)
             if ndim == 3:
                 surrogate_max = surrogate_max[0]
@@ -356,9 +388,10 @@ class Comodulogram(object):
             return None
 
     def plot(self, titles=None, axs=None, cmap=None, vmin=None, vmax=None,
-             unit='', cbar=True, label=True, contours=None, tight_layout=True):
+             unit='', cbar=True, label=True, contour_level=None,
+             contour_method='comod_max', tight_layout=True):
         """
-        Plot one or more comodulograms.
+        Plot the comodulograms computed during the fit
 
         titles : list of string or None
             List of titles for each comodulogram
@@ -383,21 +416,35 @@ class Comodulogram(object):
         label : boolean
             Display labels or not
 
-        contours : None or float
-            If not None, contours will be added around values where the z-score
-            is above contours value. z-score is computed only when
-            n_surrogates > 2.
+        contour_level : None or float
+            If not None, contours will be added around values where the
+            significance level is above contour value. The significance level
+            is computed only when n_surrogates >= 2.
 
-        contours_mode : str in ('comod_max', 'z-score'), (default: 'comod_max')
-            Choose the method used to represent the surrogate
+        contour_method : str in ('comod_max', 'z_score'), (default:'comod_max')
+            Select the method used to compute the significance level.
+                - 'comod_max': Compute the maximum of each surrogate
+                    comodulogram, then estimate a threshold that correspond to
+                    a p-value specified in contour_level.
+                - 'z_score': Compute the z-score for each couple of frequencies
+                    This method might suffer from multiple testing issues.
 
         tight_layout : boolean
             Use tight_layout or not
         """
         check_is_fitted(self, 'comod_')
         comod_ = self.comod_
+        surrogate_max_, comod_z_score_ = None, None
+        if contour_level is not None:
+            surrogate_max_ = self.surrogate_max_
+            comod_z_score_ = self.comod_z_score_
+
         if comod_.ndim == 2:
             comod_ = comod_[None, :, :]
+            if surrogate_max_ is not None:
+                surrogate_max_ = surrogate_max_[None, :]
+            if comod_z_score_ is not None:
+                comod_z_score_ = comod_z_score_[None, :, :]
 
         n_comod, n_low, n_high = comod_.shape
 
@@ -422,7 +469,7 @@ class Comodulogram(object):
         if cmap is None:
             cmap = plt.get_cmap('viridis')
 
-        n_channels, n_low_fq, n_high_fq = comod_.shape
+        n_comod, n_low_fq, n_high_fq = comod_.shape
         extent = [
             self.low_fq_range[0],
             self.low_fq_range[-1],
@@ -431,7 +478,7 @@ class Comodulogram(object):
         ]
 
         # plot the image
-        for i in range(n_channels):
+        for i in range(n_comod):
             cax = axs[i].imshow(comod_[i].T, cmap=cmap, vmin=vmin, vmax=vmax,
                                 aspect='auto', origin='lower', extent=extent,
                                 interpolation='none')
@@ -439,14 +486,23 @@ class Comodulogram(object):
             if titles is not None:
                 axs[i].set_title(titles[i], fontsize=12)
 
-            if contours is not None:
-                if self.comod_z_score_ is None:
-                    raise ValueError("Impossible to show contours since the "
-                                     "z-score was not computed. Try to refit "
-                                     "the estimator with n_surrogates > 2.")
-                axs[i].contour(self.comod_z_score_[i].T,
-                               levels=np.atleast_1d(contours), colors='w',
-                               origin='lower', extent=extent)
+            if contour_level is not None:
+                if contour_method == 'comod_max':
+                    p_values = np.atleast_1d(contour_level)
+                    percentiles = 100. * (1 - p_values)
+                    levels = np.atleast_1d(
+                        np.percentile(surrogate_max_[i], percentiles))
+
+                    axs[i].contour(self.comod_[i].T, levels=levels, colors='w',
+                                   origin='lower', extent=extent)
+                elif contour_method == 'z_score':
+                    levels = np.atleast_1d(contour_level)
+                    axs[i].contour(comod_z_score_[i].T, levels=levels,
+                                   colors='w', origin='lower', extent=extent)
+                else:
+                    raise ValueError(
+                        "contour_method has to be one of ('comod_max', "
+                        "'z_score'), got %s" % (contour_method, ))
 
         if label:
             axs[-1].set_xlabel('Driver frequency (Hz)')
@@ -464,18 +520,16 @@ class Comodulogram(object):
 
     def get_maximum_pac(self):
         """Get maximum PAC value in a comodulogram.
-        'low_fq_range' and 'high_fq_range' must be the same than used in the
-        modulation_index function that computed 'comodulograms'.
 
         Returns
         -------
-        low_fq : float or array, shape (n_comod, )
+        low_fq : float or array, shape (n_masks, )
             Low frequency of maximum PAC
 
-        high_fq : float or array, shape (n_comod, )
+        high_fq : float or array, shape (n_masks, )
             High frequency of maximum PAC
 
-        pac_value : float or array, shape (n_comod, )
+        pac_value : float or array, shape (n_masks, )
             Maximum PAC value
         """
         check_is_fitted(self, 'comod_')
@@ -486,12 +540,12 @@ class Comodulogram(object):
             return_array = False
 
         # check that the sizes match
-        n_comod, n_low, n_high = self.comod_.shape
+        n_masks, n_low, n_high = self.comod_.shape
 
         # compute the maximum of the comodulogram, and get the frequencies
-        max_pac_value = np.zeros(n_comod)
-        low_fq = np.zeros(n_comod)
-        high_fq = np.zeros(n_comod)
+        max_pac_value = np.zeros(n_masks)
+        low_fq = np.zeros(n_masks)
+        high_fq = np.zeros(n_masks)
         for k, comodulogram in enumerate(self.comod_):
             i, j = argmax_2d(comodulogram)
             max_pac_value[k] = comodulogram[i, j]
