@@ -114,3 +114,12 @@ class ProgressBar():
             sys.stdout.write('\n')
             sys.stdout.flush()
             self.closed = True
+
+    def __call__(self, sequence):
+        while True:
+            try:
+                yield next(sequence)
+                self.update_with_increment_value(1)
+            except StopIteration:
+                self.close()
+                return
