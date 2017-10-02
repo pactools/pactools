@@ -35,7 +35,7 @@ low_fq = 5.0  # Hz
 low_fq_width = 1.0  # Hz
 
 n_points = 1000
-noise_level = 0.3
+noise_level = 0.4
 
 signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=low_fq_width, noise_level=noise_level,
@@ -45,7 +45,7 @@ signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
 # Then, let's define the range of low frequency, and the PAC metric used.
 
 low_fq_range = np.linspace(1, 10, 50)
-method = 'duprelatour'  # or 'tort', 'ozkurt', 'penny', ...
+method = 'duprelatour'  # or 'tort', 'ozkurt', 'penny', 'colgin', ...
 
 # We also choose the number of comodulograms computed in the surrogate
 # analysis. A good rule of thumb is 10 / p_value. Example: 10 / 0.05 = 200.
