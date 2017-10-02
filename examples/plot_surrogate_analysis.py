@@ -47,13 +47,17 @@ signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
 low_fq_range = np.linspace(1, 10, 50)
 method = 'duprelatour'  # or 'tort', 'ozkurt', 'penny', 'colgin', ...
 
+###############################################################################
 # We also choose the number of comodulograms computed in the surrogate
 # analysis. A good rule of thumb is 10 / p_value. Example: 10 / 0.05 = 200.
+
 n_surrogates = 200
 
+###############################################################################
 # As a surrogate analysis recquires to compute many comodulograms, the
 # computation can be slow. If you have multiple cores in your CPU, you can
 # leverage them using the parameter `n_jobs` > 1.
+
 n_jobs = 1
 
 ###############################################################################
