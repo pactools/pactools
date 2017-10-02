@@ -148,7 +148,7 @@ class Comodulogram(object):
         high_fq_range = self.high_fq_range
         if isinstance(high_fq_range, str) and high_fq_range == 'auto':
             self.high_fq_range = np.linspace(
-                max(self.low_fq_range), self.fs / 2.0, 40)
+                max(self.low_fq_range), self.fs / 2.0, 80)
 
         high_fq_width = self.high_fq_width
         if isinstance(high_fq_width, str) and high_fq_width == 'auto':
@@ -923,20 +923,21 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
         high_sig = np.atleast_2d(high_sig)
         sigs = np.r_[low_sig, high_sig]
 
-    if estimator.progress_bar:
-        bar = ProgressBar(max_value=len(estimator.low_fq_range) * len(mask),
-                          title='comodulogram: %s' %
-                          (model.get_title(name=True), ))
-    else:
-        bar = None
-
-    results = Parallel(n_jobs=estimator.n_jobs)(
+    generator = (
         delayed(_driven_comodulogram_column)(estimator, filtered_signals,
-                                             high_sig, mask, n_epochs, bar)
+                                             high_sig, mask, n_epochs)
         for filtered_signals in multiple_extract_driver(
             sigs=sigs, fs=estimator.fs, bandwidth=estimator.low_fq_width,
             frequency_range=estimator.low_fq_range,
             random_state=estimator.random_state, **estimator.extract_params))
+
+    if estimator.progress_bar:
+        bar = ProgressBar(max_value=len(estimator.low_fq_range) * len(mask),
+                          title='comodulogram: %s' %
+                          (model.get_title(name=True), ))
+        generator = bar(generator)
+
+    results = Parallel(n_jobs=estimator.n_jobs)(generator)
 
     if estimator.progress_bar:
         bar.update(cur_value=bar.max_value)
@@ -954,7 +955,7 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
 
 
 def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
-                                n_epochs, bar):
+                                n_epochs):
     extract_complex = estimator.extract_params.get('extract_complex', True)
 
     model = estimator.method
@@ -992,8 +993,6 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
             comod_list.append(comod)
         results.append(np.array(comod_list))
 
-    if bar is not None:
-        bar.update_with_increment_value(1)
     return results
 
 
