@@ -328,11 +328,7 @@ class Comodulogram(object):
 
         comod_ = self.comod_.copy()
         surrogates_ = self.surrogates_
-        if surrogates_ is None:
-            raise ValueError(
-                "Impossible to compute comod_z_score_ since the surrogate "
-                "comodulograms were not computed. Try to refit the "
-                "estimator with n_surrogates > 2.")
+
         ndim = surrogates_.ndim
         if ndim == 3:
             surrogates_ = surrogates_[None, ...]
@@ -347,7 +343,10 @@ class Comodulogram(object):
                 comod_z_score = comod_z_score[0]
             return comod_z_score
         else:
-            return None
+            raise ValueError(
+                "Impossible to compute comod_z_score_ since the surrogate "
+                "comodulograms were not computed. Try to refit the "
+                "estimator with n_surrogates > 1.")
 
     @property
     def surrogate_max_(self):
@@ -360,13 +359,8 @@ class Comodulogram(object):
             be: shape (n_masks, n_surrogates)
         """
         check_is_fitted(self, 'surrogates_')
-
         surrogates_ = self.surrogates_
-        if surrogates_ is None:
-            raise ValueError(
-                "Impossible to compute surrogate_max_ since the surrogate "
-                "comodulograms were not computed. Try to refit the "
-                "estimator with n_surrogates > 2.")
+
         ndim = surrogates_.ndim
         if ndim == 3:
             surrogates_ = surrogates_[None, ...]
@@ -380,7 +374,10 @@ class Comodulogram(object):
                 surrogate_max = surrogate_max[0]
             return surrogate_max
         else:
-            return None
+            raise ValueError(
+                "Impossible to compute comod_z_score_ since the surrogate "
+                "comodulograms were not computed. Try to refit the "
+                "estimator with n_surrogates > 1.")
 
     def plot(self, titles=None, axs=None, cmap=None, vmin=None, vmax=None,
              unit='', cbar=True, label=True, contour_level=None,
@@ -426,6 +423,11 @@ class Comodulogram(object):
 
         tight_layout : boolean
             Use tight_layout or not
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            The figure object
         """
         check_is_fitted(self, 'comod_')
         comod_ = self.comod_
@@ -503,7 +505,7 @@ class Comodulogram(object):
                     levels = np.atleast_1d(
                         np.percentile(surrogate_max_[i], percentiles))
 
-                    axs[i].contour(self.comod_[i].T, levels=levels, colors='w',
+                    axs[i].contour(comod_[i].T, levels=levels, colors='w',
                                    origin='lower', extent=extent)
                 elif contour_method == 'z_score':
                     levels = np.atleast_1d(contour_level)

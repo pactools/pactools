@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pactools.dar_model import AR, DAR, HAR, StableDAR
-from pactools.utils.testing import assert_equal
+from pactools.utils.testing import assert_equal, assert_greater
 from pactools.utils.testing import assert_raises, assert_array_equal
 from pactools.utils.testing import assert_true, assert_array_almost_equal
 from pactools.comodulogram import Comodulogram
@@ -109,6 +109,52 @@ def test_empty_mask():
         comod_0 = fast_comod(mask=mask, method=method)
         comod_1 = fast_comod(low_sig=signal[~mask], method=method)
         assert_array_almost_equal(comod_0, comod_1, decimal=7)
+
+
+def test_surrogates():
+    # Test the surrogates comodulogram
+    for method in ALL_PAC_METRICS:
+        msg = 'with method=%s' % method
+        if method in BICOHERENCE_PAC_METRICS or method == 'jiang':
+            continue
+
+        n_surrogates = 10
+        est = ComodTest(method=method, n_surrogates=n_surrogates).fit(signal)
+        assert_array_equal(est.comod_.shape, (n_low, n_high), err_msg=msg)
+        assert_array_equal(est.surrogates_.shape, (n_surrogates, n_low,
+                                                   n_high), err_msg=msg)
+
+        # z-score
+        z_score = est.comod_z_score_
+        assert_array_equal(z_score.shape, (n_low, n_high), err_msg=msg)
+        if method != 'jiang':  # 'jiang' method does not estimate CFC but CFD
+            assert_greater(z_score[1, 1], z_score[-1, -1], msg=msg)
+
+        # surrogate_max
+        surrogate_max = est.surrogate_max_
+        assert_array_equal(surrogate_max.shape, (n_surrogates, ))
+        assert_greater(est.comod_[1, 1], surrogate_max.max(), msg=msg)
+        assert_greater(surrogate_max.max(), est.comod_[-1, -1], msg=msg)
+
+    # Smoke test with contours in the plotting function
+    est.plot(contour_level=0.01, contour_method='comod_max')
+    est.plot(contour_level=3, contour_method='z_score')
+    plt.close('all')
+
+
+def test_no_surrogate():
+    # Test the errors when n_surrogates == 0
+    for method in ALL_PAC_METRICS:
+        est = ComodTest(method=method, n_surrogates=0).fit(signal)
+
+        with assert_raises(ValueError):
+            est.comod_z_score_
+        with assert_raises(ValueError):
+            est.surrogate_max_
+
+    with assert_raises(ValueError):
+        est.plot(contour_level=0.01)
+    plt.close('all')
 
 
 def test_comodulogram_dar_models():
