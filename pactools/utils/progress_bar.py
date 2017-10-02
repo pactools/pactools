@@ -121,5 +121,4 @@ class ProgressBar():
                 yield next(sequence)
                 self.update_with_increment_value(1)
             except StopIteration:
-                self.close()
                 return

@@ -257,8 +257,9 @@ class Comodulogram(object):
                 high_sig = low_sig
 
             if self.progress_bar:
-                self.progress_bar = ProgressBar('coherence: %s' % self.method,
-                                                max_value=n_masks)
+                self.progress_bar = ProgressBar(
+                    'coherence: %s' % self.method,
+                    max_value=n_masks * len(self.shifts_))
 
             # compute a number of band-pass filtered signals
             filtered_high = multiple_band_pass(
@@ -268,9 +269,6 @@ class Comodulogram(object):
             for this_mask in mask:
                 results = _coherence(self, low_sig, filtered_high, this_mask)
                 all_results.append(results)
-
-                if self.progress_bar:
-                    self.progress_bar.update_with_increment_value(1)
 
         # compute PAC with the bispectrum/bicoherence
         elif self.method in BICOHERENCE_PAC_METRICS:
@@ -818,14 +816,16 @@ def _coherence(estimator, low_sig, filtered_high, mask):
         estimator.fs, estimator.low_fq_width, estimator.method,
         **estimator.coherence_params)
 
-    comod_list = []
-    for sh in estimator.shifts_:
-        comod = _one_coherence_modulation_index(
-            shift=sh, fs=estimator.fs, low_sig=low_sig,
-            filtered_high=filtered_high, method=estimator.method,
-            low_fq_range=estimator.low_fq_range,
-            coherence_params=coherence_params)
-        comod_list.append(comod)
+    delayed_func = delayed(_one_coherence_modulation_index)
+    generator = (delayed_func(
+        shift=sh, fs=estimator.fs, low_sig=low_sig,
+        filtered_high=filtered_high, method=estimator.method,
+        low_fq_range=estimator.low_fq_range, coherence_params=coherence_params)
+        for sh in estimator.shifts_)
+    if estimator.progress_bar:
+        generator = estimator.progress_bar(generator)
+
+    comod_list = Parallel(n_jobs=estimator.n_jobs)(generator)
     comod_list = np.array(comod_list)
 
     return comod_list
