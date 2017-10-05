@@ -212,6 +212,7 @@ class BandPassFilter(FIR):
 
             fir = FIR(fir=self.fir_imag, fs=self.fs)
             fir.plot(axs=axs, fscale=fscale)
+        return fig
 
 
 class LowPassFilter(FIR):
