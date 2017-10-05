@@ -439,6 +439,11 @@ class BaseDAR(object):
         """Bayesian information criterion (BIC) of the model"""
         return self._compute_criterion()['bic']
 
+    @property
+    def tmax(self):
+        """Scaling of self.logl, self.aic, and self.bic"""
+        return self._compute_criterion()['tmax']
+
     def _reset_criterions(self):
         """Reset stored criterions (negative log_likelihood, AIC or BIC)"""
         self.model_selection_criterions_ = None
