@@ -933,7 +933,7 @@ class BaseDAR(object):
         # full oscillation for derivative
         phase = np.linspace(-np.pi, np.pi, nbcols, endpoint=False)
         if self.sigdriv_imag is None:
-            sigdriv = xlim[1] * np.cos(phase)
+            sigdriv = np.linspace(xlim[0], xlim[1], nbcols)
             sigdriv_imag = None
         else:
             sigdriv = xlim[0] * np.cos(phase)
