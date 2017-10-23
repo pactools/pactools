@@ -720,7 +720,9 @@ class BaseDAR(object):
         if squared:
             G_cols *= 2
         if not log:
-            G_cols = np.exp(G_cols)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                G_cols = np.exp(G_cols) + EPSILON * 10
         return G_cols
 
     def _estimate_log_likelihood(self, train=False, skip=0):
@@ -746,7 +748,6 @@ class BaseDAR(object):
 
         # -------- estimate the gain
         gain2 = self._develop_gain(basis, squared=True)
-        gain2 += EPSILON
 
         # -------- compute the log likelihood from the residual
         logL = wgn_log_likelihood(residual, gain2, weights=weights)
@@ -877,10 +878,10 @@ class BaseDAR(object):
             n_fft *= 2
 
         if ordar_ > 0:
-            AR_cols = AR_cols / (G_cols + EPSILON)
+            AR_cols = AR_cols / G_cols
             AR_spec = np.fft.rfft(AR_cols, n=n_fft, axis=0)
         else:
-            Ginv_cols = 1.0 / (G_cols + EPSILON)
+            Ginv_cols = 1.0 / G_cols
             AR_spec = np.fft.rfft(Ginv_cols, n=n_fft, axis=0)
 
         # -------- estimate AR spectrum

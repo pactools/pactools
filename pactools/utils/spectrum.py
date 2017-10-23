@@ -49,8 +49,9 @@ class Spectrum(object):
 
     def check_params(self):
         # block_length
-        if self.block_length < 0:
-            raise ValueError('Block length is negative')
+        if self.block_length <= 0:
+            raise ValueError('Block length is negative: %s' %
+                             (self.block_length, ))
         self.block_length = int(self.block_length)
 
         # fft_length
