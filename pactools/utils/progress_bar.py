@@ -116,6 +116,7 @@ class ProgressBar():
             self.closed = True
 
     def __call__(self, sequence):
+        sequence = iter(sequence)
         while True:
             try:
                 yield next(sequence)
