@@ -32,7 +32,7 @@ class BaseLattice(BaseDAR):
             sigdriv = self.sigdriv
             try:
                 newbasis = self.basis_
-            except:
+            except AttributeError:
                 newbasis = self._make_basis()
         else:
             newbasis = self._make_basis(sigdriv=sigdriv)

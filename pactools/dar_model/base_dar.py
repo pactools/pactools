@@ -395,7 +395,7 @@ class BaseDAR(object):
         criterion = criterion.lower()
         try:
             value = self._compute_criterion(train=train)[criterion]
-        except:
+        except KeyError:
             raise KeyError('Wrong criterion: %s' % criterion)
         return value
 
@@ -848,7 +848,7 @@ class BaseDAR(object):
             sigdriv = self.sigdriv
             try:
                 basis = self.basis_
-            except:
+            except AttributeError:
                 basis = self._make_basis(ordriv=self.ordriv_)
         else:
             basis = self._make_basis(sigdriv=sigdriv,

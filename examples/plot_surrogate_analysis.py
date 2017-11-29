@@ -45,18 +45,18 @@ signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
 # Then, let's define the range of low frequency, and the PAC metric used.
 
 low_fq_range = np.linspace(1, 10, 50)
-method = 'duprelatour'  # or 'tort', 'ozkurt', 'penny', 'colgin', ...
+method = 'duprelatour'  # or 'tort', 'ozkurt', 'penny', 'colgin', ...
 
 ###############################################################################
 # We also choose the number of comodulograms computed in the surrogate
-# analysis. A good rule of thumb is 10 / p_value. Example: 10 / 0.05 = 200.
+# analysis. A good rule of thumb is 10 / p_value. Example: 10 / 0.05 = 200.
 
 n_surrogates = 200
 
 ###############################################################################
-# As a surrogate analysis recquires to compute many comodulograms, the
-# computation can be slow. If you have multiple cores in your CPU, you can
-# leverage them using the parameter `n_jobs` > 1.
+# As a surrogate analysis recquires to compute many comodulograms, the
+# computation can be slow. If you have multiple cores in your CPU, you can
+# leverage them using the parameter `n_jobs` > 1.
 
 n_jobs = 1
 
@@ -73,9 +73,9 @@ estimator.fit(signal)
 
 ###############################################################################
 # Then we plot the significance level on top of the comodulogram.
-# Here we present two methods.
+# Here we present two methods.
 #
-# The z-score method presented here considers independently each pair of
+# The z-score method presented here considers independently each pair of
 # frequency of the comodulogram. For each pair, we compute the mean `mu` and
 # standard deviation `sigma` of the PAC values computed over the surrogates
 # signals. We then transform the original PAC values `PAC` (non time-shifted)
@@ -86,10 +86,10 @@ estimator.fit(signal)
 # is Gaussian.
 #
 #
-# The other method presented here considers the ditribution of comodulogram
+# The other method presented here considers the ditribution of comodulogram
 # maxima. For each surrogate comodulogram, we compute the maximum PAC value.
 # From the obtained empirical distribution of maxima, we compute the
-# 95-percentile, which corresponds to a p-value of 0.05.
+# 95-percentile, which corresponds to a p-value of 0.05.
 #
 # This method does not assume the distribution to be Gaussian, nor suffers from
 # multiple-testing issues. This is the default method in the `plot` method.
