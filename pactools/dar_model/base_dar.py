@@ -23,7 +23,8 @@ class BaseDAR(object):
 
     def __init__(self, ordar=1, ordriv=0, criterion=None, normalize=True,
                  ortho=True, center=True, iter_gain=10, eps_gain=1.0e-4,
-                 progress_bar=False, use_driver_phase=False):
+                 progress_bar=False, use_driver_phase=False, max_ordar=None,
+                 warn_gain_estimation_failure=False):
         # -------- save parameters
         self.ordar = ordar
         self.criterion = criterion
@@ -34,6 +35,10 @@ class BaseDAR(object):
         self.eps_gain = eps_gain
         self.progress_bar = progress_bar
         self.use_driver_phase = use_driver_phase
+        self.warn_gain_estimation_failure = warn_gain_estimation_failure
+
+        # for fair loglikelihood comparison
+        self.max_ordar = max_ordar if max_ordar is not None else ordar
 
         # power of the Taylor expansion
         self.ordriv = ordriv
@@ -152,7 +157,6 @@ class BaseDAR(object):
             # -------- select the best order
             self._order_selection()
             self._estimate_error(recompute=True)
-            self._estimate_gain()
 
         else:
             self._fit()
@@ -403,7 +407,7 @@ class BaseDAR(object):
 
         # else compute the criterions base on the log likelihood
         logl, tmax = self._estimate_log_likelihood(train=train,
-                                                   skip=self.ordar_)
+                                                   skip=self.max_ordar)
         degrees = self.degrees_of_freedom()
 
         # Akaike Information Criterion
@@ -559,8 +563,9 @@ class BaseDAR(object):
         try:
             self._estimate_driven_gain(regul=regul)
         except Exception as e:
-            msg = 'Gain estimation failed, fixed gain used. Error: %s' % e
-            warnings.warn(msg)
+            if self.warn_gain_estimation_failure:
+                msg = 'Gain estimation failed, fixed gain used. Error: %s' % e
+                warnings.warn(msg)
             self._estimate_fixed_gain()
 
     def _estimate_driven_gain(self, regul=0.):

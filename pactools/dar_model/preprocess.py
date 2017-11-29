@@ -299,7 +299,7 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0, zero_phase=True,
         ar.arma2psd(hold=True)
         ar.periodogram(sigout, hold=True)
         ar.plot('periodogram before/after whitening', labels=[
-            'with electric network', 'without electric network', 'model AR',
+            'PSD', 'sqrt(PSD) without electric network', 'model AR',
             'whitened'
         ], fscale='lin')
         plt.legend(loc='lower left')
