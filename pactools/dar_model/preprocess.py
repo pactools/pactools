@@ -188,7 +188,7 @@ def extract_and_fill(sig, fs, fc, n_cycles=None, bandwidth=1.0, fill=0,
         else:
             fa = fc
             dfa = bandwidth
-        high_sig = fill_gap(high_sig, fs, fa=fa, dfa=dfa, draw=draw,
+        high_sig = fill_gap(high_sig, fs, fgap=(fa - dfa, fa + dfa), draw=draw,
                             fill_sig=fill_sig)
 
         if 'z' in draw or 'e' in draw:
@@ -218,7 +218,7 @@ def low_pass_and_fill(sig, fs, fc=1.0, draw='', bandwidth=1.,
     filt = LowPassFilter(fs=fs, fc=fc, bandwidth=bandwidth)
     fill_sig = filt.transform(random_noise)
     # adjust power of fill_sig and add it to high_sig
-    filled_sig = fill_gap(sig=high_sig, fs=fs, fa=fc / 2., dfa=fc / 2.,
+    filled_sig = fill_gap(sig=high_sig, fs=fs, fgap=(0, fc),
                           draw=draw, fill_sig=fill_sig)
     return filled_sig
 
@@ -307,18 +307,17 @@ def whiten(sig, fs, ordar=8, draw='', enf=50.0, d_enf=1.0, zero_phase=True,
     return sigout
 
 
-def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
+def fill_gap(sig, fs, fgap, draw='', fill_sig=None,
              random_state=None):
     """Fill a frequency gap with white noise.
     """
     rng = check_random_state(random_state)
 
     # -------- get the amplitude of the gap
-    sp = Spectrum(block_length=min(2048, sig.size), fs=fs, wfunc=np.blackman)
+    sp = Spectrum(block_length=min(512, sig.size), fs=fs, wfunc=np.blackman)
     fft_length, _ = sp.check_params()
     sp.periodogram(sig)
-    fmin = fa - dfa
-    fmax = fa + dfa
+    fmin, fmax = fgap
     kmin = max((0, int(fft_length * fmin / fs)))
     kmax = min(fft_length // 2, int(fft_length * fmax / fs) + 1)
     Amin = sp.psd[-1][0, kmin]
@@ -338,14 +337,34 @@ def fill_gap(sig, fs, fa=50.0, dfa=25.0, draw='', fill_sig=None,
 
     # -------- bandpass filtering of white noise
     if fill_sig is None:
-        n_cycles = 1.65 * fa / dfa
-        fir = BandPassFilter(fs=fs, fc=fa, n_cycles=n_cycles, bandwidth=None,
-                             zero_mean=False)
-        fill_sig = fir.transform(rng.randn(*sig.shape))
+        white_noise = rng.randn(*sig.shape)
+        if kmin == 0:
+            fir = LowPassFilter(fs=fs, fc=fmax,
+                                bandwidth=min(fmax, fs / 2 - fmax),
+                                zero_mean=False)
+            fill_sig = fir.transform(white_noise)
+        elif kmax == (fft_length // 2):
+            fir = LowPassFilter(fs=fs, fc=fmax,
+                                bandwidth=min(fmax, fs / 2 - fmax),
+                                zero_mean=False)
+
+            fill_sig = white_noise - fir.transform(white_noise)
+        else:
+            fc = fmin + fmax / 2.
+            bandwidth = (fmin - fmax) / 2.
+            fir = BandPassFilter(fs=fs, fc=fc, n_cycles=None,
+                                 bandwidth=bandwidth,
+                                 zero_mean=False)
+            fill_sig = fir.transform(white_noise)
 
     # -------- compute the scale parameter
     sp.periodogram(fill_sig, hold=True)
-    kfa = int(fft_length * fa / fs)
+    if kmin == 0:
+        kfa = kmin
+    elif kmax == (fft_length // 2):
+        kfa = kmax
+    else:
+        kfa = int(fft_length * (fmin + fmax) / 2. / fs)
     scale = np.sqrt(A_fa / sp.psd[-1][0, kfa])
     fill_sig *= scale
 
