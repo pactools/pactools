@@ -6,7 +6,7 @@ from pactools.utils.testing import assert_almost_equal
 
 
 def test_pink_noise_shape():
-    n_points = 1000
+    n_points = 999
 
     # test the shape
     for func in almost_pink_noise, pink_noise:

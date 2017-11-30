@@ -96,7 +96,7 @@ p_value = 0.05
 n_jobs = 11
 
 # prepare the plot axes
-n_lines = 1
+n_lines = 2
 n_columns = int(np.ceil(len(methods) / float(n_lines)))
 figsize = (4 * n_columns, 3 * n_lines)
 fig, axs = plt.subplots(nrows=n_lines, ncols=n_columns, figsize=figsize)
