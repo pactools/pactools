@@ -963,8 +963,8 @@ class BaseDAR(object):
 
         if sigdriv_imag is None:
             bounds = np.percentile(sigdriv, [5, 95])
-            bound_min = min(-bounds[0], bounds[1])
-            bounds = (-bound_min, bound_min)
+            # bound_min = min(-bounds[0], bounds[1])
+            # bounds = (-bound_min, bound_min)
         else:
             bounds_real = np.sqrt(np.median(sigdriv ** 2))
             bounds_imag = np.sqrt(np.median(sigdriv_imag ** 2))

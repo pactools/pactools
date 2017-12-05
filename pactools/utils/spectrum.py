@@ -66,7 +66,7 @@ class Spectrum(object):
 
         # step
         if self.step is None:
-            step = int(self.block_length // 2)
+            step = max(int(self.block_length // 2), 1)
         else:
             step = int(self.step)
         if step <= 0 or step > self.block_length:
