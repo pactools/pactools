@@ -1073,7 +1073,7 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_surrogates):
 
 
 def read_comodulogram(fname):
-    data = read_hdf5(fname,  'comodulogram', slash='replace')
+    data = read_hdf5(fname, 'comodulogram', slash='replace')
     init_params = {k: v for k, v in data.items() if not k.endswith('_')}
     if 'random_state' in init_params:
         rs = init_params['random_state']
