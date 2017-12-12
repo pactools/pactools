@@ -42,7 +42,7 @@ trailing-spaces:
 flake8:
 	flake8 . --ignore=E266,W503,E265,E123 --exclude=setup.py \
 	&& echo -e '        flake8 \033[32m PASSED'\
-	|| echo -e '        flake8 \033[31m FAILED'
+	|| (echo -e '        flake8 \033[31m FAILED' && exit 1)
 
 ascii:
 	# find every file that contains non-ASCII characters
