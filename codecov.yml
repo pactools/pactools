@@ -11,6 +11,4 @@ coverage:
     changes: false
   ignore:
     - "pactools/viz"
-comment:
-  layout: "header, diff, sunburst, uncovered"
-  behavior: default
+comment: false
