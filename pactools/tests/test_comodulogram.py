@@ -3,11 +3,13 @@ from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 
+from mne.utils import _TempDir
+
 from pactools.dar_model import AR, DAR, HAR, StableDAR
 from pactools.utils.testing import assert_equal, assert_greater
 from pactools.utils.testing import assert_raises, assert_array_equal
 from pactools.utils.testing import assert_true, assert_array_almost_equal
-from pactools.comodulogram import Comodulogram
+from pactools.comodulogram import Comodulogram, read_comodulogram
 from pactools.comodulogram import ALL_PAC_METRICS, BICOHERENCE_PAC_METRICS
 from pactools.simulate_pac import simulate_pac
 
@@ -189,3 +191,38 @@ def test_plot_comodulogram():
 def test_signal_unchanged():
     # Test that signal has not been changed during the test
     assert_array_equal(signal_copy, signal)
+
+
+def _compare_values(v, v2):
+    if isinstance(v, np.ndarray):
+        assert_array_equal(v, v2)
+    elif isinstance(v, dict):
+        for key, value in v.items():
+            _compare_values(v[key], v2[key])
+    elif isinstance(v, np.random.RandomState):
+        for s, s2 in zip(v.get_state(), v2.get_state()):
+            _compare_values(s, s2)
+    else:
+        assert_equal(v, v2)
+
+
+def _compare_instance(inst1, inst2):
+    for k, v in vars(inst1).items():
+        v2 = getattr(inst2, k)
+        _compare_values(v, v2)
+
+
+def test_save():
+    # Test File IO
+    tmp = _TempDir()
+    est = ComodTest()
+    fname = tmp + '/test.hdf5'
+    est.save(fname)
+    est2 = read_comodulogram(fname)
+    _compare_instance(est, est2)
+
+    # Now fit and save
+    est.fit(signal)
+    est.save(fname, overwrite=True)
+    est3 = read_comodulogram(fname)
+    _compare_instance(est, est3)

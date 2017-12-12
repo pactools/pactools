@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d, interp2d
 
+from mne.externals.h5io import write_hdf5, read_hdf5
+
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
 from .dar_model.preprocess import multiple_extract_driver
@@ -557,6 +559,16 @@ class Comodulogram(object):
         else:
             return low_fq[0], high_fq[0], max_pac_value[0]
 
+    def save(self, fname, overwrite=False):
+        save_vars = {k: v for k, v in vars(self).items()}
+        if 'random_state' in save_vars:
+            rs = save_vars['random_state']
+            if type(rs) != np.int:
+                save_vars['random_state'] = 'mtrand'
+                save_vars['random_state_state_'] = rs.__getstate__()
+        write_hdf5(fname, save_vars, title='comodulogram',
+                   overwrite=overwrite, slash='replace')
+
 
 def _comodulogram(estimator, filtered_low, filtered_high, mask,
                   filtered_low_2):
@@ -1058,3 +1070,21 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_surrogates):
     shifts[0] = 0
 
     return shifts
+
+
+def read_comodulogram(fname):
+    data = read_hdf5(fname, 'comodulogram', slash='replace')
+    init_params = {k: v for k, v in data.items() if not k.endswith('_')}
+    if 'random_state' in init_params:
+        rs = init_params['random_state']
+        if rs == 'mtrand':
+            rs_state = data['random_state_state_']
+            del data['random_state_state_']
+            rs = np.random.RandomState()
+            rs.set_state(rs_state)
+            init_params['random_state'] = rs
+    attrs = {k: v for k, v in data.items() if k.endswith('_')}
+    inst = Comodulogram(**init_params)
+    for k, v in attrs.items():
+        setattr(inst, k, v)
+    return inst
