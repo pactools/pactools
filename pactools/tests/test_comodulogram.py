@@ -201,7 +201,7 @@ def _compare_values(v, v2):
             _compare_values(v[key], v2[key])
     elif isinstance(v, np.random.RandomState):
         for s, s2 in zip(v.get_state(), v2.get_state())):
-          _compare_values(s, s2)
+            _compare_values(s, s2)
     else:
         assert_equal(v, v2)
 
