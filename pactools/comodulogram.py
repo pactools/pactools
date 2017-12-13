@@ -5,8 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d, interp2d
 
-from mne.externals.h5io import write_hdf5, read_hdf5
-
 from .dar_model.base_dar import BaseDAR
 from .dar_model.dar import DAR
 from .dar_model.preprocess import multiple_extract_driver
@@ -18,7 +16,7 @@ from .utils.validation import check_array, check_random_state
 from .utils.validation import check_consistent_shape, check_is_fitted
 from .utils.viz import add_colorbar
 from .bandpass_filter import multiple_band_pass
-from .mne_api import MaskIterator
+from .mne_api import MaskIterator, _check_mne
 
 N_BINS_TORT = 18
 
@@ -560,6 +558,27 @@ class Comodulogram(object):
             return low_fq[0], high_fq[0], max_pac_value[0]
 
     def save(self, fname, overwrite=False):
+        """
+        Save a comodulogram object on disk with h5py.
+
+        Parameters
+        ----------
+        fname : string
+            Filename to use.
+        overwrite : boolean
+            If True, overwrite file if it exists.
+
+        Examples
+        --------
+        >>> from pactools.comodulogram import Comodulgram, read_comodulogram
+        >>> est = Comodulogram(fs=1000., low_fq_range=[1, 2, 3])
+        >>> fname = '/my_filename.hdf5'
+        >>> est.save(fname)
+        >>> est2 = read_comodulogram(fname)
+        """
+        mne = _check_mne('Comodulogram.save')
+        write_hdf5 = mne.externals.h5io.write_hdf5
+
         save_vars = {k: v for k, v in vars(self).items()}
         if 'random_state' in save_vars:
             rs = save_vars['random_state']
@@ -1073,6 +1092,9 @@ def _get_shifts(random_state, n_points, minimum_shift, fs, n_surrogates):
 
 
 def read_comodulogram(fname):
+    mne = _check_mne('read_comodulogram')
+    read_hdf5 = mne.externals.h5io.read_hdf5
+
     data = read_hdf5(fname, 'comodulogram', slash='replace')
     init_params = {k: v for k, v in data.items() if not k.endswith('_')}
     if 'random_state' in init_params:

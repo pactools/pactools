@@ -1,6 +1,15 @@
 import numpy as np
 
 
+def _check_mne(name):
+    """Helper to check if h5py is installed"""
+    try:
+        import mne
+    except ImportError:
+        raise ImportError('Please install MNE-python to use %s.' % name)
+    return mne
+
+
 def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
     """
     A function to transform MNE data into pactools input signals.
@@ -61,12 +70,9 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
     >>> for one_mask in mask:
     ...     pass
     """
-    try:
-        from mne.io import BaseRaw
-    except ImportError:
-        raise ImportError('Please install MNE-python to use raw_to_mask.')
+    mne = _check_mne('raw_to_mask')
 
-    if not isinstance(raw, BaseRaw):
+    if not isinstance(raw, mne.io.BaseRaw):
         raise ValueError('Must supply Raw as input')
 
     ixs = np.atleast_1d(ixs)

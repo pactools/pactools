@@ -31,7 +31,11 @@ Installation
 
 To install ``pactools``, you first need to install its dependencies::
 
-	pip install numpy matplotlib scipy
+	pip install numpy scipy matplotlib
+
+To enable all features, you will also need to install optional packages::
+
+    pip install mne h5py joblib
 
 Then install ``pactools``::
 
