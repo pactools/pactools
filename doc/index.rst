@@ -7,7 +7,7 @@ in neural time series.
 In particular, it implements the **driven auto-regressive (DAR)**
 models presented in [`Dupre la Tour et al. 2017`_].
 
-.. _Dupre la Tour et al. 2017: http://www.biorxiv.org/content/early/2017/07/06/159731
+.. _Dupre la Tour et al. 2017: http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005893
 
 Contents
 --------

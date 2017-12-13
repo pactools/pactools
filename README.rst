@@ -98,14 +98,19 @@ If you use this code in your project, please cite
 
 .. code-block:: none
 
-    @article {duprelatour159731,
-        author = {Dupr\'e la Tour, Tom and Tallot, Lucille and Grabot, Laetitia and Doy\`ere, Val\'erie and van Wassenhove, Virginie and Grenier, Yves and Gramfort, Alexandre},
-        title = {Non-linear Auto-Regressive Models for Cross-Frequency Coupling in Neural Time Series},
+    @article{duprelatour2017nonlinear,
+        author = {Dupr{\'e} la Tour, Tom and Tallot, Lucille and Grabot, Laetitia and Doy{\`e}re, Val{\'e}rie and van Wassenhove, Virginie and Grenier, Yves and Gramfort, Alexandre},
+        journal = {PLOS Computational Biology},
+        publisher = {Public Library of Science},
+        title = {Non-linear auto-regressive models for cross-frequency coupling in neural time series},
         year = {2017},
-        doi = {10.1101/159731},
-        publisher = {Cold Spring Harbor Labs Journals},
-        URL = {http://www.biorxiv.org/content/early/2017/07/06/159731},
-        journal = {bioRxiv}
+        month = {12},
+        volume = {13},
+        url = {https://doi.org/10.1371/journal.pcbi.1005893},
+        pages = {1-32},
+        number = {12},
+        doi = {10.1371/journal.pcbi.1005893}
     }
 
-.. _Dupre la Tour et al. 2017: http://www.biorxiv.org/content/early/2017/07/06/159731
+
+.. _Dupre la Tour et al. 2017: http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005893
