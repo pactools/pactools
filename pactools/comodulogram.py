@@ -585,6 +585,8 @@ class Comodulogram(object):
             if type(rs) != np.int:
                 save_vars['random_state'] = 'mtrand'
                 save_vars['random_state_state_'] = rs.__getstate__()
+            if self.progress_bar:
+                save_vars['progress_bar'] = True
         write_hdf5(fname, save_vars, title='comodulogram',
                    overwrite=overwrite, slash='replace')
 
