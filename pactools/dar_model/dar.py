@@ -94,8 +94,9 @@ class DAR(BaseDAR):
         K = self.ordar
 
         # -------- model at order 0
-        AR_ = np.empty((0, m))
-        yield AR_
+        if not only_last:
+            AR_ = np.empty((0, m))
+            yield AR_
 
         if K > 0:
             # -------- prepare regression signals

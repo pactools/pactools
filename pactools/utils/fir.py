@@ -25,7 +25,7 @@ class FIR(object):
         self.fir = fir
         self.fs = fs
 
-    def transform(self, sigin):
+    def transform(self, sigin, out=None, out_imag=None):
         """Apply this filter to a signal
 
         Parameters
@@ -35,19 +35,28 @@ class FIR(object):
 
         Returns
         -------
-        filtered : array, shape (n_points, ) or (n_signals, n_points)
+        out : array, shape (n_points, ) or (n_signals, n_points)
             Filtered signal
         """
         sigin_ndim = sigin.ndim
         sigin = np.atleast_2d(sigin)
-        filtered = [signal.fftconvolve(sig, self.fir, 'same') for sig in sigin]
+
+        if out is None:
+            out = np.empty(sigin.shape)
+        else:
+            out = np.atleast_2d(out)
+            assert out.dtype.kind in 'fc'
+
+        for i, sig in enumerate(sigin):
+            tmp = signal.fftconvolve(sig, self.fir, 'same')
+            out[i] = tmp
 
         if sigin_ndim == 1:
-            filtered = filtered[0]
+            out = out[0]
         else:
-            filtered = np.asarray(filtered)
+            out = np.asarray(out)
 
-        return filtered
+        return out
 
     def plot(self, axs=None, fscale='log'):
         """
@@ -73,8 +82,7 @@ class FIR(object):
         s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
                      step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
-        s.plot('Transfer function of FIR filter', fscale=fscale,
-               axes=axs[0])
+        s.plot('Transfer function of FIR filter', fscale=fscale, axes=axs[0])
 
         # plots
         axs[1].plot(self.fir)
@@ -174,7 +182,7 @@ class BandPassFilter(FIR):
         order = half_order * 2 + 1
         return order
 
-    def transform(self, sigin):
+    def transform(self, sigin, out=None, out_imag=None):
         """Apply this filter to a signal
 
         Parameters
@@ -191,11 +199,11 @@ class BandPassFilter(FIR):
             Only when extract_complex is true.
             Filtered signal with the imaginary part of the filter
         """
-        filtered = super(BandPassFilter, self).transform(sigin)
+        filtered = super(BandPassFilter, self).transform(sigin, out=out)
 
         if self.extract_complex:
             fir = FIR(fir=self.fir_imag, fs=self.fs)
-            filtered_imag = fir.transform(sigin)
+            filtered_imag = fir.transform(sigin, out=out_imag)
             return filtered, filtered_imag
         else:
             return filtered
