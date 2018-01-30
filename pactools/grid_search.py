@@ -8,36 +8,66 @@ from .utils.validation import check_is_fitted
 class DARSklearn(DAR, BaseEstimator):
     """Different interface to DAR models, to use scikit-learn's GridSearchCV
 
+    Parameters
+    ----------
+    fs : float
+        Sampling frequency
+
+    max_ordar : int >= 0
+        Maximum ordar over a potential cross-validation scheme.
+        The log-likelihood does not use the first max_ordar points in its
+        computation, to fairly compare different ordar over cross-validation.
+
+    ordar : int >= 0
+        Order of the autoregressive model (p)
+
+    ordriv : int >= 0
+        Order of the taylor expansion for sigdriv (m)
+
+    normalize : boolean
+        If True, the basis vectors are normalized to unit energy.
+
+    ortho : boolean
+        If True, the basis vectors are orthogonalized.
+
+    center : boolean
+        If True, we subtract the mean in sigin
+
+    iter_gain : int >=0
+        Maximum number of iteration in gain estimation
+
+    eps_gain : float >= 0
+        Threshold to stop iterations in gain estimation
+
+    use_driver_phase : boolean
+        If True, we divide the driver by its instantaneous amplitude.
+
     Examples
     --------
     >>> from sklearn.model_selection import GridSearchCV
     >>> from pactools.grid_search import DARSklearn
-    >>>
     >>> model = DARSklearn(fs=fs)
-    >>> param_grid = {ordar:  [10, 20, 30], ordriv: [0, 1, 2]}
+    >>> param_grid = {'ordar': [10, 20, 30], 'ordriv': [0, 1, 2]}
     >>> gscv = GridSearchCV(model, param_grid=param_grid)
     >>> X = MultipleArray(high_sig, low_sig, low_sig_imag)
     >>> gscv.fit(X)
     >>> print(gscv.cv_results_)
-
     """
-    def __init__(self, fs, use_imag=True, ordar=1, ordriv=0, criterion=None,
+    def __init__(self, fs, max_ordar, ordar=1, ordriv=0,
                  normalize=False, ortho=True, center=True, iter_gain=10,
                  eps_gain=1.0e-4, progress_bar=False, use_driver_phase=False,
-                 max_ordar=None, warn_gain_estimation_failure=False):
+                 warn_gain_estimation_failure=False):
         super(DARSklearn, self).__init__(
-            ordar=ordar, ordriv=ordriv, criterion=criterion,
+            ordar=ordar, ordriv=ordriv, criterion=None,
             normalize=normalize, ortho=ortho, center=center,
             iter_gain=iter_gain, eps_gain=eps_gain, progress_bar=progress_bar,
             use_driver_phase=use_driver_phase, max_ordar=max_ordar,
             warn_gain_estimation_failure=warn_gain_estimation_failure)
 
         self.fs = fs
-        self.use_imag = use_imag
 
     def fit(self, X, y=None):
         sigin, sigdriv, sigdriv_imag = X.to_list()
-        sigdriv_imag = sigdriv_imag if self.use_imag else None
         super(DARSklearn, self).fit(sigin=sigin, sigdriv=sigdriv, fs=self.fs,
                                     sigdriv_imag=sigdriv_imag)
         return self
@@ -49,14 +79,28 @@ class DARSklearn(DAR, BaseEstimator):
     def transform(self, X, y=None):
         check_is_fitted(self, 'AR_')
         sigin, sigdriv, sigdriv_imag = X.to_list()
-        sigdriv_imag = sigdriv_imag if self.use_imag else None
         return super(DARSklearn,
                      self).transform(sigin=sigin, sigdriv=sigdriv, fs=self.fs,
                                      sigdriv_imag=sigdriv_imag)
 
     def score(self, X, y=None):
+        """Difference in log-likelihood of this model and a model AR(0)
+
+        We subtract the log-likelihood of an autoregressive model at order 0,
+        in order to have a reference stable over cross-validation splits.
+        """
         self.transform(X, y)
-        return self.logl * self.tmax
+        score = self.logl * self.tmax
+
+        max_ordar = self.max_ordar
+        if max_ordar is None:
+            raise ValueError(
+                'max_ordar should not be zero, since it biases the grid search'
+                ' over ordar. Set max_ordar to the maximum value of ordar in '
+                'the grid search, or bigger.')
+        # remove the log likelihood of an AR(0) to better compare likelihoods
+        score -= self._estimate_log_likelihood_ref(skip=max_ordar)[0]
+        return score
 
 
 class AddDriverDelay(BaseEstimator, TransformerMixin):
@@ -67,17 +111,18 @@ class AddDriverDelay(BaseEstimator, TransformerMixin):
     >>> from sklearn.model_selection import GridSearchCV
     >>> from sklearn.pipeline import pipeline
     >>> from pactools.grid_search import DARSklearn, AddDriverDelay
-    >>>
-    >>> model = Pipeline(steps=[('add', AddDriverDelay()),
-    ...                         ('dar', DARsklearn(fs=fs))])
-    >>> param_grid = {'dar__ordar': [10, 20, 30],
-    ...               'dar__ordriv': [0, 1, 2],
-    ...               'add__delay': [-10, 0, 10]}
-    >>> gscv = GridSearchCV(model, param_grid=param_grid)
+    >>> param_grid = {
+    ...     'dar__ordar': [10, 20, 30],
+    ...     'dar__ordriv': [0, 1, 2],
+    ...     'add__delay': [-10, 0, 10]
+    ... }
+    >>> model = Pipeline(steps=[
+    ...     ('add', AddDriverDelay()),
+    ...     ('dar', DARSklearn(fs=fs, max_ordar=30)),
+    ... ])
     >>> X = MultipleArray(high_sig, low_sig, low_sig_imag)
     >>> gscv.fit(X)
     >>> print(gscv.cv_results_)
-
     """
     def __init__(self, delay=0, n_decay=30):
         self.delay = delay
@@ -116,9 +161,8 @@ class MultipleArray(object):
     --------
     >>> from sklearn.model_selection import GridSearchCV
     >>> from pactools.grid_search import DARSklearn
-    >>>
     >>> model = DARSklearn(fs=fs)
-    >>> param_grid = {ordar:  [10, 20, 30], ordriv: [0, 1, 2]}
+    >>> param_grid = {'ordar': [10, 20, 30], 'ordriv': [0, 1, 2]}
     >>> gscv = GridSearchCV(model, param_grid=param_grid)
     >>> X = MultipleArray(sigin, sigdriv, sigdriv_imag)
     >>> gscv.fit(X)

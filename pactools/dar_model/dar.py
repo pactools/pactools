@@ -27,7 +27,7 @@ class DAR(BaseDAR):
 
     Parameters
     ----------
-    ordar : int > 0
+    ordar : int >= 0
         Order of the autoregressive model (p)
 
     ordriv : int >= 0
@@ -94,7 +94,7 @@ class DAR(BaseDAR):
         K = self.ordar
 
         # -------- model at order 0
-        if not only_last:
+        if not only_last or K == 0:
             AR_ = np.empty((0, m))
             yield AR_
 

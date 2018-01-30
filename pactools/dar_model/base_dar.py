@@ -38,7 +38,7 @@ class BaseDAR(object):
         self.warn_gain_estimation_failure = warn_gain_estimation_failure
 
         # for fair loglikelihood comparison
-        self.max_ordar = max_ordar if max_ordar is not None else ordar
+        self.max_ordar = max_ordar
 
         # power of the Taylor expansion
         self.ordriv = ordriv
@@ -99,7 +99,7 @@ class BaseDAR(object):
             sigdriv_imag = sigdriv_imag / amplitude
 
         if self.center:
-            sigin -= np.mean(sigin)
+            sigin = sigin - np.mean(sigin)
 
         # -------- save signals as attributes of the model
         self.sigin = sigin
@@ -143,8 +143,8 @@ class BaseDAR(object):
         self.fs = fs
 
         # -------- check parameters
-        if self.ordar < 1:
-            raise ValueError('self.ordar is zero or negative')
+        if self.ordar < 0:
+            raise ValueError('self.ordar is negative')
         if self.ordriv < 0:
             raise ValueError('self.ordriv is negative')
 
@@ -160,6 +160,8 @@ class BaseDAR(object):
 
         else:
             self._fit()
+
+        self._estimate_fit_std()
 
         return self
 
@@ -406,8 +408,10 @@ class BaseDAR(object):
             return criterions
 
         # else compute the criterions base on the log likelihood
-        logl, tmax = self._estimate_log_likelihood(train=train,
-                                                   skip=self.max_ordar)
+        max_ordar = self.max_ordar
+        if self.max_ordar is None:
+            max_ordar = self.ordar
+        logl, tmax = self._estimate_log_likelihood(train=train, skip=max_ordar)
         degrees = self.degrees_of_freedom()
 
         # Akaike Information Criterion
@@ -560,6 +564,10 @@ class BaseDAR(object):
 
     def _estimate_gain(self, regul=0.):
         """helper to handle failure in gain estimation"""
+        if self.ordriv == 0:
+            self._estimate_fixed_gain()
+            return None
+
         try:
             self._estimate_driven_gain(regul=regul)
         except Exception as e:
@@ -730,6 +738,45 @@ class BaseDAR(object):
                 G_cols = np.exp(G_cols) + EPSILON * 10
         return G_cols
 
+    def _estimate_fit_std(self, train=False, skip=0):
+        """Estimate the likelihood of a model with ordar=0, ordriv=0"""
+        if train:
+            sigin, weights = self._get_train_data([self.sigin])
+        else:
+            sigin, weights = self._get_test_data([self.sigin])
+
+        sigin = sigin[:, self.ordar_:]
+        if weights is not None:
+            weights = weights[:, self.ordar_:]
+
+        if weights is not None:
+            average = np.average(sigin, weights=weights)
+            sigma2 = np.average((sigin - average) ** 2, weights=weights)
+            sigma = np.sqrt(sigma2)
+        else:
+            sigma = np.std(sigin)
+
+        self.fit_std_ = sigma
+
+    def _estimate_log_likelihood_ref(self, train=False, skip=0):
+        """Estimate the likelihood of a model with ordar=0, ordriv=0"""
+        if train:
+            sigin, weights = self._get_train_data([self.sigin])
+        else:
+            sigin, weights = self._get_test_data([self.sigin])
+
+        gain2 = self.fit_std_ ** 2
+
+        # skip first samples
+        sigin = sigin[:, skip:]
+        if weights is not None:
+            weights = weights[:, skip:]
+
+        logL = wgn_log_likelihood(sigin, gain2, weights=weights)
+        tmax = sigin.size
+
+        return logL, tmax
+
     def _estimate_log_likelihood(self, train=False, skip=0):
         """Approximate computation of the logarithm of the likelihood
 
@@ -758,7 +805,6 @@ class BaseDAR(object):
         logL = wgn_log_likelihood(residual, gain2, weights=weights)
 
         tmax = gain2.size
-
         return logL, tmax
 
     def likelihood_ratio(self, ar0):

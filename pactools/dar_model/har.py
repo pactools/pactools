@@ -17,7 +17,7 @@ class HAR(BaseDAR):
 
     Parameters
     ----------
-    ordar : int > 0
+    ordar : int >= 0
         Order of the autoregressive model (p)
 
     ordriv : int >= 0
