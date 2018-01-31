@@ -1,12 +1,13 @@
 """
-Use grid-search and cross-validation
-------------------------------------
-This example creates an artificial signal with phase-amplitude coupling (PAC),
+Grid-search and cross-validation
+--------------------------------
+This examples presents the interface with scikit-learn's GridSearchCV.
+
+It creates an artificial signal with phase-amplitude coupling (PAC),
 fits a DAR model over a grid-search of parameter, using cross_validation.
 
 Cross-validation is done over epochs, with any strategy provided in
-scikit-learn:
-http://scikit-learn.org/stable/modules/classes.html#splitter-classes
+scikit-learn (KFold, ...).
 
 Note that the score computed by a DARSklearn model is the log-likelihood from
 which we subtracted the log-likelihood of an autoregressive model at order 0.
