@@ -23,7 +23,6 @@ low_fq_width = 1.0  # Hz
 
 n_points = 10000
 noise_level = 0.4
-t_plot = 2.0  # sec
 
 signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=low_fq_width, noise_level=noise_level,

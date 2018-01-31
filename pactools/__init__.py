@@ -5,13 +5,19 @@ from .simulate_pac import simulate_pac, sigmoid
 from .peak_locking import PeakLocking
 from .mne_api import raw_to_mask
 from .delay_estimator import DelayEstimator
+from .grid_search import DARSklearn, AddDriverDelay
+from .grid_search import ExtractDriver, MultipleArray
 
 __version__ = '0.1'
 
 __all__ = [
+    'AddDriverDelay',
     'Comodulogram',
+    'DARSklearn',
     'DelayEstimator',
+    'ExtractDriver',
     'simulate_pac',
+    'MultipleArray',
     'multiple_band_pass',
     'PeakLocking',
     'raw_to_mask',

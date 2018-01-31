@@ -384,7 +384,8 @@ def _show_plot(draw):
 
 def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
                    whitening='after', ordar=10, normalize=False,
-                   extract_complex=True, random_state=None, draw=''):
+                   extract_complex=True, random_state=None, draw='',
+                   max_low_fq=None):
     """Extract the driver with filtering and fill the rest of the signal.
 
     The driver is extracted with a bandpass filter, subtracted from the signal,
@@ -441,6 +442,9 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
             - 'w' : whitening step
             - 'z' : all
 
+    max_low_fq : float or None
+        Maximum low_fq over a potential cross-validation scheme.
+
     Returns
     -------
     low_sigs : array, shape (n_epochs, n_points)
@@ -455,7 +459,7 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
 
     Examples
     --------
-    low_sig, high_sig = extract_driver(sigs, fs, 3.0):
+    >>> low_sig, high_sig, low_sigs_imag = extract_driver(sigs, fs, 3.0)
     """
     frequency_range = [low_fq]
     for sigs in multiple_extract_driver(
@@ -463,7 +467,7 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
             n_cycles=n_cycles, bandwidth=bandwidth, fill=fill,
             whitening=whitening, ordar=ordar, normalize=normalize,
             extract_complex=extract_complex, random_state=random_state,
-            draw=draw):
+            draw=draw, max_low_fq=max_low_fq):
         pass
     return sigs
 
@@ -471,7 +475,7 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
 def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
                             bandwidth=1.0, fill=2, whitening='after', ordar=10,
                             normalize=False, extract_complex=True,
-                            random_state=None, draw=''):
+                            random_state=None, draw='', max_low_fq=None):
     """Extract the driver for several bandpass center frequency.
 
     Parameters
@@ -525,6 +529,9 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
             - 'w' : whitening step
             - 'z' : all
 
+    max_low_fq : float or None
+        Maximum low_fq over a potential cross-validation scheme.
+
     Returns
     -------
     low_sigs : array, shape (n_epochs, n_points)
@@ -537,10 +544,11 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
         Imaginary part of the bandpass filtered signal
         Returned only if extract_complex is True.
 
-    Example
-    -------
-    for (low_sig, high_sig) in multiple_extract_driver(sigs, fs, [2., 3., 4.]):
-        pass
+    Examples
+    --------
+    >>> for (low_sig, high_sig, low_sigs_imag) in multiple_extract_driver(
+    ...         sigs, fs, [2., 3., 4.]):
+    ...     pass
     """
     frequency_range = np.atleast_1d(frequency_range)
     sigs = np.atleast_2d(sigs)
@@ -556,8 +564,9 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
         random_noise = None
 
     # extract the high frequencies independently of the driver
-    fc_low_pass = (
-        frequency_range[-1] + frequency_range[0] + bandwidth)  # arbitrary
+    if max_low_fq is None:
+        max_low_fq = max(frequency_range)
+    fc_low_pass = (max_low_fq + bandwidth * 2)  # arbitrary
     low_pass_width = bandwidth
     low_and_high = [
         extract_and_fill(sig, fs=fs, fc=fc_low_pass, bandwidth=low_pass_width,
@@ -604,8 +613,8 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
 
         _show_plot(draw)
 
-        low_sigs = np.array(low_sigs)
-        high_sigs = np.array(high_sigs)
+        low_sigs = np.asarray(low_sigs)
+        high_sigs = np.asarray(high_sigs)
         if extract_complex:
             low_sigs_imag = np.array(low_sigs_imag)
             yield low_sigs, high_sigs, low_sigs_imag
