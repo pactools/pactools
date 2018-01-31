@@ -21,6 +21,18 @@ Phase amplitude coupling (PAC)
    raw_to_mask
    simulate_pac
 
+scikit-learn GridSearchCV API
+=============================
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+   :template: class.rst
+
+   DARSklearn
+   ExtractDriver
+   AddDriverDelay
+   MultipleArray
 
 Driven auto-regressive (DAR) models
 ===================================
