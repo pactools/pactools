@@ -268,9 +268,9 @@ class AddDriverDelay(BaseEstimator, TransformerMixin):
 
         def window_and_roll(sig):
             sig = sig.copy()  # copy to avoid modifying original
-            sig[:, :n_decay] *= window
-            sig[:, -n_decay:] *= window[::-1]
-            sig = np.roll(sig, self.delay, axis=1)
+            sig[..., :n_decay] *= window
+            sig[..., -n_decay:] *= window[::-1]
+            sig = np.roll(sig, self.delay, axis=-1)
             return sig
 
         sigdriv = window_and_roll(sigdriv)
@@ -389,6 +389,13 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
         """
         low_sig, high_sig = X.to_list()
 
+        # handle 3D and more arrays, such as (n_epochs, n_channels, n_points)
+        shape = low_sig.shape
+        if len(shape) > 2:
+            low_sig = low_sig.reshape(-1, shape[-1])
+            if high_sig is not None:
+                high_sig.reshape(-1, shape[-1])
+
         n_epochs = low_sig.shape[0]
         if high_sig is None:
             sigs = low_sig
@@ -420,6 +427,12 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
             sigdriv = np.array(filtered_low[:n_epochs])
             if self.extract_complex:
                 sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
+
+        # recover initial shape
+        sigin = sigin.reshape(shape)
+        sigdriv = sigdriv.reshape(shape)
+        if sigdriv_imag is not None:
+            sigdriv_imag = sigdriv_imag.reshape(shape)
 
         return MultipleArray(sigin, sigdriv, sigdriv_imag)
 
