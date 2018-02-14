@@ -74,7 +74,7 @@ class Spectrum(object):
 
         return fft_length, step
 
-    def periodogram(self, signals, hold=False):
+    def periodogram(self, signals, hold=False, mean_psd=False):
         """
         Computes the estimation (in dB) for each epoch in a signal
 
@@ -88,9 +88,12 @@ class Spectrum(object):
             estimations, else, the list is emptied and only the current
             estimation is stored.
 
+        mean_psd : boolean, default = False
+            If True, the PSD is the mean PSD over all epochs.
+
         Returns
         -------
-        psd : array, shape (n_epochs, n_freq)
+        psd : array, shape (n_epochs, n_freq) or (1, n_freq) if mean_psd
             Power spectrum estimated with a Welsh method on each epoch
             n_freq = fft_length // 2 + 1
         """
@@ -128,6 +131,9 @@ class Spectrum(object):
             else:
                 scale = 1.0 / count
             psd[i] *= scale
+
+        if mean_psd:
+            psd = np.mean(psd, axis=0)[None, :]
 
         if not hold:
             self.psd = []

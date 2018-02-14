@@ -558,11 +558,6 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
         sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
         _show_plot(draw)
 
-    if fill == 2:
-        random_noise = rng.randn(len(sigs[0]))
-    else:
-        random_noise = None
-
     # extract the high frequencies independently of the driver
     if max_low_fq is None:
         max_low_fq = max(frequency_range)
@@ -570,9 +565,10 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
     low_pass_width = bandwidth
     low_and_high = [
         extract_and_fill(sig, fs=fs, fc=fc_low_pass, bandwidth=low_pass_width,
-                         fill=fill, random_noise=random_noise, draw=draw,
-                         extract_complex=False, low_pass=True,
-                         random_state=random_state) for sig in sigs
+                         fill=fill, random_noise=None,
+                         draw=draw, extract_complex=False, low_pass=True,
+                         random_state=rng.randint(np.iinfo(np.int32).max))
+        for sig in sigs
     ]
     high_sigs = [both[1] for both in low_and_high]
 

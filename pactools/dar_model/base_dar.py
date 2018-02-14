@@ -723,7 +723,6 @@ class BaseDAR(object):
             sigdriv=sigdriv, sigdriv_imag=sigdriv_imag, ordriv=self.ordriv_)
 
         self._estimate_error(recompute=True)
-        self._estimate_fit_std()
         return self.residual_
 
     def _develop_gain(self, basis, sigdriv=None, squared=False, log=False):
