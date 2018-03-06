@@ -738,16 +738,18 @@ class BaseDAR(object):
                 G_cols = np.exp(G_cols) + EPSILON * 10
         return G_cols
 
-    def _estimate_fit_std(self, train=False, skip=0):
+    def _estimate_fit_std(self, train=False, skip=None):
         """Estimate the likelihood of a model with ordar=0, ordriv=0"""
         if train:
             sigin, weights = self._get_train_data([self.sigin])
         else:
             sigin, weights = self._get_test_data([self.sigin])
 
-        sigin = sigin[:, self.ordar_:]
+        if skip is None:
+            skip = self.ordar_
+        sigin = sigin[:, skip:]
         if weights is not None:
-            weights = weights[:, self.ordar_:]
+            weights = weights[:, skip:]
 
         if weights is not None:
             average = np.average(sigin, weights=weights)

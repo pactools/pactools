@@ -385,7 +385,7 @@ def _show_plot(draw):
 def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
                    whitening='after', ordar=10, normalize=False,
                    extract_complex=True, random_state=None, draw='',
-                   max_low_fq=None):
+                   max_low_fq=None, enf=50.):
     """Extract the driver with filtering and fill the rest of the signal.
 
     The driver is extracted with a bandpass filter, subtracted from the signal,
@@ -467,7 +467,7 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
             n_cycles=n_cycles, bandwidth=bandwidth, fill=fill,
             whitening=whitening, ordar=ordar, normalize=normalize,
             extract_complex=extract_complex, random_state=random_state,
-            draw=draw, max_low_fq=max_low_fq):
+            draw=draw, max_low_fq=max_low_fq, enf=enf):
         pass
     return sigs
 
@@ -475,7 +475,8 @@ def extract_driver(sigs, fs, low_fq, n_cycles=None, bandwidth=1.0, fill=2,
 def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
                             bandwidth=1.0, fill=2, whitening='after', ordar=10,
                             normalize=False, extract_complex=True,
-                            random_state=None, draw='', max_low_fq=None):
+                            random_state=None, draw='', max_low_fq=None,
+                            enf=50.):
     """Extract the driver for several bandpass center frequency.
 
     Parameters
@@ -555,7 +556,8 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
     rng = check_random_state(random_state)
 
     if whitening == 'before':
-        sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw) for sig in sigs]
+        sigs = [whiten(sig, fs=fs, ordar=ordar, draw=draw, enf=enf)
+                for sig in sigs]
         _show_plot(draw)
 
     # extract the high frequencies independently of the driver
@@ -574,7 +576,7 @@ def multiple_extract_driver(sigs, fs, frequency_range, n_cycles=None,
 
     if whitening == 'after':
         high_sigs = [
-            whiten(high_sig, fs=fs, ordar=ordar, draw=draw)
+            whiten(high_sig, fs=fs, ordar=ordar, draw=draw, enf=enf)
             for high_sig in high_sigs
         ]
 

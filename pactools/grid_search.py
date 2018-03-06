@@ -320,6 +320,9 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
     random_state : None, int or np.random.RandomState instance
         Seed or random number generator for the white noise filling strategy.
 
+    enf : float
+        Electric Network Frequency
+
     Examples
     --------
     >>> from sklearn.model_selection import GridSearchCV
@@ -343,7 +346,7 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
 
     def __init__(self, fs, low_fq, max_low_fq, low_fq_width=1.0, fill=2,
                  whitening='after', ordar=10, normalize=False,
-                 extract_complex=True, random_state=None):
+                 extract_complex=True, random_state=None, enf=50.):
         self.fs = fs
         self.low_fq = low_fq
         self.max_low_fq = max_low_fq
@@ -354,6 +357,7 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
         self.normalize = normalize
         self.extract_complex = extract_complex
         self.random_state = random_state
+        self.enf = enf
 
     def fit(self, X, y=None):
         """No fit is needed"""
@@ -409,7 +413,8 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
             bandwidth=self.low_fq_width, fill=self.fill,
             whitening=self.whitening, ordar=self.ordar,
             normalize=self.normalize, extract_complex=self.extract_complex,
-            random_state=self.random_state, max_low_fq=self.max_low_fq)
+            random_state=self.random_state, max_low_fq=self.max_low_fq,
+            enf=self.enf)
 
         if self.extract_complex:
             filtered_low, filtered_high, filtered_low_imag = filtered_signals
