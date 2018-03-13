@@ -433,7 +433,7 @@ class ExtractDriver(BaseEstimator, TransformerMixin):
             if self.extract_complex:
                 sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
 
-        # recover initial shape
+        # recover initial shape
         sigin = sigin.reshape(shape)
         sigdriv = sigdriv.reshape(shape)
         if sigdriv_imag is not None:
