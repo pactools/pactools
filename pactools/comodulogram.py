@@ -954,7 +954,7 @@ def _driven_comodulogram(estimator, low_sig, high_sig, mask):
     else:
         # hack to call only once extract
         high_sig = np.atleast_2d(high_sig)
-        sigs = np.r_[low_sig, high_sig]
+        sigs = np.r_[high_sig, low_sig]
 
     generator = (
         delayed(_driven_comodulogram_column)(estimator, filtered_signals,
@@ -1007,10 +1007,10 @@ def _driven_comodulogram_column(estimator, filtered_signals, high_sig, mask,
         if extract_complex:
             sigdriv_imag = np.array(filtered_low_imag)
     else:
-        sigin = np.array(filtered_high[n_epochs:])
-        sigdriv = np.array(filtered_low[:n_epochs])
+        sigin = np.array(filtered_high[:n_epochs])
+        sigdriv = np.array(filtered_low[n_epochs:])
         if extract_complex:
-            sigdriv_imag = np.array(filtered_low_imag[:n_epochs])
+            sigdriv_imag = np.array(filtered_low_imag[n_epochs:])
 
     sigin /= np.std(sigin)
 
