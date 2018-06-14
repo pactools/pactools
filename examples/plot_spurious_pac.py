@@ -55,7 +55,7 @@ def simulate_spurious_pac(n_points, fs, spike_amp=1.5, spike_fwhm=0.01,
                                         std=spike_std * fs)
     spikes = scipy.signal.fftconvolve(spikes, spike_shape, mode='same')
 
-    noise = pink_noise(n_points, slope=1.)
+    noise = pink_noise(n_points, slope=1., random_state=random_state)
 
     return spikes + noise, spikes
 
