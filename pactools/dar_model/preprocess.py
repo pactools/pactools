@@ -350,8 +350,8 @@ def fill_gap(sig, fs, fgap, draw='', fill_sig=None,
 
             fill_sig = white_noise - fir.transform(white_noise)
         else:
-            fc = fmin + fmax / 2.
-            bandwidth = (fmin - fmax) / 2.
+            fc = (fmin + fmax) / 2.
+            bandwidth = (fmax - fmin) / 2.
             fir = BandPassFilter(fs=fs, fc=fc, n_cycles=None,
                                  bandwidth=bandwidth,
                                  zero_mean=False)

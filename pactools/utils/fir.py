@@ -58,7 +58,7 @@ class FIR(object):
 
         return out
 
-    def plot(self, axs=None, fscale='log'):
+    def plot(self, axs=None, fscale='log', colors=None):
         """
         Plots the impulse response and the transfer function of the filter.
         """
@@ -82,10 +82,11 @@ class FIR(object):
         s = Spectrum(fft_length=fft_length, block_length=self.fir.size,
                      step=None, fs=self.fs, wfunc=np.ones, donorm=False)
         s.periodogram(self.fir)
-        s.plot('Transfer function of FIR filter', fscale=fscale, axes=axs[0])
+        s.plot('Transfer function of FIR filter', fscale=fscale, axes=axs[0],
+               colors=colors)
 
         # plots
-        axs[1].plot(self.fir)
+        axs[1].plot(self.fir, color=colors[0])
         axs[1].set_title('Impulse response of FIR filter')
         axs[1].set_xlabel('Samples')
         axs[1].set_ylabel('Amplitude')
@@ -208,18 +209,19 @@ class BandPassFilter(FIR):
         else:
             return filtered
 
-    def plot(self, axs=None, fscale='log'):
+    def plot(self, axs=None, fscale='log', colors=None):
         """
         Plots the impulse response and the transfer function of the filter.
         """
-        fig = super(BandPassFilter, self).plot(axs=axs, fscale=fscale)
+        fig = super(BandPassFilter, self).plot(axs=axs, fscale=fscale,
+                                               colors=colors)
 
         if self.extract_complex:
             if axs is None:
                 axs = fig.axes
 
             fir = FIR(fir=self.fir_imag, fs=self.fs)
-            fir.plot(axs=axs, fscale=fscale)
+            fir.plot(axs=axs, fscale=fscale, colors=colors)
         return fig
 
 
