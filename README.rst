@@ -37,9 +37,15 @@ To enable all features, you will also need to install optional packages::
 
     pip install mne h5py
 
-Then install ``pactools``::
+Then install ``pactools`` with one of the following two commands:
 
-	pip install git+https://github.com/pactools/pactools.git#egg=pactools
+- Development version::
+
+    pip install git+https://github.com/pactools/pactools.git#egg=pactools
+
+- Latest stable version::
+
+    pip install pactools
 
 To upgrade, use the ``--upgrade`` flag provided by ``pip``.
 
