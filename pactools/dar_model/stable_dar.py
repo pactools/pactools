@@ -15,9 +15,9 @@ class StableDAR(BaseLattice):
 
     with:
 
-    .. math:: a_p^{(p)} = k_p; \;\;\;\;
+    .. math:: a_p^{(p)} = k_p;
               a_i^{(p)} = a_i^{(p-1)} + k_p a_{p-i}^{(p-1)}
-    .. math:: \\gamma_i = \\log\\left(\\frac{1+k_i}{1-k_i}\\right); \;\;\;\;
+    .. math:: \\gamma_i = \\log\\left(\\frac{1+k_i}{1-k_i}\\right);
               \\gamma_{i}(t)=\\sum_{j=0}^{m}\\gamma_{ij}x(t)^j
 
     and:

@@ -140,7 +140,7 @@ def frac_to_str(frac):
     if frac.numerator == -1:
         res += '-'
     if frac.numerator != 0:
-        res += '\pi'
+        res += r'\pi'
         if frac.denominator != 1:
             res += '/' + str(frac.denominator)
 
@@ -152,7 +152,7 @@ def frac_to_float(frac):
 
 
 def phase_string(sig):
-    """Take the angle and create a string as \pi if close to some \pi values"""
+    """Take the angle and create a string as pi if close to some pi values"""
     if isinstance(sig, np.ndarray):
         sig = sig.ravel()[0]
     if isinstance(sig, np.complex):

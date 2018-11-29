@@ -211,9 +211,9 @@ class Comodulogram(object):
         check_consistent_shape(low_sig, high_sig)
 
         # check the masks
-        multiple_masks = (isinstance(mask, list) or
-                          isinstance(mask, MaskIterator) or
-                          (isinstance(mask, np.ndarray) and mask.ndim == 3))
+        multiple_masks = (isinstance(mask, list)
+                          or isinstance(mask, MaskIterator)
+                          or (isinstance(mask, np.ndarray) and mask.ndim == 3))
         if not multiple_masks:
             mask = [mask]
         if not isinstance(mask, MaskIterator):
@@ -587,8 +587,8 @@ class Comodulogram(object):
                 save_vars['random_state_state_'] = rs.__getstate__()
             if self.progress_bar:
                 save_vars['progress_bar'] = True
-        write_hdf5(fname, save_vars, title='comodulogram',
-                   overwrite=overwrite, slash='replace')
+        write_hdf5(fname, save_vars, title='comodulogram', overwrite=overwrite,
+                   slash='replace')
 
 
 def _comodulogram(estimator, filtered_low, filtered_high, mask,

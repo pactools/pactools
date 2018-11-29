@@ -112,12 +112,12 @@ class BaseLattice(BaseDAR):
             e_forward[:, ordar] = excitation[:, t + tburn] * gain[0, max(t, 0)]
             for p in range(ordar, 0, -1):
                 e_forward[:, p - 1] = (
-                    e_forward[:, p] - parcor_list[p - 1, :, max(t, 0)] *
-                    e_backward[:, p - 1])
+                    e_forward[:, p] -
+                    parcor_list[p - 1, :, max(t, 0)] * e_backward[:, p - 1])
             for p in range(ordar, 0, -1):
                 e_backward[:, p] = (
-                    e_backward[:, p - 1] + parcor_list[p - 1, :, max(t, 0)] *
-                    e_forward[:, p - 1])
+                    e_backward[:, p - 1] +
+                    parcor_list[p - 1, :, max(t, 0)] * e_forward[:, p - 1])
             e_backward[:, 0] = e_forward[:, 0]
             sigout[:, max(t, 0)] = e_forward[:, 0]
 
@@ -269,8 +269,8 @@ class BaseLattice(BaseDAR):
 
         """
         if self.basis_ is None:
-            raise ValueError('%s: basis_ does not yet exist' %
-                             self.__class__.__name__)
+            raise ValueError(
+                '%s: basis_ does not yet exist' % self.__class__.__name__)
 
         # --------  get the training data
         sigin, basis, weights = self._get_train_data([self.sigin, self.basis_])
@@ -346,8 +346,8 @@ class BaseLattice(BaseDAR):
             # -------- Newton-Raphson refinement
             dLAR = np.inf
             itnum = 0
-            while (itnum < self.iter_newton and
-                   np.amax(np.abs(dLAR)) > self.eps_newton):
+            while (itnum < self.iter_newton
+                   and np.amax(np.abs(dLAR)) > self.eps_newton):
                 itnum += 1
 
                 # -------- compute next residual
@@ -365,9 +365,8 @@ class BaseLattice(BaseDAR):
                     g *= weights[:, 1:n_points]
                 # n_epochs, n_points - 1 = g.shape = h.shape
                 # n_basis, n_epochs, n_points = basis.shape
-                gradient = 2.0 * np.dot(
-                    w_basis[:, :, 1:n_points].reshape(n_basis, -1),
-                    g.reshape(-1, 1))
+                gradient = 2.0 * np.dot(w_basis[:, :, 1:n_points].reshape(
+                    n_basis, -1), g.reshape(-1, 1))
                 gradient.shape = (n_basis, 1)
 
                 h = self._common_hessian(k + 1, parcor_list)
