@@ -41,6 +41,10 @@ ixs = (8, 10)
 # results.
 
 # create the input array for Comodulogram.fit
+
+# low_sig, high_sig = raw[8, :][0], raw[10, :][0]
+# mask = MaskIterator(events, tmin, tmax, raw.n_times, raw.info['sfreq'])
+
 low_sig, high_sig, mask = raw_to_mask(raw, ixs=ixs, events=events, tmin=tmin,
                                       tmax=tmax)
 # create the instance of Comodulogram
