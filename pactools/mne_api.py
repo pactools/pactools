@@ -49,8 +49,8 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
         each event index. If a list of floats is given, then PAC is calculated
         for each pair of `tmin` and `tmax`. Defaults to `max(raw.times)`.
 
-    Attributes
-    ----------
+    Returns
+    -------
     low_sig : array, shape (1, n_points)
         Input data for the phase signal
 
@@ -93,6 +93,20 @@ def raw_to_mask(raw, ixs, events=None, tmin=None, tmax=None):
 
 class MaskIterator(object):
     """Iterator that creates the masks one at a time.
+
+    Parameters
+    ----------
+
+    events : array, shape (n_events, ...) | None
+        The events array
+    tmin : float
+        Start time before event.
+    tmax : float
+        End time after event.
+    n_points : int
+        The length of each mask.
+    fs : float
+        The sampling frequency.
 
     Examples
     --------
@@ -137,6 +151,13 @@ class MaskIterator(object):
         return self._n_iter
 
     def next(self):
+        """Returns mask.
+
+        Returns
+        -------
+        mask : array | shape (n_points, )
+            The Boolean mask for the next event.
+        """
         if self.events.ndim == 1:
             event_names = [None, ]
         else:
