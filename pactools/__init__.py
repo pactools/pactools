@@ -3,7 +3,7 @@ from .comodulogram import Comodulogram
 from .references import REFERENCES
 from .simulate_pac import simulate_pac, sigmoid
 from .peak_locking import PeakLocking
-from .mne_api import raw_to_mask
+from .mne_api import raw_to_mask, MaskIterator
 from .delay_estimator import DelayEstimator
 from .grid_search import DARSklearn, AddDriverDelay
 from .grid_search import ExtractDriver, MultipleArray
@@ -21,6 +21,7 @@ __all__ = [
     'multiple_band_pass',
     'PeakLocking',
     'raw_to_mask',
+    'MaskIterator',
     'REFERENCES',
     'sigmoid',
 ]
