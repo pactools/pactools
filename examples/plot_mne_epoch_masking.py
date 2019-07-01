@@ -14,7 +14,7 @@ import mne
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pactools import raw_to_mask, Comodulogram
+from pactools import raw_to_mask, Comodulogram, MaskIterator
 
 ###############################################################################
 # Load the dataset
@@ -42,11 +42,19 @@ ixs = (8, 10)
 
 # create the input array for Comodulogram.fit
 
-# low_sig, high_sig = raw[8, :][0], raw[10, :][0]
-# mask = MaskIterator(events, tmin, tmax, raw.n_times, raw.info['sfreq'])
-
 low_sig, high_sig, mask = raw_to_mask(raw, ixs=ixs, events=events, tmin=tmin,
                                       tmax=tmax)
+
+###############################################################################
+# The mask is an iterable which goes over the _unique_ events in the event
+# array (if it is 3D). PAC is estimated where the `mask` is `False`.
+# Alternatively, we could also compute the `MaskIterator` object directly.
+# This is useful if you want to compute PAC on other kinds of time series,
+# for example source time courses.
+
+low_sig, high_sig = raw[8, :][0], raw[10, :][0]
+mask = MaskIterator(events, tmin, tmax, raw.n_times, raw.info['sfreq'])
+
 # create the instance of Comodulogram
 estimator = Comodulogram(fs=raw.info['sfreq'],
                          low_fq_range=np.linspace(1, 10, 20), low_fq_width=2.,

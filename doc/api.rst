@@ -17,6 +17,7 @@ Phase amplitude coupling (PAC)
    Comodulogram
    DelayEstimator
    PeakLocking
+   MaskIterator
    :template: function.rst
    raw_to_mask
    simulate_pac
