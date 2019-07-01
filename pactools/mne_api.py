@@ -97,14 +97,28 @@ class MaskIterator(object):
     Parameters
     ----------
 
-    events : array, shape (n_events, ...) | None
-        The events array
-    tmin : float
-        Start time before event.
-    tmax : float
-        End time after event.
+    events : array, shape (n_events, 3) | array, shape (n_events,) | None
+        MNE events array. To be supplied if data is 2D and output should be
+        split by events. In this case, `tmin` and `tmax` must be provided. If
+        `ndim == 1`, it is assumed to be event indices, and all events will be
+        grouped together. Otherwise, events will be grouped along the third
+        dimension.
+
+    tmin : float | list of floats, shape (n_windows, ) | None
+        If `events` is not provided, it is the start time to use in `raw`.
+        If `events` is provided, it is the time (in seconds) to include before
+        each event index. If a list of floats is given, then PAC is calculated
+        for each pair of `tmin` and `tmax`. Defaults to `min(raw.times)`.
+
+    tmax : float | list of floats, shape (n_windows, ) | None
+        If `events` is not provided, it is the stop time to use in `raw`.
+        If `events` is provided, it is the time (in seconds) to include after
+        each event index. If a list of floats is given, then PAC is calculated
+        for each pair of `tmin` and `tmax`. Defaults to `max(raw.times)`.
+
     n_points : int
         The length of each mask.
+
     fs : float
         The sampling frequency.
 
