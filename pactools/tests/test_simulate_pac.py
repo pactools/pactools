@@ -9,14 +9,15 @@ low_fq_range = [1., 3., 5., 7.]
 high_fq_range = [25., 50., 75.]
 n_low = len(low_fq_range)
 n_high = len(high_fq_range)
-n_points = 1024
+signal_len = 1024 / 200.
+fs = 200.
 
 
-def simulate_pac_default(n_points=128, fs=200., high_fq=50., low_fq=3.,
+def simulate_pac_default(signal_len=0.64, fs=200., high_fq=50., low_fq=3.,
                          low_fq_width=1., noise_level=0.1, random_state=42,
                          *args, **kwargs):
     """Call simulate_pac with default values, used for testing only."""
-    return simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width,
+    return simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width,
                         noise_level, random_state=random_state, *args,
                         **kwargs)
 
@@ -24,8 +25,8 @@ def simulate_pac_default(n_points=128, fs=200., high_fq=50., low_fq=3.,
 def test_correct_size():
     # Test that the signals are 1D and with the correct number of points
     for n_points_in in np.int_(np.logspace(1, 3, 5)):
-        signal = simulate_pac_default(n_points=n_points_in)
-        assert_equal(signal.size, n_points_in)
+        signal = simulate_pac_default(signal_len=n_points_in * fs)
+        assert_equal(signal.size, n_points_in * fs)
         assert_equal(signal.ndim, 1)
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 
 from .utils.fir import BandPassFilter
-from .utils.validation import check_random_state
+from .utils.validation import check_random_state, check_evoked
 from .utils.deprecation import ignore_warnings
 
 
@@ -12,15 +12,15 @@ def sigmoid(array, sharpness):
     return result
 
 
-def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
+def simulate_pac(sig_len, fs, high_fq, low_fq, low_fq_width, noise_level,
                  high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
                  sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
     ----------
-    n_points : int
-        Number of points in the signal
+    sig_len : int
+        Length of the signal in seconds
 
     fs : float
         Sampling frequency of the signal
@@ -61,11 +61,11 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     Returns
     -------
-    signal : array, shape (n_points, )
+    signal : array, shape (sig_len * fs, )
         Signal with artifical PAC
 
     """
-    n_points = int(n_points)
+    n_points = int(sig_len * fs)
     fs = float(fs)
     rng = check_random_state(random_state)
     if high_fq >= fs / 2 or low_fq >= fs / 2:
@@ -97,7 +97,6 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     # create the modulation, with a sigmoid, and a phase lag
     phase = np.exp(1j * phi_0)
-    sigmoid_sharpness = sigmoid_sharpness
     modulation = sigmoid(np.real(driver * phase), sharpness=sigmoid_sharpness)
 
     # the slow oscillation is not phased lag
@@ -109,6 +108,7 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     # apply modulation
     gamma = carrier * modulation
+
     # create noise
     noise = rng.randn(n_points) * noise_level
     # add all oscillations

@@ -11,10 +11,10 @@ from pactools.simulate_pac import simulate_pac
 high_fq = 80.
 low_fq = 3.
 low_fq_width = 2.
-n_points = 1024
+sig_len = 1024 / 500.
 fs = 500.
 
-signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+signal = simulate_pac(sig_len=sig_len, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=1., noise_level=0.1, random_state=0)
 
 
@@ -46,7 +46,7 @@ def test_different_dimension_in_input():
 
 def test_empty_mask():
     # Test that using an empty mask does not change the results
-    mask = np.zeros(n_points, dtype=bool)
+    mask = np.zeros(int(sig_len * fs), dtype=bool)
 
     est_0 = fast_delay(mask=mask)
     est_1 = fast_delay()

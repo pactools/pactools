@@ -62,7 +62,7 @@ offset = -1.
 sharpness = 5.
 noise_level = 0.1
 
-n_points = 30000
+sig_len = 150  # sec
 t_plot = 1.  # sec
 
 
@@ -81,7 +81,7 @@ def clean_peak_finder(sig):
 def simulate_and_plot(phi_0, delay, ax, rng):
     """Simulate oscillations with frequency modulation"""
     # create the slow oscillations
-    time = np.arange(n_points) / fs
+    time = sig_len
     phase = time * 2 * np.pi * low_fq + np.pi / 2
     # add frequency modulation
     phase += low_fq_mod_amp * np.sin(time * 2 * np.pi * low_fq_mod_fq)

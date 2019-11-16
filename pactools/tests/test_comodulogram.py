@@ -20,10 +20,10 @@ n_low = len(low_fq_range)
 n_high = len(high_fq_range)
 high_fq = high_fq_range[1]
 low_fq = low_fq_range[1]
-n_points = 1024
+sig_len = 1024 / 200.
 fs = 200.
 
-signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
+signal = simulate_pac(sig_len=sig_len, fs=fs, high_fq=high_fq, low_fq=low_fq,
                       low_fq_width=1., noise_level=0.1, random_state=0)
 signal_copy = signal.copy()
 
@@ -105,7 +105,7 @@ def test_comod_correct_maximum():
 
 def test_empty_mask():
     # Test that using an empty mask does not change the results
-    mask = np.zeros(n_points, dtype=bool)
+    mask = np.zeros(int(sig_len * fs), dtype=bool)
 
     for method in ALL_PAC_METRICS:
         comod_0 = fast_comod(mask=mask, method=method)
