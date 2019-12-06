@@ -21,13 +21,13 @@ high_fq = 50.0  # Hz
 low_fq = 3.0  # Hz
 low_fq_width = 2.0  # Hz
 
-sig_len = 50  # sec
+signal_len = 50  # sec
 noise_level = 0.4
 t_plot = 2.0  # sec
 
-signal = simulate_pac(sig_len=sig_len, fs=fs, high_fq=high_fq, low_fq=low_fq,
-                      low_fq_width=low_fq_width, noise_level=noise_level,
-                      random_state=0)
+signal = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+                      low_fq=low_fq, low_fq_width=low_fq_width,
+                      noise_level=noise_level, random_state=0)
 
 ###############################################################################
 # Plot the amplitude of each frequency, locked with the peak of the slow wave

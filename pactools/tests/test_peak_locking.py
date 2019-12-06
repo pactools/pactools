@@ -13,11 +13,12 @@ n_low = len(low_fq_range)
 n_high = len(high_fq_range)
 high_fq = high_fq_range[1]
 low_fq = low_fq_range[1]
-sig_len = 1024 / 200.
+signal_len = 1024 / 200.
 fs = 200.
 
-signal = simulate_pac(sig_len=sig_len, fs=fs, high_fq=high_fq, low_fq=low_fq,
-                      low_fq_width=1., noise_level=0.1, random_state=0)
+signal = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+                      low_fq=low_fq, low_fq_width=1., noise_level=0.1,
+                      random_state=0)
 
 
 def fast_peak_locking(low_sig=signal, high_sig=None, mask=None, fs=fs,
@@ -49,7 +50,7 @@ def test_different_dimension_in_input():
 
 def test_empty_mask():
     # Test that using an empty mask does not change the results
-    mask = np.zeros(int(sig_len * fs), dtype=bool)
+    mask = np.zeros(int(signal_len * fs), dtype=bool)
 
     plkg_0 = fast_peak_locking(mask=mask)
     plkg_1 = fast_peak_locking(low_sig=signal[~mask])

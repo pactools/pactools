@@ -1,7 +1,7 @@
 import numpy as np
 
 from .utils.fir import BandPassFilter
-from .utils.validation import check_random_state, check_evoked
+from .utils.validation import check_random_state
 from .utils.deprecation import ignore_warnings
 
 
@@ -12,14 +12,14 @@ def sigmoid(array, sharpness):
     return result
 
 
-def simulate_pac(sig_len, fs, high_fq, low_fq, low_fq_width, noise_level,
+def simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width, noise_level,
                  high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
                  sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
     ----------
-    sig_len : int
+    signal_len : int
         Length of the signal in seconds
 
     fs : float
@@ -61,11 +61,11 @@ def simulate_pac(sig_len, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     Returns
     -------
-    signal : array, shape (sig_len * fs, )
+    signal : array, shape (signal_len * fs, )
         Signal with artifical PAC
 
     """
-    n_points = int(sig_len * fs)
+    n_points = int(signal_len * fs)
     fs = float(fs)
     rng = check_random_state(random_state)
     if high_fq >= fs / 2 or low_fq >= fs / 2:

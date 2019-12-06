@@ -21,12 +21,12 @@ high_fq = 50.0  # Hz
 low_fq = 5.0  # Hz
 low_fq_width = 1.0  # Hz
 
-sig_len = 6.25  # sec
+signal_len = 6.25  # sec
 noise_level = 0.4
 
-signal = simulate_pac(sig_len=sig_len, fs=fs, high_fq=high_fq, low_fq=low_fq,
-                      low_fq_width=low_fq_width, noise_level=noise_level,
-                      random_state=0)
+signal = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+                      low_fq=low_fq, low_fq_width=low_fq_width,
+                      noise_level=noise_level, random_state=0)
 
 ###############################################################################
 # Extract a low-frequency band, and fit a DAR model, using BIC order selection.

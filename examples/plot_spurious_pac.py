@@ -21,7 +21,7 @@ from pactools.utils.pink_noise import pink_noise
 from pactools.utils.validation import check_random_state
 
 
-def simulate_spurious_pac(sig_len, fs, spike_amp=1.5, spike_fwhm=0.01,
+def simulate_spurious_pac(signal_len, fs, spike_amp=1.5, spike_fwhm=0.01,
                           spike_fq=10., spike_interval_jitter=0.2,
                           random_state=None):
     """Simulate some spurious phase-amplitude coupling (PAC) with spikes
@@ -33,7 +33,7 @@ def simulate_spurious_pac(sig_len, fs, spike_amp=1.5, spike_fwhm=0.01,
     signals in the absence of functional interaction between neural sources.
     PloS one, 11(12), e0167351
     """
-    n_points = int(sig_len * fs)
+    n_points = int(signal_len * fs)
     fs = float(fs)
     rng = check_random_state(random_state)
 
@@ -63,13 +63,14 @@ def simulate_spurious_pac(sig_len, fs, spike_amp=1.5, spike_fwhm=0.01,
 #############################################################################
 # Let's generate the spurious PAC signal
 fs = 1000.  # Hz
-sig_len = 300  # sec
+signal_len = 300  # sec
 spike_amp = 1.5
 random_state = 0
 
 # generate the signal
 signal, spikes = simulate_spurious_pac(
-    sig_len=sig_len, fs=fs, random_state=random_state, spike_amp=spike_amp)
+    signal_len=signal_len, fs=fs, random_state=random_state,
+    spike_amp=spike_amp)
 
 # plot the signal and the spikes
 n_points_plot = np.int(1. * fs)
