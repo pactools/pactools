@@ -81,7 +81,8 @@ def clean_peak_finder(sig):
 def simulate_and_plot(phi_0, delay, ax, rng):
     """Simulate oscillations with frequency modulation"""
     # create the slow oscillations
-    time = signal_len
+    n_points = int(signal_len * fs)
+    time = np.arange(n_points) / fs
     phase = time * 2 * np.pi * low_fq + np.pi / 2
     # add frequency modulation
     phase += low_fq_mod_amp * np.sin(time * 2 * np.pi * low_fq_mod_fq)

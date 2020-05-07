@@ -16,12 +16,14 @@ n_low = len(low_fq_range)
 n_high = len(high_fq_range)
 high_fq = high_fq_range[1]
 low_fq = low_fq_range[1]
-n_points = 1024
+signal_len = 5.12  # seconds -> 1024 points
 fs = 200.
+n_points = int(signal_len * fs)
 
-_sigin = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq, low_fq=low_fq,
-                      low_fq_width=1., noise_level=0.3, random_state=0)
-_sigdriv = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq,
+_sigin = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+                      low_fq=low_fq, low_fq_width=1., noise_level=0.3,
+                      random_state=0)
+_sigdriv = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
                         low_fq=low_fq, low_fq_width=1., noise_level=0.,
                         random_state=0, high_fq_amp=0, return_driver=True)
 _sigdriv_imag = np.imag(_sigdriv)

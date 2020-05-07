@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 
 from .utils.fir import BandPassFilter
@@ -14,7 +15,8 @@ def sigmoid(array, sharpness):
 
 def simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width, noise_level,
                  high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
-                 sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False):
+                 sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False,
+                 n_points='depreciated'):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
@@ -65,6 +67,14 @@ def simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width, noise_level,
         Signal with artifical PAC
 
     """
+    if n_points != 'depreciated':
+        warnings.warn("'n_points' was changed to 'signal_len' in version 0.3 "
+                      "and will be removed in 0.4.",
+                      FutureWarning)
+    if signal_len > 10000:
+        warnings.warn("'n_points was changed to 'signal_len' in version 0.3"
+                      "if passed as a non-keyword argument this will lead to "
+                      "unexpected behavior")
     n_points = int(signal_len * fs)
     fs = float(fs)
     rng = check_random_state(random_state)

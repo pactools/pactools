@@ -25,8 +25,8 @@ def simulate_pac_default(signal_len=0.64, fs=200., high_fq=50., low_fq=3.,
 def test_correct_size():
     # Test that the signals are 1D and with the correct number of points
     for n_points_in in np.int_(np.logspace(1, 3, 5)):
-        signal = simulate_pac_default(signal_len=n_points_in * fs)
-        assert_equal(signal.size, n_points_in * fs)
+        signal = simulate_pac_default(signal_len=n_points_in / fs)
+        assert_equal(signal.size, n_points_in)
         assert_equal(signal.ndim, 1)
 
 
