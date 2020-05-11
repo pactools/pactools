@@ -32,7 +32,8 @@ def test_ordar_ordriv_selection():
     # Test ordar and ordriv selection over grid-search and cross_validation
     param_grid = {'ordar': np.arange(0, 110, 10), 'ordriv': [0, 1]}
     model = DARSklearn(fs=fs, max_ordar=max(param_grid['ordar']))
-    gscv = GridSearchCV(model, param_grid=param_grid, return_train_score=False)
+    gscv = GridSearchCV(model, param_grid=param_grid, cv=3,
+                        return_train_score=False)
 
     X = MultipleArray(sigin, sigdriv, sigdriv_imag)
     gscv.fit(X)
@@ -48,7 +49,8 @@ def test_delay_selection():
         ('add', AddDriverDelay()),
         ('dar', DARSklearn(fs=fs, ordar=10, ordriv=1, max_ordar=10)),
     ])
-    gscv = GridSearchCV(model, param_grid=param_grid, return_train_score=False)
+    gscv = GridSearchCV(model, param_grid=param_grid, cv=3,
+                        return_train_score=False)
 
     X = MultipleArray(sigin, sigdriv, sigdriv_imag)
     gscv.fit(X)
@@ -70,7 +72,7 @@ def test_frequency_selection():
         'driver__low_fq_width': [0.25, 0.5, 1.],
     }
 
-    gscv = GridSearchCVProgressBar(model, param_grid=param_grid,
+    gscv = GridSearchCVProgressBar(model, param_grid=param_grid, cv=3,
                                    return_train_score=False, verbose=1)
     X = MultipleArray(raw_signal, None)
     gscv.fit(X)
