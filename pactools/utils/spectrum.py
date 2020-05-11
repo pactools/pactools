@@ -35,7 +35,6 @@ class Spectrum(object):
         If True, the amplitude is normalized
 
     """
-
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1., donorm=True):
 
@@ -116,8 +115,8 @@ class Spectrum(object):
             # iterate on blocks
             count = 0
             while block[-1] < sig.size:
-                psd[i] += np.abs(
-                    sp.fft(window * sig[block], fft_length, 0))[:n_freq] ** 2
+                psd[i] += np.abs(sp.fft.fft(window * sig[block], fft_length,
+                                            0))[:n_freq] ** 2
                 count = count + 1
                 block = block + step
             if count == 0:
@@ -258,7 +257,6 @@ class Coherence(Spectrum):
     donorm : boolean
         If True, the amplitude is normalized
     """
-
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
         super(Coherence,
@@ -310,13 +308,13 @@ class Coherence(Spectrum):
             while block[-1] < n_points:
 
                 for i_a in range(n_signals_a):
-                    F_a = sp.fft(window * sigs_a[i_a, i_epoch, block],
-                                 fft_length, 0)[:n_freq]
+                    F_a = sp.fft.fft(window * sigs_a[i_a, i_epoch, block],
+                                     fft_length, 0)[:n_freq]
                     norm_a[i_a] += square(F_a)
 
                     for i_b in range(n_signals_b):
-                        F_b = sp.fft(window * sigs_b[i_b, i_epoch, block],
-                                     fft_length, 0)[:n_freq]
+                        F_b = sp.fft.fft(window * sigs_b[i_b, i_epoch, block],
+                                         fft_length, 0)[:n_freq]
                         # compute only once
                         if i_a == 0:
                             norm_b[i_b] += square(F_b)
@@ -371,7 +369,6 @@ class Bicoherence(Spectrum):
     donorm : boolean
         If True, the amplitude is normalized
     """
-
     def __init__(self, block_length=1024, fft_length=None, step=None,
                  wfunc=np.hamming, fs=1.):
 
@@ -415,8 +412,8 @@ class Bicoherence(Spectrum):
         for i_epoch in range(n_epochs):
             block = np.arange(block_length)
             while block[-1] < n_points:
-                F = sp.fft(window * sigs[i_epoch, block], fft_length,
-                           0)[:n_freq]
+                F = sp.fft.fft(window * sigs[i_epoch, block], fft_length,
+                               0)[:n_freq]
                 F1 = F[None, :]
                 F2 = F1.T
                 mask = hankel(np.arange(n_freq))
