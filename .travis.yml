@@ -10,7 +10,6 @@ matrix:
   include:
     # Most recent versions
     - env: PYTHON_VERSION="3.6" COVERAGE="true"
-    - env: PYTHON_VERSION="2.7"
     - env: RUN_FLAKE8="true" SKIP_TEST="true"
 
 before_install: source continuous_integration/before_install.sh
