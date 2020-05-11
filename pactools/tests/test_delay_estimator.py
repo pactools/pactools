@@ -11,10 +11,12 @@ from pactools.simulate_pac import simulate_pac
 high_fq = 80.
 low_fq = 3.
 low_fq_width = 2.
-signal_len = 1024 / 500.
+n_points = 1024
 fs = 500.
+signal_len = n_points / fs
 
-signal = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq,
                       low_fq=low_fq, low_fq_width=1., noise_level=0.1,
                       random_state=0)
 

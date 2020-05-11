@@ -20,10 +20,11 @@ n_low = len(low_fq_range)
 n_high = len(high_fq_range)
 high_fq = high_fq_range[1]
 low_fq = low_fq_range[1]
-signal_len = 1024 / 200.
+n_points = 1024
 fs = 200.
+signal_len = n_points / fs
 
-signal = simulate_pac(signal_len=signal_len, fs=fs, high_fq=high_fq,
+signal = simulate_pac(n_points=n_points, fs=fs, high_fq=high_fq,
                       low_fq=low_fq, low_fq_width=1., noise_level=0.1,
                       random_state=0)
 signal_copy = signal.copy()

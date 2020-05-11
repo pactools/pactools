@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 
 from .utils.fir import BandPassFilter
@@ -13,16 +12,17 @@ def sigmoid(array, sharpness):
     return result
 
 
-def simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width, noise_level,
+def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
                  high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
                  sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False,
-                 n_points='depreciated'):
+                 signal_len=None):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
     ----------
-    signal_len : int
-        Length of the signal in seconds
+
+    n_points : int
+        Number of points in the signal- must be None if signal_len is not None
 
     fs : float
         Sampling frequency of the signal
@@ -61,21 +61,20 @@ def simulate_pac(signal_len, fs, high_fq, low_fq, low_fq_width, noise_level,
     return_driver : boolean
         If True, return the complex driver instead of the full signal
 
+    signal_len : int
+        Length of the signal in seconds- cannot be None if n_points is not None
+
     Returns
     -------
     signal : array, shape (signal_len * fs, )
         Signal with artifical PAC
 
     """
-    if n_points != 'depreciated':
-        warnings.warn("'n_points' was changed to 'signal_len' in version 0.3 "
-                      "and will be removed in 0.4.",
-                      FutureWarning)
-    if signal_len > 10000:
-        warnings.warn("'n_points was changed to 'signal_len' in version 0.3"
-                      "if passed as a non-keyword argument this will lead to "
-                      "unexpected behavior")
-    n_points = int(signal_len * fs)
+    if ((n_points is None and signal_len is None
+         ) or (n_points is not None and signal_len is not None)):
+        raise ValueError("'n_points' xor 'signal_len' must be defined")
+    if signal_len is not None:
+        n_points = int(signal_len * fs)
     fs = float(fs)
     rng = check_random_state(random_state)
     if high_fq >= fs / 2 or low_fq >= fs / 2:
