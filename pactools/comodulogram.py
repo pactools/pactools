@@ -638,7 +638,9 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
         # preproces the phase array
         if estimator.method == 'tort':
             n_bins = N_BINS_TORT
-            phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+            # make sure edge case for right edge is included
+            eps = np.finfo(filtered_low[i].dtype).eps * 2
+            phase_bins = np.linspace(-np.pi, np.pi + eps, n_bins + 1)
             # get the indices of the bins to which each value in input belongs
             phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
         elif estimator.method == 'penny':
