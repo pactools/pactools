@@ -39,7 +39,7 @@ def gaussian1d(array, mu, sigma):
 # leave one channel for events and make signal as long as events
 # with a bit of room on either side so events don't get cut off
 signal = np.zeros((2, int(n_points * n_events + 2 * first_samp * fs)))
-events = np.zeros((n_events, 3))
+events = np.zeros((n_events, 3), dtype=int)
 events[:, 0] = np.arange((first_samp + mu) * fs,
                          n_points * n_events + (first_samp + mu) * fs,
                          trial_len * fs, dtype=int)
@@ -60,6 +60,20 @@ for i in range(n_events):
 info = mne.create_info(['Ch1', 'STI 014'], fs, ['eeg', 'stim'])
 raw = mne.io.RawArray(signal, info)
 raw.add_events(events, stim_channel='STI 014')
+
+###############################################################################
+# Let's plot the signal and its power spectral density to visualize the data.
+# As shown in the plots below, there is a peak for the driver frequency at
+# 3 Hz and a peak for the carrier frequency at 50 Hz but phase-amplitude
+# coupling cannot be seen in the evoked plot by eye because the signal is
+# averaged over different phases for each epoch.
+
+raw.plot_psd(fmax=60)
+epochs = mne.Epochs(raw, events, tmin=-3, tmax=3)
+epochs.average().plot()
+
+###############################################################################
+# Let's save the raw object out for input/output demonstration purposes
 
 root = mne.utils._TempDir()
 raw.save(op.join(root, 'pac_example-raw.fif'))
