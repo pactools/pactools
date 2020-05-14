@@ -199,7 +199,7 @@ sphinx_gallery_conf = {
     # Modules for which function level galleries are created
     'doc_module': ('pactools', ),
     'reference_url': {
-        'mne': 'http://martinos.org/mne/stable',
+        # 'mne': 'http://martinos.org/mne/stable',
         'pactools': 'http://pactools.github.io/',
         'matplotlib': 'http://matplotlib.org',
         'numpy': 'http://docs.scipy.org/doc/numpy-1.9.1',

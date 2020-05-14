@@ -66,6 +66,10 @@ the coupling over a grid of frequencies.
 Comodulograms can be computed in `pactools` with more
 than 10 different methods.
 
+.. include:: generated/backreferences/pactools.Comodulogram.examples
+.. raw:: html
+
+    <div style='clear:both'></div>
 
 Driven auto-regressive (DAR) models
 ===================================
@@ -80,6 +84,11 @@ this data-driven feature is unique to such model-based approach.
 We recommend using DAR models to estimate PAC in neural time-series.
 More detail in [`Dupre la Tour et al. 2017`_].
 
+
+.. include:: generated/backreferences/pactools.dar_model.DAR.examples
+.. raw:: html
+
+    <div style='clear:both'></div>
 
 Acknowledgment
 ==============
