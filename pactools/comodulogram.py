@@ -640,8 +640,9 @@ def _comodulogram(estimator, filtered_low, filtered_high, mask,
             n_bins = N_BINS_TORT
             phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
             # get the indices of the bins to which each value in input belongs
-            phase_preprocessed = (np.digitize(filtered_low[i], phase_bins,
-                                              right=True) - 1)
+            phase_preprocessed = np.digitize(filtered_low[i], phase_bins) - 1
+            # fix the edge case where right bin is not included if phase == pi
+            phase_preprocessed[phase_preprocessed == n_bins] -= 1
         elif estimator.method == 'penny':
             phase_preprocessed = np.c_[np.ones_like(filtered_low[i]),
                                        np.cos(filtered_low[i]),
