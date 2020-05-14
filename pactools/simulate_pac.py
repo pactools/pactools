@@ -14,7 +14,8 @@ def sigmoid(array, sharpness):
 
 def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
                  high_fq_amp=0.5, low_fq_amp=0.5, random_state=None,
-                 sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False):
+                 sigmoid_sharpness=6, phi_0=0., delay=0., return_driver=False,
+                 separate=False):
     """Simulate a 1D signal with artificial phase amplitude coupling (PAC).
 
     Parameters
@@ -59,9 +60,12 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     return_driver : boolean
         If True, return the complex driver instead of the full signal
 
+    separate : bool
+        If True, the signal is separated into driver and carrier signals
+
     Returns
     -------
-    signal : array, shape (n_points, )
+    signal : array, shape (n_points, ) or (2, n_points)
         Signal with artifical PAC
 
     """
@@ -111,7 +115,11 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     gamma = carrier * modulation
     # create noise
     noise = rng.randn(n_points) * noise_level
-    # add all oscillations
-    signal = gamma + theta + noise
+
+    if separate:
+
+    else:
+        # add all oscillations
+        signal = gamma + theta + noise
 
     return signal
