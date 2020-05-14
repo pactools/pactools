@@ -79,7 +79,7 @@ param_grid = {
 # Plug the model and the parameter grid into a GridSearchCV estimator
 # (GridSearchCVProgressBar is identical to GridSearchCV, but it adds a nice
 # progress bar to monitor progress.)
-gscv = GridSearchCVProgressBar(model, param_grid=param_grid,
+gscv = GridSearchCVProgressBar(model, param_grid=param_grid, cv=3,
                                return_train_score=False, verbose=1)
 
 # Fit the grid-search. We use `MultipleArray` to put together low_sig and
