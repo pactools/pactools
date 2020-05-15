@@ -47,6 +47,7 @@ events[:, 0] = np.arange((first_samp + mu) * fs,
                          trial_len * fs, dtype=int)
 events[:, 2] = np.ones((n_events))
 mod_fun = gaussian1d(np.arange(n_points), mu * fs, sigma * fs)
+mod_fun *= (1 - noise_level)
 for i in range(n_events):
     signal_no_pac = np.random.randn(n_points)
     driver, carrier = simulate_pac(n_points=n_points, fs=fs,
@@ -55,13 +56,14 @@ for i in range(n_events):
                                    noise_level=noise_level,
                                    separate=True, random_state=i)
     signal[0, i * n_points:(i + 1) * n_points] = \
-        driver * mod_fun + signal_no_pac * (1 - mod_fun)
+        (driver * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
     signal[1, i * n_points:(i + 1) * n_points] = \
-        carrier * mod_fun + signal_no_pac * (1 - mod_fun)
+        (carrier * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
     # note: extra channels are necessary to properly separate driver
     # and carrier signals due to average reference
     for j in range(2, 6):
-        signal[j, i * n_points:(i + 1) * n_points] = np.random.randn(n_points)
+        signal[j, i * n_points:(i + 1) * n_points] = \
+            np.random.randn(n_points) * 1e-5
 
 
 ch_names = ['Driver', 'Carrier']
@@ -71,17 +73,10 @@ info = mne.create_info(ch_names, fs, ['eeg'] * 6 + ['stim'])
 raw = mne.io.RawArray(signal, info)
 raw.add_events(events, stim_channel='STI 014')
 
-###############################################################################
-# Let's plot the signal and its power spectral density to visualize the data.
-# As shown in the plots, there is a peak at the driver frequency at
-# 3 Hz in the 'Driver' channel and a peak at the carrier frequency at 50 Hz
-# in the 'Carrier' channel.
-
-raw.plot_psd(fmax=60)
 
 ###############################################################################
-# In the evoked plot of the 'Driver' and 'Carrier' channels, you can see what
-# phase-amplitude coupling looks like in the voltage trace.
+# Let's plot the evoked potentials for the 'Driver' and 'Carrier' channels.
+# You can see what phase-amplitude coupling looks like in the voltage trace.
 
 epochs = mne.Epochs(raw, events, tmin=-0.5, tmax=2)
 epochs.average().plot(picks=['Driver', 'Carrier'])
