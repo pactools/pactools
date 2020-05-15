@@ -31,6 +31,8 @@ low_fq_width = 2.0  # Hz
 n_points = int(trial_len * fs)
 noise_level = 0.4
 
+np.random.seed(0)
+
 
 def gaussian1d(array, mu, sigma):
     return np.exp(-0.5 * ((array - mu) / sigma) ** 2)
@@ -38,7 +40,7 @@ def gaussian1d(array, mu, sigma):
 
 # leave one channel for events and make signal as long as events
 # with a bit of room on either side so events don't get cut off
-signal = np.zeros((2, int(n_points * n_events + 2 * first_samp * fs)))
+signal = np.zeros((7, int(n_points * n_events + 2 * first_samp * fs)))
 events = np.zeros((n_events, 3), dtype=int)
 events[:, 0] = np.arange((first_samp + mu) * fs,
                          n_points * n_events + (first_samp + mu) * fs,
@@ -46,31 +48,39 @@ events[:, 0] = np.arange((first_samp + mu) * fs,
 events[:, 2] = np.ones((n_events))
 mod_fun = gaussian1d(np.arange(n_points), mu * fs, sigma * fs)
 for i in range(n_events):
-    signal_no_pac = simulate_pac(n_points=n_points, fs=fs,
-                                 high_fq=high_fq, low_fq=low_fq,
-                                 low_fq_width=low_fq_width,
-                                 noise_level=1.0, random_state=i)
-    signal_pac = simulate_pac(n_points=n_points, fs=fs,
-                              high_fq=high_fq, low_fq=low_fq,
-                              low_fq_width=low_fq_width,
-                              noise_level=noise_level, random_state=i)
+    signal_no_pac = np.random.randn(n_points)
+    driver, carrier = simulate_pac(n_points=n_points, fs=fs,
+                                   high_fq=high_fq, low_fq=low_fq,
+                                   low_fq_width=low_fq_width,
+                                   noise_level=noise_level,
+                                   separate=True, random_state=i)
     signal[0, i * n_points:(i + 1) * n_points] = \
-        signal_pac * mod_fun + signal_no_pac * (1 - mod_fun)
+        driver * mod_fun + signal_no_pac * (1 - mod_fun)
+    signal[1, i * n_points:(i + 1) * n_points] = \
+        carrier * mod_fun + signal_no_pac * (1 - mod_fun)
+    # note: extra channels are necessary to properly separate driver
+    # and carrier signals due to average reference
+    for j in range(2, 6):
+        signal[j, i * n_points:(i + 1) * n_points] = np.random.randn(n_points)
 
-info = mne.create_info(['Ch1', 'STI 014'], fs, ['eeg', 'stim'])
+
+ch_names = ['Driver', 'Carrier']
+ch_names += ['Ch%i' % i for i in range(2, 6)]
+ch_names += ['STI 014']
+info = mne.create_info(ch_names, fs, ['eeg'] * 6 + ['stim'])
 raw = mne.io.RawArray(signal, info)
 raw.add_events(events, stim_channel='STI 014')
 
 ###############################################################################
 # Let's plot the signal and its power spectral density to visualize the data.
 # As shown in the plots below, there is a peak for the driver frequency at
-# 3 Hz and a peak for the carrier frequency at 50 Hz but phase-amplitude
-# coupling cannot be seen in the evoked plot by eye because the signal is
-# averaged over different phases for each epoch.
+# 3 Hz and a peak for the carrier frequency at 50 Hz and you can see what
+# phase-amplitude coupling looks like in the voltage trace.
 
 raw.plot_psd(fmax=60)
-epochs = mne.Epochs(raw, events, tmin=-3, tmax=3)
-epochs.average().plot()
+epochs = mne.Epochs(raw, events, tmin=-0.5, tmax=2)
+epochs.average().plot(picks=['Driver', 'Carrier'])
+epochs.average().plot(picks=['Ch%i' % i for i in range(2, 6)])
 
 ###############################################################################
 # Let's save the raw object out for input/output demonstration purposes
@@ -88,7 +98,7 @@ events = mne.find_events(raw)
 # select the time interval around the events
 tmin, tmax = mu - 3 * sigma, mu + 3 * sigma
 # select the channels (phase_channel, amplitude_channel)
-ixs = (0, 0)
+ixs = (0, 1)
 
 ###############################################################################
 # Then, we create the inputs with the function raw_to_mask, which creates the

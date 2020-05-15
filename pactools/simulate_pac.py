@@ -65,8 +65,11 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
 
     Returns
     -------
-    signal : array, shape (n_points, ) or (2, n_points)
+    signal : array, shape (n_points, ) or tuple
         Signal with artifical PAC
+            If 'separate == True', the driver and carrier are returned
+            separately in that order.
+
 
     """
     n_points = int(n_points)
@@ -117,9 +120,9 @@ def simulate_pac(n_points, fs, high_fq, low_fq, low_fq_width, noise_level,
     noise = rng.randn(n_points) * noise_level
 
     if separate:
-
+        # add noise to driver and carrier separately
+        noise_gamma = rng.randn(n_points) * noise_level
+        return theta + noise, gamma + noise_gamma
     else:
         # add all oscillations
-        signal = gamma + theta + noise
-
-    return signal
+        return gamma + theta + noise
