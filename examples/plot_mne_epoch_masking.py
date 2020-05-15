@@ -73,14 +73,18 @@ raw.add_events(events, stim_channel='STI 014')
 
 ###############################################################################
 # Let's plot the signal and its power spectral density to visualize the data.
-# As shown in the plots below, there is a peak for the driver frequency at
-# 3 Hz and a peak for the carrier frequency at 50 Hz and you can see what
-# phase-amplitude coupling looks like in the voltage trace.
+# As shown in the plots, there is a peak at the driver frequency at
+# 3 Hz in the 'Driver' channel and a peak at the carrier frequency at 50 Hz
+# in the 'Carrier' channel.
 
 raw.plot_psd(fmax=60)
+
+###############################################################################
+# In the evoked plot of the 'Driver' and 'Carrier' channels, you can see what
+# phase-amplitude coupling looks like in the voltage trace.
+
 epochs = mne.Epochs(raw, events, tmin=-0.5, tmax=2)
 epochs.average().plot(picks=['Driver', 'Carrier'])
-epochs.average().plot(picks=['Ch%i' % i for i in range(2, 6)])
 
 ###############################################################################
 # Let's save the raw object out for input/output demonstration purposes
