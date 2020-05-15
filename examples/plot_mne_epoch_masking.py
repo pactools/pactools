@@ -18,14 +18,16 @@ from pactools import simulate_pac, raw_to_mask, Comodulogram, MaskIterator
 # Simulate a dataset and save it out
 
 n_events = 100
-mu = 1.  # mean onset of PAC in seconds
-sigma = 0.25  # standard deviation of onset of PAC in seconds
+mu = 0.5  # mean onset of PAC in seconds
+sigma = 0.05  # standard deviation of onset of PAC in seconds
 trial_len = 2.  # len of the simulated trial in seconds
 first_samp = 5  # seconds before the first sample and after the last
 
 fs = 200.  # Hz
 high_fq = 50.0  # Hz
+high_fq_amp = 0.5
 low_fq = 3.0  # Hz
+low_fq_amp = 1.
 low_fq_width = 2.0  # Hz
 
 n_points = int(trial_len * fs)
@@ -51,13 +53,14 @@ mod_fun *= (1 - noise_level)
 for i in range(n_events):
     signal_no_pac = np.random.randn(n_points)
     driver, carrier = simulate_pac(n_points=n_points, fs=fs,
-                                   high_fq=high_fq, low_fq=low_fq,
+                                   high_fq=high_fq, high_fq_amp=high_fq_amp,
+                                   low_fq=low_fq, low_fq_amp=low_fq_amp,
                                    low_fq_width=low_fq_width,
                                    noise_level=noise_level,
                                    separate=True, random_state=i)
-    signal[0, i * n_points:(i + 1) * n_points] = \
+    signal[0, events[i, 0]:events[i, 0] + n_points] = \
         (driver * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
-    signal[1, i * n_points:(i + 1) * n_points] = \
+    signal[1, events[i, 0]:events[i, 0] + n_points] = \
         (carrier * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
     # note: extra channels are necessary to properly separate driver
     # and carrier signals due to average reference
