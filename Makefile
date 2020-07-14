@@ -53,3 +53,8 @@ ascii:
 	done;
 
 fix: trailing-spaces ascii flake8
+
+pypi:
+	rm -rf build dist
+	python setup.py sdist bdist_wheel
+	python -m twine upload dist/*
