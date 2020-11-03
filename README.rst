@@ -29,23 +29,15 @@ Read more in the `documentation <https://pactools.github.io>`_.
 Installation
 ============
 
-To install ``pactools``, you first need to install its dependencies::
-
-	pip install numpy scipy matplotlib scikit-learn
-
-To enable all features, you will also need to install optional packages::
-
-    pip install mne h5py
-
-Then install ``pactools`` with one of the following two commands:
-
-- Development version::
-
-    pip install git+https://github.com/pactools/pactools.git#egg=pactools
+To install ``pactools``, use one of the following two commands:
 
 - Latest stable version::
 
     pip install pactools
+
+- Development version::
+
+    pip install git+https://github.com/pactools/pactools.git#egg=pactools
 
 To upgrade, use the ``--upgrade`` flag provided by ``pip``.
 

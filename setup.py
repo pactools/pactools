@@ -18,4 +18,13 @@ setup(
         'pactools',
         'pactools.dar_model',
         'pactools.utils',
-    ], )
+    ],
+    install_requires=[
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "scikit-learn",
+        "mne",
+        "h5py",
+    ],
+)
