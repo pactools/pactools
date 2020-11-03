@@ -6,7 +6,7 @@ descr = """Estimation of phase-amplitude coupling (PAC) in neural time series,
 
 setup(
     name='pactools',
-    version='0.4dev',
+    version='0.3.1',
     description=descr,
     long_description=open('README.rst').read(),
     license='BSD (3-clause)',
@@ -18,4 +18,13 @@ setup(
         'pactools',
         'pactools.dar_model',
         'pactools.utils',
-    ], )
+    ],
+    install_requires=[
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "scikit-learn",
+        "mne",
+        "h5py",
+    ],
+)
