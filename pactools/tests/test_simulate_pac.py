@@ -27,6 +27,12 @@ def test_correct_size():
         signal = simulate_pac_default(n_points=n_points_in)
         assert_equal(signal.size, n_points_in)
         assert_equal(signal.ndim, 1)
+        driver, carrier = simulate_pac_default(n_points=n_points_in,
+                                               separate=True)
+        assert_equal(driver.size, n_points_in)
+        assert_equal(carrier.size, n_points_in)
+        assert_equal(driver.ndim, 1)
+        assert_equal(carrier.ndim, 1)
 
 
 def test_random_state():
