@@ -7,7 +7,7 @@ from .utils.fir import BandPassFilter
 
 
 def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
-                       filter_method='pactools'):
+                       filter_method='mne'):
     """
     Band-pass filter the signal at multiple frequencies
 
@@ -68,7 +68,14 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
 
         # --------- with mne.filter.band_pass_filter
         if filter_method == 'mne':
-            from mne.filter import band_pass_filter
+            import mne
+            info = mne.create_info(1, fs, 'eeg')
+            epochs = mne.EpochsArray(sigs[:, np.newaxis], info)
+            epochs.filter(l_freq=frequency - bandwidth / 2,
+                          h_freq=frequency + bandwidth / 2, verbose=False)
+            epochs.apply_hilbert()
+            filtered[jj] = epochs._data[:, 0]
+            '''from mne.filter import band_pass_filter
             for ii in range(n_epochs):
                 low_sig = band_pass_filter(
                     sigs[ii, :], Fs=fs, Fp1=frequency - bandwidth / 2.0,
@@ -76,7 +83,7 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
                     l_trans_bandwidth=bandwidth / 4.0,
                     h_trans_bandwidth=bandwidth / 4.0, n_jobs=1, method='iir')
 
-                filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
+                filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]'''
 
         # --------- with pactools.utils.Carrier (deprecated)
         elif filter_method == 'carrier':
