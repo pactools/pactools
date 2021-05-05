@@ -66,15 +66,19 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
         if fixed_n_cycles is None:
             n_cycles = 1.65 * frequency / bandwidth
 
-        # --------- with mne.filter.band_pass_filter
-        if filter_method == 'mne':
-            from mne.filter import band_pass_filter
+        # --------- with mne.filter.filter_data
+        if filter_method == "mne":
+            from mne.filter import filter_data
             for ii in range(n_epochs):
-                low_sig = band_pass_filter(
-                    sigs[ii, :], Fs=fs, Fp1=frequency - bandwidth / 2.0,
-                    Fp2=frequency + bandwidth / 2.0,
-                    l_trans_bandwidth=bandwidth / 4.0,
-                    h_trans_bandwidth=bandwidth / 4.0, n_jobs=1, method='iir')
+                l_freq = (frequency -
+                          bandwidth / 2 if frequency > bandwidth / 2 else None)
+                h_freq = (frequency + bandwidth / 2
+                          if frequency + bandwidth / 2 < fs / 2 else None)
+                low_sig = filter_data(sigs[ii, :], sfreq=fs, l_freq=l_freq,
+                                      h_freq=h_freq,
+                                      l_trans_bandwidth=bandwidth / 4.0,
+                                      h_trans_bandwidth=bandwidth / 4.0,
+                                      n_jobs=1, method='iir', verbose=False)
 
                 filtered[jj, ii, :] = hilbert(low_sig, n_fft)[:n_points]
 

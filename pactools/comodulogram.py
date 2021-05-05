@@ -111,6 +111,11 @@ class Comodulogram(object):
         Number of jobs to use in parallel computations.
         Recquires scikit-learn installed.
 
+    filter_method : string, in {'mne', 'pactools'}
+        Method to bandpass filter.
+        - 'pactools' uses internal wavelet-based bandpass filter. (default)
+        - 'mne' uses mne.filter.band_pass_filter in MNE-python package.
+
     Examples
     --------
     >>> from pactools.comodulogram import Comodulogram
@@ -125,7 +130,8 @@ class Comodulogram(object):
                  high_fq_width='auto', method='tort', n_surrogates=0,
                  vmin=None, vmax=None, progress_bar=True, ax_special=None,
                  minimum_shift=1.0, random_state=None, coherence_params=dict(),
-                 extract_params=dict(), low_fq_width_2=4.0, n_jobs=1):
+                 extract_params=dict(), low_fq_width_2=4.0, n_jobs=1,
+                 filter_method="pactools"):
         self.fs = fs
         self.low_fq_range = low_fq_range
         self.low_fq_width = low_fq_width
@@ -143,6 +149,7 @@ class Comodulogram(object):
         self.extract_params = extract_params
         self.low_fq_width_2 = low_fq_width_2
         self.n_jobs = n_jobs
+        self.filter_method = filter_method
 
     def _check_params(self):
         high_fq_range = self.high_fq_range
@@ -237,12 +244,15 @@ class Comodulogram(object):
 
             # compute a number of band-pass filtered signals
             filtered_high = multiple_band_pass(
-                high_sig, self.fs, self.high_fq_range, self.high_fq_width)
+                high_sig, self.fs, self.high_fq_range, self.high_fq_width,
+                filter_method=self.filter_method)
             filtered_low = multiple_band_pass(
-                low_sig, self.fs, self.low_fq_range, self.low_fq_width)
+                low_sig, self.fs, self.low_fq_range, self.low_fq_width,
+                filter_method=self.filter_method)
             if self.method == 'vanwijk':
                 filtered_low_2 = multiple_band_pass(
-                    low_sig, self.fs, self.low_fq_range, self.low_fq_width_2)
+                    low_sig, self.fs, self.low_fq_range, self.low_fq_width_2,
+                    filter_method=self.filter_method)
             else:
                 filtered_low_2 = None
 
@@ -263,7 +273,8 @@ class Comodulogram(object):
 
             # compute a number of band-pass filtered signals
             filtered_high = multiple_band_pass(
-                high_sig, self.fs, self.high_fq_range, self.high_fq_width)
+                high_sig, self.fs, self.high_fq_range, self.high_fq_width,
+                filter_method=self.filter_method)
 
             all_results = []
             for this_mask in mask:
