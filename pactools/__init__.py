@@ -8,7 +8,7 @@ from .delay_estimator import DelayEstimator
 from .grid_search import DARSklearn, AddDriverDelay
 from .grid_search import ExtractDriver, MultipleArray
 
-__version__ = '0.1'
+__version__ = "0.3.2"
 
 __all__ = [
     'AddDriverDelay',
