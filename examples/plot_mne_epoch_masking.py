@@ -18,18 +18,22 @@ from pactools import simulate_pac, raw_to_mask, Comodulogram, MaskIterator
 # Simulate a dataset and save it out
 
 n_events = 100
-mu = 1.  # mean onset of PAC in seconds
-sigma = 0.25  # standard deviation of onset of PAC in seconds
+mu = 0.5  # mean onset of PAC in seconds
+sigma = 0.05  # standard deviation of onset of PAC in seconds
 trial_len = 2.  # len of the simulated trial in seconds
 first_samp = 5  # seconds before the first sample and after the last
 
 fs = 200.  # Hz
 high_fq = 50.0  # Hz
+high_fq_amp = 0.5
 low_fq = 3.0  # Hz
+low_fq_amp = 1.
 low_fq_width = 2.0  # Hz
 
 n_points = int(trial_len * fs)
 noise_level = 0.4
+
+np.random.seed(0)
 
 
 def gaussian1d(array, mu, sigma):
@@ -38,39 +42,47 @@ def gaussian1d(array, mu, sigma):
 
 # leave one channel for events and make signal as long as events
 # with a bit of room on either side so events don't get cut off
-signal = np.zeros((2, int(n_points * n_events + 2 * first_samp * fs)))
+signal = np.zeros((7, int(n_points * n_events + 2 * first_samp * fs)))
 events = np.zeros((n_events, 3), dtype=int)
 events[:, 0] = np.arange((first_samp + mu) * fs,
                          n_points * n_events + (first_samp + mu) * fs,
                          trial_len * fs, dtype=int)
 events[:, 2] = np.ones((n_events))
 mod_fun = gaussian1d(np.arange(n_points), mu * fs, sigma * fs)
+mod_fun *= (1 - noise_level)
 for i in range(n_events):
-    signal_no_pac = simulate_pac(n_points=n_points, fs=fs,
-                                 high_fq=high_fq, low_fq=low_fq,
-                                 low_fq_width=low_fq_width,
-                                 noise_level=1.0, random_state=i)
-    signal_pac = simulate_pac(n_points=n_points, fs=fs,
-                              high_fq=high_fq, low_fq=low_fq,
-                              low_fq_width=low_fq_width,
-                              noise_level=noise_level, random_state=i)
-    signal[0, i * n_points:(i + 1) * n_points] = \
-        signal_pac * mod_fun + signal_no_pac * (1 - mod_fun)
+    signal_no_pac = np.random.randn(n_points)
+    driver, carrier = simulate_pac(n_points=n_points, fs=fs,
+                                   high_fq=high_fq, high_fq_amp=high_fq_amp,
+                                   low_fq=low_fq, low_fq_amp=low_fq_amp,
+                                   low_fq_width=low_fq_width,
+                                   noise_level=noise_level,
+                                   separate=True, random_state=i)
+    signal[0, events[i, 0]:events[i, 0] + n_points] = \
+        (driver * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
+    signal[1, events[i, 0]:events[i, 0] + n_points] = \
+        (carrier * mod_fun + signal_no_pac * (1 - mod_fun)) * 1e-5
+    # note: extra channels are necessary to properly separate driver
+    # and carrier signals due to average reference
+    for j in range(2, 6):
+        signal[j, i * n_points:(i + 1) * n_points] = \
+            np.random.randn(n_points) * 1e-5
 
-info = mne.create_info(['Ch1', 'STI 014'], fs, ['eeg', 'stim'])
+
+ch_names = ['Driver', 'Carrier']
+ch_names += ['Ch%i' % i for i in range(2, 6)]
+ch_names += ['STI 014']
+info = mne.create_info(ch_names, fs, ['eeg'] * 6 + ['stim'])
 raw = mne.io.RawArray(signal, info)
 raw.add_events(events, stim_channel='STI 014')
 
-###############################################################################
-# Let's plot the signal and its power spectral density to visualize the data.
-# As shown in the plots below, there is a peak for the driver frequency at
-# 3 Hz and a peak for the carrier frequency at 50 Hz but phase-amplitude
-# coupling cannot be seen in the evoked plot by eye because the signal is
-# averaged over different phases for each epoch.
 
-raw.plot_psd(fmax=60)
-epochs = mne.Epochs(raw, events, tmin=-3, tmax=3)
-epochs.average().plot()
+###############################################################################
+# Let's plot the evoked potentials for the 'Driver' and 'Carrier' channels.
+# You can see what phase-amplitude coupling looks like in the voltage trace.
+
+epochs = mne.Epochs(raw, events, tmin=-0.5, tmax=2)
+epochs.average().plot(picks=['Driver', 'Carrier'])
 
 ###############################################################################
 # Let's save the raw object out for input/output demonstration purposes
@@ -88,7 +100,7 @@ events = mne.find_events(raw)
 # select the time interval around the events
 tmin, tmax = mu - 3 * sigma, mu + 3 * sigma
 # select the channels (phase_channel, amplitude_channel)
-ixs = (0, 0)
+ixs = (0, 1)
 
 ###############################################################################
 # Then, we create the inputs with the function raw_to_mask, which creates the
