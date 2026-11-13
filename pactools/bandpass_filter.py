@@ -62,6 +62,11 @@ def multiple_band_pass(sigs, fs, frequency_range, bandwidth, n_cycles=None,
         if frequency <= 0:
             raise ValueError("Center frequency for bandpass filter should"
                              "be non-negative. Got %s." % (frequency, ))
+        if frequency >= fs / 2.0:
+            raise ValueError(
+                "Center frequency for bandpass filter should be below the "
+                "Nyquist frequency (fs / 2 = %s). Got %s."
+                % (fs / 2.0, frequency))
         # evaluate the number of cycle for this bandwidth and frequency
         if fixed_n_cycles is None:
             n_cycles = 1.65 * frequency / bandwidth

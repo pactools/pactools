@@ -61,6 +61,20 @@ def test_input_checking():
     assert_raises(ValueError, func)
 
 
+def test_high_fq_range_rejects_nyquist_and_above():
+    # fs=200. here, so Nyquist is 100.: centers at or above it alias and
+    # must be rejected, not silently accepted.
+    func = partial(fast_comod, high_fq_range=[100.])
+    assert_raises(ValueError, func)
+    func = partial(fast_comod, high_fq_range=[150.])
+    assert_raises(ValueError, func)
+
+    # the automatic grid must not include the Nyquist frequency either
+    comod = ComodTest(high_fq_range='auto')
+    comod._check_params()
+    assert_true(np.max(comod.high_fq_range) < fs / 2.0)
+
+
 def test_different_dimension_in_input():
     # Test that 1D or 2D signals are accepted, but not 3D
     for dim in [
