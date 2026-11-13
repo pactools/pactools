@@ -147,8 +147,10 @@ class Comodulogram(object):
     def _check_params(self):
         high_fq_range = self.high_fq_range
         if isinstance(high_fq_range, str) and high_fq_range == 'auto':
-            self.high_fq_range = np.linspace(
-                max(self.low_fq_range), self.fs / 2.0, 80)
+            grid = np.linspace(max(self.low_fq_range), self.fs / 2.0, 80)
+            # Exclude the Nyquist frequency itself: the sampled cosine/sine
+            # kernel degenerates there, and any later addition would alias.
+            self.high_fq_range = grid[grid < self.fs / 2.0]
 
         high_fq_width = self.high_fq_width
         if isinstance(high_fq_width, str) and high_fq_width == 'auto':
